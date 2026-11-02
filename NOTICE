@@ -9,3 +9,8 @@ AlgoClerk is inspired by the genre of programming puzzle games and by classic
 algorithm interview topics. It contains no assets, text, level designs or
 names from any other game or website. See CREDITS.md for third-party
 components, fonts and their licences.
+
+The pixel-art engine design (palette, sprite and font formats, canvas, text-song
+synthesiser, integer-scaled virtual screen) and the Bevy shell structure are
+adapted from the sibling project Falabichos (Apache-2.0, same owner). All
+AlgoClerk art, music, levels and text are original.

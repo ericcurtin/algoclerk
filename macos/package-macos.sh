@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 TARGET="${1:-$(rustc -vV | sed -n 's/host: //p')}"
 VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
-cargo build --release --target "$TARGET" -p algoclerk-app --bin algoclerk
+cargo build --release --target "$TARGET" -p algoclerk-app --bin algoclerk --features audio
 OUT="dist/AlgoClerk.app"
 rm -rf "$OUT" && mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources"
 cp "${CARGO_TARGET_DIR:-target}/$TARGET/release/algoclerk" "$OUT/Contents/MacOS/algoclerk"

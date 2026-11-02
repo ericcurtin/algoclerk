@@ -134,7 +134,11 @@ impl Song {
                             "x" => (1.0, 1.0),
                             "h" => (2.0, 2.0),
                             "-" | "." => (0.0, 0.0),
-                            _ => return Err(format!("line {ln}: noise token `{note}` (use x, h, .)")),
+                            _ => {
+                                return Err(format!(
+                                    "line {ln}: noise token `{note}` (use x, h, .)"
+                                ));
+                            }
                         }
                     } else if note == "-" || note == "." {
                         (0.0, 0.0)
@@ -156,7 +160,12 @@ impl Song {
             } else if let Some((k, v)) = line.split_once(':') {
                 match k.trim() {
                     "name" => song.name = v.trim().to_string(),
-                    "bpm" => song.bpm = v.trim().parse().map_err(|_| format!("line {ln}: bad bpm"))?,
+                    "bpm" => {
+                        song.bpm = v
+                            .trim()
+                            .parse()
+                            .map_err(|_| format!("line {ln}: bad bpm"))?
+                    }
                     "loop" => song.looped = matches!(v.trim(), "yes" | "true"),
                     other => return Err(format!("line {ln}: unknown header `{other}`")),
                 }
@@ -207,7 +216,9 @@ impl Song {
                     let attack = (secs / 0.004).min(1.0);
                     let release = (((len - i) as f32 / SAMPLE_RATE as f32) / 0.012).min(1.0);
                     let env = match ch.wave {
-                        Wave::Noise => (1.0 - secs / if ev.f0 > 1.5 { 0.04 } else { 0.12 }).max(0.0),
+                        Wave::Noise => {
+                            (1.0 - secs / if ev.f0 > 1.5 { 0.04 } else { 0.12 }).max(0.0)
+                        }
                         _ => (0.55 + 0.45 * (-secs * 9.0).exp()) * attack * release,
                     };
                     let s = if ev.f0 == 0.0 {

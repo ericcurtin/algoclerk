@@ -28,7 +28,13 @@ pub struct Limits {
 
 impl Default for Limits {
     fn default() -> Limits {
-        Limits { steps: 5_000_000, depth: 200, cells: 4_000_000, measure: false, trace_events: 0 }
+        Limits {
+            steps: 5_000_000,
+            depth: 200,
+            cells: 4_000_000,
+            measure: false,
+            trace_events: 0,
+        }
     }
 }
 
@@ -161,7 +167,11 @@ struct Machine<'a> {
 }
 
 fn rt_err(node: NodeId, f: Fail) -> Box<RtError> {
-    Box::new(RtError { kind: f.0, node, msg: f.1 })
+    Box::new(RtError {
+        kind: f.0,
+        node,
+        msg: f.1,
+    })
 }
 
 fn lg(n: u64) -> u64 {
@@ -170,9 +180,18 @@ fn lg(n: u64) -> u64 {
 
 fn idx_fail(i: i64, len: usize) -> Fail {
     if len == 0 {
-        (RtKind::Index, format!("Slot {i} does not exist: this shelf is empty!"))
+        (
+            RtKind::Index,
+            format!("Slot {i} does not exist: this shelf is empty!"),
+        )
     } else {
-        (RtKind::Index, format!("Slot {i} does not exist: this shelf only has slots 0 to {}.", len - 1))
+        (
+            RtKind::Index,
+            format!(
+                "Slot {i} does not exist: this shelf only has slots 0 to {}.",
+                len - 1
+            ),
+        )
     }
 }
 
@@ -187,12 +206,16 @@ fn step_mut<'v>(v: &'v mut Value, st: &Step) -> Result<&'v mut Value, Fail> {
                 Ok(&mut vv[*i as usize])
             }
         }
-        (Value::Map(rc), Step::At(k)) => {
-            Rc::make_mut(rc).get_mut(k).ok_or_else(|| (RtKind::Key, "There is no drawer with that label!".to_string()))
-        }
+        (Value::Map(rc), Step::At(k)) => Rc::make_mut(rc).get_mut(k).ok_or_else(|| {
+            (
+                RtKind::Key,
+                "There is no drawer with that label!".to_string(),
+            )
+        }),
         (Value::Tuple(rc), Step::Tup(n)) => {
             let t = Rc::make_mut(rc);
-            t.get_mut(*n).ok_or((RtKind::Internal, "bad tuple index".to_string()))
+            t.get_mut(*n)
+                .ok_or((RtKind::Internal, "bad tuple index".to_string()))
         }
         _ => Err((RtKind::Internal, "cannot step into this value".to_string())),
     }
@@ -206,12 +229,19 @@ fn walk<'v>(mut v: &'v mut Value, steps: &[Step]) -> Result<&'v mut Value, Fail>
 }
 
 fn empty(what: &str) -> Fail {
-    (RtKind::Empty, format!("The {what} is empty, so there is nothing to take!"))
+    (
+        RtKind::Empty,
+        format!("The {what} is empty, so there is nothing to take!"),
+    )
 }
 
 impl<'a> Machine<'a> {
     fn fail(&self, node: NodeId, kind: RtKind, msg: impl Into<String>) -> Box<RtError> {
-        Box::new(RtError { kind, node, msg: msg.into() })
+        Box::new(RtError {
+            kind,
+            node,
+            msg: msg.into(),
+        })
     }
     fn at(&self, node: NodeId, f: Fail) -> Box<RtError> {
         self.fail(node, f.0, f.1)
@@ -219,14 +249,22 @@ impl<'a> Machine<'a> {
     fn charge(&mut self, node: NodeId, n: u64) -> Res<()> {
         self.cost = self.cost.saturating_add(n);
         if self.cost > self.limits.steps {
-            return Err(self.fail(node, RtKind::Time, "The clock ran out! This is taking too long. Is there a faster way?"));
+            return Err(self.fail(
+                node,
+                RtKind::Time,
+                "The clock ran out! This is taking too long. Is there a faster way?",
+            ));
         }
         Ok(())
     }
     fn grow(&mut self, node: NodeId, by: i64) -> Res<()> {
         self.live = (self.live + by).max(0);
         if self.live > self.limits.cells {
-            return Err(self.fail(node, RtKind::Memory, "The shelves are full! This uses far too much space."));
+            return Err(self.fail(
+                node,
+                RtKind::Memory,
+                "The shelves are full! This uses far too much space.",
+            ));
         }
         Ok(())
     }
@@ -264,12 +302,14 @@ impl<'a> Machine<'a> {
     }
     fn tick(&mut self) {
         self.stmts += 1;
-        if self.limits.measure && self.stmts % (1 + self.stmts / 128) == 0 {
+        if self.limits.measure && self.stmts.is_multiple_of(1 + self.stmts / 128) {
             self.sample();
         }
     }
     fn record(&mut self, node: NodeId, returned: Option<Value>) {
-        let Some(tr) = self.trace.as_mut() else { return };
+        let Some(tr) = self.trace.as_mut() else {
+            return;
+        };
         if tr.events.len() >= self.limits.trace_events {
             tr.truncated = true;
             return;
@@ -283,7 +323,14 @@ impl<'a> Machine<'a> {
             }
             vars.push(self.stack[i].clone());
         }
-        let ev = Event { node, func: self.func, depth: self.depth, cost: self.cost, vars, returned };
+        let ev = Event {
+            node,
+            func: self.func,
+            depth: self.depth,
+            cost: self.cost,
+            vars,
+            returned,
+        };
         if let Some(tr) = self.trace.as_mut() {
             tr.events.push(ev);
         }
@@ -302,7 +349,12 @@ impl<'a> Machine<'a> {
 
     fn eval_owned(&mut self, e: &Expr) -> Res<Value> {
         let v = self.eval(e)?;
-        if v.is_bulky() && matches!(e.kind, ExprKind::Var(_) | ExprKind::Index(..) | ExprKind::TupleIdx(..)) {
+        if v.is_bulky()
+            && matches!(
+                e.kind,
+                ExprKind::Var(_) | ExprKind::Index(..) | ExprKind::TupleIdx(..)
+            )
+        {
             self.charge(e.id, v.cells())?;
         }
         Ok(v)
@@ -352,7 +404,13 @@ impl<'a> Machine<'a> {
                 }
                 Ok(Flow::Next)
             }
-            StmtKind::ForRange { start, end, step, body, .. } => {
+            StmtKind::ForRange {
+                start,
+                end,
+                step,
+                body,
+                ..
+            } => {
                 let a = match start {
                     Some(e) => self.eval(e)?.as_int().unwrap_or(0),
                     None => 0,
@@ -363,7 +421,11 @@ impl<'a> Machine<'a> {
                     None => 1,
                 };
                 if st == 0 {
-                    return Err(self.fail(s.id, RtKind::BadArg, "A range cannot step by 0; I would never get anywhere!"));
+                    return Err(self.fail(
+                        s.id,
+                        RtKind::BadArg,
+                        "A range cannot step by 0; I would never get anywhere!",
+                    ));
                 }
                 let slot = self.info.slots[s.id as usize];
                 let mut i = a;
@@ -386,27 +448,51 @@ impl<'a> Machine<'a> {
             }
             StmtKind::ForEach { pat, iter, body } => {
                 let items: Vec<Value> = match &iter.kind {
-                    ExprKind::Call(n, args) if (n == "enumerate" || n == "zip") && self.info.slots[iter.id as usize] == u32::MAX => {
+                    ExprKind::Call(n, args)
+                        if (n == "enumerate" || n == "zip")
+                            && self.info.slots[iter.id as usize] == u32::MAX =>
+                    {
                         if n == "enumerate" {
                             let v = self.eval(&args[0])?;
-                            let Value::Vec(v) = v else { return Err(self.fail(s.id, RtKind::Internal, "enumerate needs a shelf")) };
+                            let Value::Vec(v) = v else {
+                                return Err(self.fail(
+                                    s.id,
+                                    RtKind::Internal,
+                                    "enumerate needs a shelf",
+                                ));
+                            };
                             self.charge(iter.id, v.len() as u64 + 1)?;
-                            v.iter().enumerate().map(|(i, x)| Value::tuple(vec![Value::Int(i as i64), x.clone()])).collect()
+                            v.iter()
+                                .enumerate()
+                                .map(|(i, x)| Value::tuple(vec![Value::Int(i as i64), x.clone()]))
+                                .collect()
                         } else {
                             let a = self.eval(&args[0])?;
                             let b = self.eval(&args[1])?;
                             let (Value::Vec(a), Value::Vec(b)) = (a, b) else {
-                                return Err(self.fail(s.id, RtKind::Internal, "zip needs two shelves"));
+                                return Err(self.fail(
+                                    s.id,
+                                    RtKind::Internal,
+                                    "zip needs two shelves",
+                                ));
                             };
                             let n = a.len().min(b.len());
                             self.charge(iter.id, n as u64 + 1)?;
-                            (0..n).map(|i| Value::tuple(vec![a[i].clone(), b[i].clone()])).collect()
+                            (0..n)
+                                .map(|i| Value::tuple(vec![a[i].clone(), b[i].clone()]))
+                                .collect()
                         }
                     }
                     _ => match self.eval(iter)? {
                         Value::Vec(v) => v.as_ref().clone(),
                         Value::Str(v) => v.iter().map(|c| Value::Char(*c)).collect(),
-                        _ => return Err(self.fail(s.id, RtKind::Internal, "cannot walk this value")),
+                        _ => {
+                            return Err(self.fail(
+                                s.id,
+                                RtKind::Internal,
+                                "cannot walk this value",
+                            ));
+                        }
                     },
                 };
                 for item in items {
@@ -489,7 +575,13 @@ impl<'a> Machine<'a> {
         if let ExprKind::Field(a, f) = &target.kind {
             let h = match self.eval(a)? {
                 Value::Node(h) if h != 0 => h as usize,
-                _ => return Err(self.fail(id, RtKind::Null, "That node is missing (null), so I cannot change its fields!")),
+                _ => {
+                    return Err(self.fail(
+                        id,
+                        RtKind::Null,
+                        "That node is missing (null), so I cannot change its fields!",
+                    ));
+                }
             };
             self.charge(id, 1)?;
             let new = match op {
@@ -547,7 +639,9 @@ impl<'a> Machine<'a> {
             self.stack[root] = new;
             return Ok(());
         }
-        let (last, parents) = steps.split_last().map_or((None, &steps[..]), |(l, p)| (Some(l), p));
+        let (last, parents) = steps
+            .split_last()
+            .map_or((None, &steps[..]), |(l, p)| (Some(l), p));
         let new = match op {
             None => v,
             Some(op) => {
@@ -581,24 +675,52 @@ impl<'a> Machine<'a> {
     fn binop(&mut self, id: NodeId, op: BinOp, a: Value, b: Value) -> Res<Value> {
         use BinOp::*;
         self.charge(id, 1)?;
-        let ov = |m: &Self| m.fail(id, RtKind::Overflow, "That number is too big for my pocket calculator!");
+        let ov = |m: &Self| {
+            m.fail(
+                id,
+                RtKind::Overflow,
+                "That number is too big for my pocket calculator!",
+            )
+        };
         Ok(match (op, a, b) {
-            (Add, Value::Int(x), Value::Int(y)) => Value::Int(x.checked_add(y).ok_or_else(|| ov(self))?),
-            (Sub, Value::Int(x), Value::Int(y)) => Value::Int(x.checked_sub(y).ok_or_else(|| ov(self))?),
-            (Mul, Value::Int(x), Value::Int(y)) => Value::Int(x.checked_mul(y).ok_or_else(|| ov(self))?),
-            (Div | Rem, Value::Int(_), Value::Int(0)) => {
-                return Err(self.fail(id, RtKind::DivZero, "Dividing by zero? Even my calculator refuses!"));
+            (Add, Value::Int(x), Value::Int(y)) => {
+                Value::Int(x.checked_add(y).ok_or_else(|| ov(self))?)
             }
-            (Div, Value::Int(x), Value::Int(y)) => Value::Int(x.checked_div(y).ok_or_else(|| ov(self))?),
-            (Rem, Value::Int(x), Value::Int(y)) => Value::Int(x.checked_rem(y).ok_or_else(|| ov(self))?),
+            (Sub, Value::Int(x), Value::Int(y)) => {
+                Value::Int(x.checked_sub(y).ok_or_else(|| ov(self))?)
+            }
+            (Mul, Value::Int(x), Value::Int(y)) => {
+                Value::Int(x.checked_mul(y).ok_or_else(|| ov(self))?)
+            }
+            (Div | Rem, Value::Int(_), Value::Int(0)) => {
+                return Err(self.fail(
+                    id,
+                    RtKind::DivZero,
+                    "Dividing by zero? Even my calculator refuses!",
+                ));
+            }
+            (Div, Value::Int(x), Value::Int(y)) => {
+                Value::Int(x.checked_div(y).ok_or_else(|| ov(self))?)
+            }
+            (Rem, Value::Int(x), Value::Int(y)) => {
+                Value::Int(x.checked_rem(y).ok_or_else(|| ov(self))?)
+            }
             (BitAnd, Value::Int(x), Value::Int(y)) => Value::Int(x & y),
             (BitOr, Value::Int(x), Value::Int(y)) => Value::Int(x | y),
             (BitXor, Value::Int(x), Value::Int(y)) => Value::Int(x ^ y),
             (Shl | Shr, Value::Int(x), Value::Int(y)) => {
                 if !(0..64).contains(&y) {
-                    return Err(self.fail(id, RtKind::Shift, "I can only shift by 0 to 63 places."));
+                    return Err(self.fail(
+                        id,
+                        RtKind::Shift,
+                        "I can only shift by 0 to 63 places.",
+                    ));
                 }
-                if op == Shl { Value::Int(x.wrapping_shl(y as u32)) } else { Value::Int(x >> y) }
+                if op == Shl {
+                    Value::Int(x.wrapping_shl(y as u32))
+                } else {
+                    Value::Int(x >> y)
+                }
             }
             (Add, Value::Str(x), Value::Str(y)) => {
                 self.charge(id, (x.len() + y.len()) as u64)?;
@@ -653,10 +775,15 @@ impl<'a> Machine<'a> {
                 let v = self.eval(a)?;
                 self.charge(id, 1)?;
                 match (op, v) {
-                    (UnOp::Neg, Value::Int(x)) => x
-                        .checked_neg()
-                        .map(Value::Int)
-                        .ok_or_else(|| self.fail(id, RtKind::Overflow, "That number is too big for my pocket calculator!")),
+                    (UnOp::Neg, Value::Int(x)) => {
+                        x.checked_neg().map(Value::Int).ok_or_else(|| {
+                            self.fail(
+                                id,
+                                RtKind::Overflow,
+                                "That number is too big for my pocket calculator!",
+                            )
+                        })
+                    }
                     (UnOp::BitNot, Value::Int(x)) => Ok(Value::Int(!x)),
                     (UnOp::Not, Value::Bool(b)) => Ok(Value::Bool(!b)),
                     _ => Err(self.fail(id, RtKind::Internal, "bad unary operand")),
@@ -688,17 +815,32 @@ impl<'a> Machine<'a> {
                 let iv = self.eval(i)?;
                 self.charge(id, 1)?;
                 match (av, iv) {
-                    (Value::Vec(v), Value::Int(i)) => {
-                        v.get(usize::try_from(i).unwrap_or(usize::MAX)).cloned().ok_or_else(|| self.at(id, idx_fail(i, v.len())))
-                    }
+                    (Value::Vec(v), Value::Int(i)) => v
+                        .get(usize::try_from(i).unwrap_or(usize::MAX))
+                        .cloned()
+                        .ok_or_else(|| self.at(id, idx_fail(i, v.len()))),
                     (Value::Str(v), Value::Int(i)) => v
                         .get(usize::try_from(i).unwrap_or(usize::MAX))
                         .map(|c| Value::Char(*c))
-                        .ok_or_else(|| self.at(id, (RtKind::Index, format!("Letter {i} does not exist: this word only has {} letters.", v.len())))),
-                    (Value::Map(m), k) => m
-                        .get(&k)
-                        .cloned()
-                        .ok_or_else(|| self.fail(id, RtKind::Key, "There is no drawer with that label! Check with contains() first.")),
+                        .ok_or_else(|| {
+                            self.at(
+                                id,
+                                (
+                                    RtKind::Index,
+                                    format!(
+                                        "Letter {i} does not exist: this word only has {} letters.",
+                                        v.len()
+                                    ),
+                                ),
+                            )
+                        }),
+                    (Value::Map(m), k) => m.get(&k).cloned().ok_or_else(|| {
+                        self.fail(
+                            id,
+                            RtKind::Key,
+                            "There is no drawer with that label! Check with contains() first.",
+                        )
+                    }),
                     _ => Err(self.fail(id, RtKind::Internal, "bad index operands")),
                 }
             }
@@ -714,7 +856,11 @@ impl<'a> Machine<'a> {
                     None => len,
                 };
                 if l < 0 || h < l || h > len {
-                    return Err(self.fail(id, RtKind::Slice, format!("I cannot cut from {l} to {h}: the length is only {len}.")));
+                    return Err(self.fail(
+                        id,
+                        RtKind::Slice,
+                        format!("I cannot cut from {l} to {h}: the length is only {len}."),
+                    ));
                 }
                 self.charge(id, 1 + (h - l) as u64)?;
                 let (l, h) = (l as usize, h as usize);
@@ -736,7 +882,11 @@ impl<'a> Machine<'a> {
                             _ => Value::Node(n.b),
                         })
                     }
-                    Value::Node(_) => Err(self.fail(id, RtKind::Null, "That node is missing (null), so it has nothing to read!")),
+                    Value::Node(_) => Err(self.fail(
+                        id,
+                        RtKind::Null,
+                        "That node is missing (null), so it has nothing to read!",
+                    )),
                     _ => Err(self.fail(id, RtKind::Internal, "bad field operand")),
                 }
             }
@@ -757,7 +907,11 @@ impl<'a> Machine<'a> {
                 let xv = self.eval_owned(x)?;
                 let n = self.eval(n)?.as_int().unwrap_or(0);
                 if n < 0 {
-                    return Err(self.fail(id, RtKind::BadArg, "I cannot build a shelf with a negative number of slots."));
+                    return Err(self.fail(
+                        id,
+                        RtKind::BadArg,
+                        "I cannot build a shelf with a negative number of slots.",
+                    ));
                 }
                 self.grow(id, n.min(i64::from(u32::MAX)))?;
                 self.charge(id, 1 + n as u64)?;
@@ -798,7 +952,11 @@ impl<'a> Machine<'a> {
         let mut vals = Vec::with_capacity(args.len());
         for a in args {
             // only constructors keep their arguments; everything else just reads them
-            vals.push(if name == "some" { self.eval_owned(a)? } else { self.eval(a)? });
+            vals.push(if name == "some" {
+                self.eval_owned(a)?
+            } else {
+                self.eval(a)?
+            });
         }
         self.charge(id, 1)?;
         self.builtin_fn(id, name, vals)
@@ -810,13 +968,19 @@ impl<'a> Machine<'a> {
         let f = &prog.fns[idx];
         let finfo = &info.fns[idx];
         if self.depth >= self.limits.depth {
-            return Err(self.fail(id, RtKind::Depth, "Too many notes-to-self in a row! My desk is buried in call slips."));
+            return Err(self.fail(
+                id,
+                RtKind::Depth,
+                "Too many notes-to-self in a row! My desk is buried in call slips.",
+            ));
         }
         let mut vals = Vec::with_capacity(args.len());
         for (i, a) in args.iter().enumerate() {
             let p = &f.params[i];
             if p.by_ref {
-                let ExprKind::Var(_) = a.kind else { return Err(self.fail(id, RtKind::Internal, "ref arg")) };
+                let ExprKind::Var(_) = a.kind else {
+                    return Err(self.fail(id, RtKind::Internal, "ref arg"));
+                };
                 vals.push(Value::Ref(self.abs_slot(self.info.slots[a.id as usize])));
             } else if finfo.mutated.get(i).copied().unwrap_or(false) {
                 vals.push(self.eval_owned(a)?);
@@ -867,17 +1031,24 @@ impl<'a> Machine<'a> {
                 let r = if name == "min" { it.min() } else { it.max() };
                 r.cloned().ok_or_else(|| self.at(id, empty("shelf")))
             }
-            ("abs", [Value::Int(x)]) => x
-                .checked_abs()
-                .map(Value::Int)
-                .ok_or_else(|| self.fail(id, RtKind::Overflow, "That number is too big for my pocket calculator!")),
+            ("abs", [Value::Int(x)]) => x.checked_abs().map(Value::Int).ok_or_else(|| {
+                self.fail(
+                    id,
+                    RtKind::Overflow,
+                    "That number is too big for my pocket calculator!",
+                )
+            }),
             ("sum", [Value::Vec(v)]) => {
                 self.charge(id, v.len() as u64)?;
                 let mut t: i64 = 0;
                 for x in v.iter() {
-                    t = t
-                        .checked_add(x.as_int().unwrap_or(0))
-                        .ok_or_else(|| self.fail(id, RtKind::Overflow, "That number is too big for my pocket calculator!"))?;
+                    t = t.checked_add(x.as_int().unwrap_or(0)).ok_or_else(|| {
+                        self.fail(
+                            id,
+                            RtKind::Overflow,
+                            "That number is too big for my pocket calculator!",
+                        )
+                    })?;
                 }
                 Ok(Value::Int(t))
             }
@@ -919,7 +1090,11 @@ impl<'a> Machine<'a> {
                 let t = String::from_utf8_lossy(s).into_owned();
                 match t.parse::<i64>() {
                     Ok(n) if !t.starts_with('+') => Ok(Value::Int(n)),
-                    _ => Err(self.fail(id, RtKind::BadInt, format!("\"{t}\" is not a number I can read."))),
+                    _ => Err(self.fail(
+                        id,
+                        RtKind::BadInt,
+                        format!("\"{t}\" is not a number I can read."),
+                    )),
                 }
             }
             ("ord", [Value::Char(c)]) => Ok(Value::Int(i64::from(*c))),
@@ -946,7 +1121,11 @@ impl<'a> Machine<'a> {
             }
             ("from_chars", [Value::Vec(v)]) => {
                 self.charge(id, v.len() as u64)?;
-                Ok(Value::Str(Rc::new(v.iter().map(|c| if let Value::Char(c) = c { *c } else { b'?' }).collect())))
+                Ok(Value::Str(Rc::new(
+                    v.iter()
+                        .map(|c| if let Value::Char(c) = c { *c } else { b'?' })
+                        .collect(),
+                )))
             }
             ("some", [v]) => Ok(Value::Opt(Some(Rc::new(v.clone())))),
             ("lnode", [Value::Int(v), Value::Node(n)]) => {
@@ -967,14 +1146,21 @@ impl<'a> Machine<'a> {
         let mut vals = Vec::with_capacity(args.len());
         let mutating = is_mutating(&rty, name);
         for a in args {
-            vals.push(if mutating || matches!(rty, Ty::Option(_)) { self.eval_owned(a)? } else { self.eval(a)? });
+            vals.push(if mutating || matches!(rty, Ty::Option(_)) {
+                self.eval_owned(a)?
+            } else {
+                self.eval(a)?
+            });
         }
         self.charge(id, 1)?;
         if mutating {
             let (root, steps) = self.place(recv)?;
-            let len_before = walk(&mut self.stack[root], &steps).map_err(|f| rt_err(id, f))?.shallow_len();
+            let len_before = walk(&mut self.stack[root], &steps)
+                .map_err(|f| rt_err(id, f))?
+                .shallow_len();
             let target = walk(&mut self.stack[root], &steps).map_err(|f| rt_err(id, f))?;
-            let (v, cost, grow) = apply_mut(target, name, vals, len_before).map_err(|f| rt_err(id, f))?;
+            let (v, cost, grow) =
+                apply_mut(target, name, vals, len_before).map_err(|f| rt_err(id, f))?;
             self.charge(id, cost)?;
             self.grow(id, grow)?;
             return Ok(v);
@@ -988,7 +1174,12 @@ impl<'a> Machine<'a> {
 }
 
 /// Mutating method on a place. Returns (result, extra cost, live-cell growth).
-fn apply_mut(t: &mut Value, name: &str, a: Vec<Value>, len: u64) -> Result<(Value, u64, i64), Fail> {
+fn apply_mut(
+    t: &mut Value,
+    name: &str,
+    a: Vec<Value>,
+    len: u64,
+) -> Result<(Value, u64, i64), Fail> {
     let bad = || (RtKind::Internal, format!("bad arguments for {name}"));
     let mut a = a;
     let r = match (t, name) {
@@ -1042,12 +1233,16 @@ fn apply_mut(t: &mut Value, name: &str, a: Vec<Value>, len: u64) -> Result<(Valu
             (Value::Unit, 0, -(len as i64))
         }
         (Value::Vec(rc), "extend") => {
-            let Value::Vec(o) = a.pop().ok_or_else(bad)? else { return Err(bad()) };
+            let Value::Vec(o) = a.pop().ok_or_else(bad)? else {
+                return Err(bad());
+            };
             Rc::make_mut(rc).extend(o.iter().cloned());
             (Value::Unit, o.len() as u64, o.len() as i64)
         }
         (Value::Str(rc), "push") => {
-            let Value::Char(c) = a.pop().ok_or_else(bad)? else { return Err(bad()) };
+            let Value::Char(c) = a.pop().ok_or_else(bad)? else {
+                return Err(bad());
+            };
             Rc::make_mut(rc).push(c);
             (Value::Unit, 0, 1)
         }
@@ -1088,8 +1283,16 @@ fn apply_mut(t: &mut Value, name: &str, a: Vec<Value>, len: u64) -> Result<(Valu
             Rc::make_mut(rc).push_front(a.pop().ok_or_else(bad)?);
             (Value::Unit, 0, 1)
         }
-        (Value::Queue(rc), "pop" | "pop_front") => (Rc::make_mut(rc).pop_front().ok_or_else(|| empty("queue"))?, 0, -1),
-        (Value::Queue(rc), "pop_back") => (Rc::make_mut(rc).pop_back().ok_or_else(|| empty("queue"))?, 0, -1),
+        (Value::Queue(rc), "pop" | "pop_front") => (
+            Rc::make_mut(rc).pop_front().ok_or_else(|| empty("queue"))?,
+            0,
+            -1,
+        ),
+        (Value::Queue(rc), "pop_back") => (
+            Rc::make_mut(rc).pop_back().ok_or_else(|| empty("queue"))?,
+            0,
+            -1,
+        ),
         (Value::Queue(rc), "clear") => {
             Rc::make_mut(rc).clear();
             (Value::Unit, 0, -(len as i64))
@@ -1098,7 +1301,11 @@ fn apply_mut(t: &mut Value, name: &str, a: Vec<Value>, len: u64) -> Result<(Valu
             heap_push(Rc::make_mut(rc), a.pop().ok_or_else(bad)?);
             (Value::Unit, lg(len + 1), 1)
         }
-        (Value::Heap(rc), "pop") => (heap_pop(Rc::make_mut(rc)).ok_or_else(|| empty("heap"))?, lg(len), -1),
+        (Value::Heap(rc), "pop") => (
+            heap_pop(Rc::make_mut(rc)).ok_or_else(|| empty("heap"))?,
+            lg(len),
+            -1,
+        ),
         (Value::Heap(rc), "clear") => {
             Rc::make_mut(rc).clear();
             (Value::Unit, 0, -(len as i64))
@@ -1112,7 +1319,9 @@ fn find_sub(h: &[u8], n: &[u8]) -> i64 {
     if n.is_empty() {
         return 0;
     }
-    h.windows(n.len()).position(|w| w == n).map_or(-1, |p| p as i64)
+    h.windows(n.len())
+        .position(|w| w == n)
+        .map_or(-1, |p| p as i64)
 }
 
 fn needle(v: &Value) -> Vec<u8> {
@@ -1134,17 +1343,43 @@ fn apply_ref(t: &Value, name: &str, a: Vec<Value>) -> Result<(Value, u64, i64), 
         }
         (Value::Vec(v), "index_of", [x]) => {
             let p = v.iter().position(|y| y == x);
-            (Value::Int(p.map_or(-1, |p| p as i64)), p.map_or(v.len(), |p| p + 1) as u64, 0)
+            (
+                Value::Int(p.map_or(-1, |p| p as i64)),
+                p.map_or(v.len(), |p| p + 1) as u64,
+                0,
+            )
         }
-        (Value::Vec(v), "count", [x]) => (Value::Int(v.iter().filter(|y| *y == x).count() as i64), v.len() as u64, 0),
+        (Value::Vec(v), "count", [x]) => (
+            Value::Int(v.iter().filter(|y| *y == x).count() as i64),
+            v.len() as u64,
+            0,
+        ),
         (Value::Vec(v), "is_empty", []) => (b(v.is_empty()), 0, 0),
         (Value::Str(s), "is_empty", []) => (b(s.is_empty()), 0, 0),
-        (Value::Str(s), "upper", []) => (Value::Str(Rc::new(s.to_ascii_uppercase())), s.len() as u64, 0),
-        (Value::Str(s), "lower", []) => (Value::Str(Rc::new(s.to_ascii_lowercase())), s.len() as u64, 0),
+        (Value::Str(s), "upper", []) => (
+            Value::Str(Rc::new(s.to_ascii_uppercase())),
+            s.len() as u64,
+            0,
+        ),
+        (Value::Str(s), "lower", []) => (
+            Value::Str(Rc::new(s.to_ascii_lowercase())),
+            s.len() as u64,
+            0,
+        ),
         (Value::Str(s), "trim", []) => {
-            let st = s.iter().position(|c| !c.is_ascii_whitespace()).unwrap_or(s.len());
-            let en = s.iter().rposition(|c| !c.is_ascii_whitespace()).map_or(st, |p| p + 1);
-            (Value::Str(Rc::new(s[st..en.max(st)].to_vec())), s.len() as u64, 0)
+            let st = s
+                .iter()
+                .position(|c| !c.is_ascii_whitespace())
+                .unwrap_or(s.len());
+            let en = s
+                .iter()
+                .rposition(|c| !c.is_ascii_whitespace())
+                .map_or(st, |p| p + 1);
+            (
+                Value::Str(Rc::new(s[st..en.max(st)].to_vec())),
+                s.len() as u64,
+                0,
+            )
         }
         (Value::Str(s), "find", [x]) => {
             let n = needle(x);
@@ -1178,8 +1413,16 @@ fn apply_ref(t: &Value, name: &str, a: Vec<Value>) -> Result<(Value, u64, i64), 
             let g = parts.len() as i64;
             (Value::vec(parts), s.len() as u64, g)
         }
-        (Value::Str(s), "chars", []) => (Value::vec(s.iter().map(|c| Value::Char(*c)).collect()), s.len() as u64, s.len() as i64),
-        (Value::Str(s), "count", [Value::Char(c)]) => (Value::Int(s.iter().filter(|x| *x == c).count() as i64), s.len() as u64, 0),
+        (Value::Str(s), "chars", []) => (
+            Value::vec(s.iter().map(|c| Value::Char(*c)).collect()),
+            s.len() as u64,
+            s.len() as i64,
+        ),
+        (Value::Str(s), "count", [Value::Char(c)]) => (
+            Value::Int(s.iter().filter(|x| *x == c).count() as i64),
+            s.len() as u64,
+            0,
+        ),
         (Value::Str(s), "replace", [Value::Str(from), Value::Str(to)]) => {
             let mut out = Vec::new();
             let mut i = 0;
@@ -1196,9 +1439,17 @@ fn apply_ref(t: &Value, name: &str, a: Vec<Value>) -> Result<(Value, u64, i64), 
         }
         (Value::Str(s), "repeat", [Value::Int(k)]) => {
             if *k < 0 || (*k as u64).saturating_mul(s.len() as u64) > 4_000_000 {
-                return Err((RtKind::BadArg, "That would make a word far too long.".into()));
+                return Err((
+                    RtKind::BadArg,
+                    "That would make a word far too long.".into(),
+                ));
             }
-            let out: Vec<u8> = s.iter().copied().cycle().take(s.len() * *k as usize).collect();
+            let out: Vec<u8> = s
+                .iter()
+                .copied()
+                .cycle()
+                .take(s.len() * *k as usize)
+                .collect();
             let l = out.len() as u64;
             (Value::Str(Rc::new(out)), l, 0)
         }
@@ -1230,10 +1481,22 @@ fn apply_ref(t: &Value, name: &str, a: Vec<Value>) -> Result<(Value, u64, i64), 
         (Value::Map(m), "get", [k, d]) => (m.get(k).cloned().unwrap_or_else(|| d.clone()), 0, 0),
         (Value::Map(m), "get", [k]) => (Value::Opt(m.get(k).map(|v| Rc::new(v.clone()))), 0, 0),
         (Value::Map(m), "contains", [k]) => (b(m.contains_key(k)), 0, 0),
-        (Value::Map(m), "keys", []) => (Value::vec(m.keys().cloned().collect()), m.len() as u64, m.len() as i64),
-        (Value::Map(m), "values", []) => (Value::vec(m.values().cloned().collect()), m.len() as u64, m.len() as i64),
+        (Value::Map(m), "keys", []) => (
+            Value::vec(m.keys().cloned().collect()),
+            m.len() as u64,
+            m.len() as i64,
+        ),
+        (Value::Map(m), "values", []) => (
+            Value::vec(m.values().cloned().collect()),
+            m.len() as u64,
+            m.len() as i64,
+        ),
         (Value::Map(m), "items", []) => (
-            Value::vec(m.iter().map(|(k, v)| Value::tuple(vec![k.clone(), v.clone()])).collect()),
+            Value::vec(
+                m.iter()
+                    .map(|(k, v)| Value::tuple(vec![k.clone(), v.clone()]))
+                    .collect(),
+            ),
             m.len() as u64,
             m.len() as i64,
         ),
@@ -1242,9 +1505,18 @@ fn apply_ref(t: &Value, name: &str, a: Vec<Value>) -> Result<(Value, u64, i64), 
         (Value::Opt(o), "is_none", []) => (b(o.is_none()), 0, 0),
         (Value::Opt(o), "unwrap", []) => match o {
             Some(v) => ((**v).clone(), 0, 0),
-            None => return Err((RtKind::Unwrap, "I opened the envelope and it was empty (none)!".into())),
+            None => {
+                return Err((
+                    RtKind::Unwrap,
+                    "I opened the envelope and it was empty (none)!".into(),
+                ));
+            }
         },
-        (Value::Opt(o), "unwrap_or", [d]) => (o.as_ref().map_or_else(|| d.clone(), |v| (**v).clone()), 0, 0),
+        (Value::Opt(o), "unwrap_or", [d]) => (
+            o.as_ref().map_or_else(|| d.clone(), |v| (**v).clone()),
+            0,
+            0,
+        ),
         (Value::Stack(v), "peek", []) => (v.last().cloned().ok_or_else(|| empty("stack"))?, 0, 0),
         (Value::Stack(v), "is_empty", []) => (b(v.is_empty()), 0, 0),
         (Value::Queue(v), "front", []) => (v.front().cloned().ok_or_else(|| empty("queue"))?, 0, 0),
@@ -1258,14 +1530,25 @@ fn apply_ref(t: &Value, name: &str, a: Vec<Value>) -> Result<(Value, u64, i64), 
 }
 
 /// Run `entry` with the given argument values. Never panics.
-pub fn run(prog: &Program, info: &TypeInfo, entry: &str, args: Vec<Value>, nodes: Vec<NodeData>, limits: &Limits) -> RunReport {
+pub fn run(
+    prog: &Program,
+    info: &TypeInfo,
+    entry: &str,
+    args: Vec<Value>,
+    nodes: Vec<NodeData>,
+    limits: &Limits,
+) -> RunReport {
     let mut nodes = nodes;
     if nodes.is_empty() {
         nodes.push(NodeData::default());
     }
     let Some(idx) = prog.fns.iter().position(|f| f.name == entry) else {
         return RunReport {
-            result: Err(RtError { kind: RtKind::Internal, node: 0, msg: format!("There is no function called {entry}.") }),
+            result: Err(RtError {
+                kind: RtKind::Internal,
+                node: 0,
+                msg: format!("There is no function called {entry}."),
+            }),
             cost: 0,
             peak_cells: 0,
             input_cells: 0,
@@ -1294,5 +1577,12 @@ pub fn run(prog: &Program, info: &TypeInfo, entry: &str, args: Vec<Value>, nodes
     if limits.measure {
         m.sample();
     }
-    RunReport { result, cost: m.cost, peak_cells: m.peak, input_cells, trace: m.trace, nodes: m.nodes }
+    RunReport {
+        result,
+        cost: m.cost,
+        peak_cells: m.peak,
+        input_cells,
+        trace: m.trace,
+        nodes: m.nodes,
+    }
 }

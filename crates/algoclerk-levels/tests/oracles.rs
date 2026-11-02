@@ -3,6 +3,13 @@
 //! without looking at the ClerkScript reference, and compared on every test (examples, hand-written,
 //! generated and large).
 
+#![allow(
+    clippy::ptr_arg,
+    clippy::needless_range_loop,
+    clippy::type_complexity,
+    clippy::manual_range_contains
+)]
+
 use algoclerk_core::judge::Judge;
 use algoclerk_core::lang::ast::Ty;
 use algoclerk_core::lang::value::{NodeData, Value, parse_value};
@@ -67,7 +74,11 @@ fn conv(v: &Value, t: &Ty, nodes: &[NodeData]) -> V {
 }
 
 fn int(v: &V) -> i64 {
-    if let I(i) = v { *i } else { panic!("int expected, got {v:?}") }
+    if let I(i) = v {
+        *i
+    } else {
+        panic!("int expected, got {v:?}")
+    }
 }
 fn ints(v: &V) -> Vec<i64> {
     match v {
@@ -77,17 +88,39 @@ fn ints(v: &V) -> Vec<i64> {
     }
 }
 fn st(v: &V) -> String {
-    if let S(s) = v { s.clone() } else { panic!("string expected, got {v:?}") }
+    if let S(s) = v {
+        s.clone()
+    } else {
+        panic!("string expected, got {v:?}")
+    }
 }
 fn strs(v: &V) -> Vec<String> {
-    if let L(xs) = v { xs.iter().map(st).collect() } else { panic!("strings expected") }
+    if let L(xs) = v {
+        xs.iter().map(st).collect()
+    } else {
+        panic!("strings expected")
+    }
 }
 fn grid(v: &V) -> Vec<Vec<i64>> {
-    if let L(rows) = v { rows.iter().map(ints).collect() } else { panic!("grid expected") }
+    if let L(rows) = v {
+        rows.iter().map(ints).collect()
+    } else {
+        panic!("grid expected")
+    }
 }
 fn cgrid(v: &V) -> Vec<Vec<char>> {
     if let L(rows) = v {
-        rows.iter().map(|r| if let L(cs) = r { cs.iter().map(|c| if let C(c) = c { *c } else { panic!() }).collect() } else { panic!() }).collect()
+        rows.iter()
+            .map(|r| {
+                if let L(cs) = r {
+                    cs.iter()
+                        .map(|c| if let C(c) = c { *c } else { panic!() })
+                        .collect()
+                } else {
+                    panic!()
+                }
+            })
+            .collect()
     } else {
         panic!("char grid expected")
     }
@@ -107,7 +140,11 @@ struct Tree {
 
 fn tree(v: &V) -> Tree {
     let T(items) = v else { panic!("tree expected") };
-    let mut t = Tree { val: vec![], left: vec![], right: vec![] };
+    let mut t = Tree {
+        val: vec![],
+        left: vec![],
+        right: vec![],
+    };
     if items.is_empty() || items[0].is_none() {
         return t;
     }
@@ -126,7 +163,11 @@ fn tree(v: &V) -> Tree {
                 t.left.push(None);
                 t.right.push(None);
                 let id = t.val.len() - 1;
-                if side == 0 { t.left[n] = Some(id) } else { t.right[n] = Some(id) }
+                if side == 0 {
+                    t.left[n] = Some(id)
+                } else {
+                    t.right[n] = Some(id)
+                }
                 q.push_back(id);
             }
             i += 1;
@@ -172,15 +213,31 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
             I(if int(&a[1]) >= 10 { t - t / 10 } else { t })
         }
         "sum-the-bills" => I(ints(&a[0]).iter().sum()),
-        "count-vowels" => I(st(&a[0]).chars().filter(|c| "aeiouAEIOU".contains(*c)).count() as i64),
+        "count-vowels" => I(st(&a[0])
+            .chars()
+            .filter(|c| "aeiouAEIOU".contains(*c))
+            .count() as i64),
         "biggest-parcel" => I(*ints(&a[0]).iter().max().unwrap()),
         "is-sorted" => B(ints(&a[0]).windows(2).all(|w| w[0] <= w[1])),
         "reverse-the-label" => S(st(&a[0]).chars().rev().collect()),
-        "fizz-memo" => L((1..=int(&a[0])).map(|i| S(match (i % 3, i % 5) { (0, 0) => "FizzBuzz".into(), (0, _) => "Fizz".into(), (_, 0) => "Buzz".into(), _ => i.to_string() })).collect()),
-        "running-total" => il(ints(&a[0]).iter().scan(0, |s, x| { *s += x; Some(*s) })),
+        "fizz-memo" => L((1..=int(&a[0]))
+            .map(|i| {
+                S(match (i % 3, i % 5) {
+                    (0, 0) => "FizzBuzz".into(),
+                    (0, _) => "Fizz".into(),
+                    (_, 0) => "Buzz".into(),
+                    _ => i.to_string(),
+                })
+            })
+            .collect()),
+        "running-total" => il(ints(&a[0]).iter().scan(0, |s, x| {
+            *s += x;
+            Some(*s)
+        })),
         // ---- records office ----
         "valid-anagram" => {
-            let (mut x, mut y): (Vec<char>, Vec<char>) = (st(&a[0]).chars().collect(), st(&a[1]).chars().collect());
+            let (mut x, mut y): (Vec<char>, Vec<char>) =
+                (st(&a[0]).chars().collect(), st(&a[1]).chars().collect());
             x.sort();
             y.sort();
             B(x == y)
@@ -190,7 +247,11 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
             B(s.chars().eq(s.chars().rev()))
         }
         "palindrome-clean" => {
-            let f: Vec<char> = st(&a[0]).chars().filter(|c| c.is_ascii_alphanumeric()).map(|c| c.to_ascii_lowercase()).collect();
+            let f: Vec<char> = st(&a[0])
+                .chars()
+                .filter(|c| c.is_ascii_alphanumeric())
+                .map(|c| c.to_ascii_lowercase())
+                .collect();
             B(f.iter().eq(f.iter().rev()))
         }
         "reverse-words" => {
@@ -242,7 +303,9 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
                 k.sort();
                 m.entry(k).or_default().push(w);
             }
-            L(m.into_values().map(|g| L(g.into_iter().map(S).collect())).collect())
+            L(m.into_values()
+                .map(|g| L(g.into_iter().map(S).collect()))
+                .collect())
         }
         "run-length" => {
             let s: Vec<char> = st(&a[0]).chars().collect();
@@ -258,11 +321,14 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
         }
         "caesar-shift" => {
             let k = (int(&a[1]) % 26) as u8;
-            S(st(&a[0]).chars().map(|c| match c {
-                'a'..='z' => ((c as u8 - b'a' + k) % 26 + b'a') as char,
-                'A'..='Z' => ((c as u8 - b'A' + k) % 26 + b'A') as char,
-                o => o,
-            }).collect())
+            S(st(&a[0])
+                .chars()
+                .map(|c| match c {
+                    'a'..='z' => ((c as u8 - b'a' + k) % 26 + b'a') as char,
+                    'A'..='Z' => ((c as u8 - b'A' + k) % 26 + b'A') as char,
+                    o => o,
+                })
+                .collect())
         }
         // ---- filing cabinets ----
         "two-sum" => {
@@ -307,14 +373,19 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
             }
             let mut order: Vec<(i64, i64)> = cnt.into_iter().map(|(v, c)| (-c, v)).collect();
             order.sort();
-            il(order.into_iter().take(int(&a[1]).max(0) as usize).map(|x| x.1))
+            il(order
+                .into_iter()
+                .take(int(&a[1]).max(0) as usize)
+                .map(|x| x.1))
         }
         "common-elements" => {
             let (mut x, mut y) = (ints(&a[0]), ints(&a[1]));
             x.sort();
             x.dedup();
             y.sort();
-            il(x.into_iter().filter(|v| y.binary_search(v).is_ok()).collect::<Vec<_>>())
+            il(x.into_iter()
+                .filter(|v| y.binary_search(v).is_ok())
+                .collect::<Vec<_>>())
         }
         "subarray-sum-k" => {
             let (n, k) = (ints(&a[0]), int(&a[1]));
@@ -336,7 +407,11 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
             n.dedup();
             let (mut best, mut run) = (0, 0);
             for i in 0..n.len() {
-                run = if i > 0 && n[i] == n[i - 1] + 1 { run + 1 } else { 1 };
+                run = if i > 0 && n[i] == n[i - 1] + 1 {
+                    run + 1
+                } else {
+                    1
+                };
                 best = best.max(run);
             }
             I(best)
@@ -358,7 +433,11 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
                 match c {
                     '(' | '[' | '{' => st_.push(c),
                     _ => {
-                        let want = match c { ')' => '(', ']' => '[', _ => '{' };
+                        let want = match c {
+                            ')' => '(',
+                            ']' => '[',
+                            _ => '{',
+                        };
                         if st_.pop() != Some(want) {
                             return Some(B(false));
                         }
@@ -369,7 +448,11 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
         }
         "daily-waits" => {
             let t = ints(&a[0]);
-            il((0..t.len()).map(|i| (i + 1..t.len()).find(|&j| t[j] > t[i]).map_or(0, |j| (j - i) as i64)))
+            il((0..t.len()).map(|i| {
+                (i + 1..t.len())
+                    .find(|&j| t[j] > t[i])
+                    .map_or(0, |j| (j - i) as i64)
+            }))
         }
         "reverse-polish" => {
             let mut s: Vec<i64> = Vec::new();
@@ -377,7 +460,12 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
                 match t.as_str() {
                     "+" | "-" | "*" | "/" => {
                         let (y, x) = (s.pop().unwrap(), s.pop().unwrap());
-                        s.push(match t.as_str() { "+" => x + y, "-" => x - y, "*" => x * y, _ => x / y });
+                        s.push(match t.as_str() {
+                            "+" => x + y,
+                            "-" => x - y,
+                            "*" => x * y,
+                            _ => x / y,
+                        });
                     }
                     n => s.push(n.parse().unwrap()),
                 }
@@ -456,7 +544,13 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
         }
         "merge-intervals" => {
             let L(rows) = &a[0] else { panic!() };
-            let mut iv: Vec<(i64, i64)> = rows.iter().map(|r| { let v = ints(r); (v[0], v[1]) }).collect();
+            let mut iv: Vec<(i64, i64)> = rows
+                .iter()
+                .map(|r| {
+                    let v = ints(r);
+                    (v[0], v[1])
+                })
+                .collect();
             iv.sort();
             let mut out: Vec<(i64, i64)> = Vec::new();
             for (s, e) in iv {
@@ -497,12 +591,18 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
         "move-zeroes" => {
             let n = ints(&a[0]);
             let zeros = n.iter().filter(|x| **x == 0).count();
-            il(n.iter().copied().filter(|x| *x != 0).chain(std::iter::repeat_n(0, zeros)).collect::<Vec<_>>())
+            il(n.iter()
+                .copied()
+                .filter(|x| *x != 0)
+                .chain(std::iter::repeat_n(0, zeros))
+                .collect::<Vec<_>>())
         }
         // ---- grid hall ----
         "transpose" => {
             let g = grid(&a[0]);
-            L((0..g[0].len()).map(|c| il(g.iter().map(|r| r[c]).collect::<Vec<_>>())).collect())
+            L((0..g[0].len())
+                .map(|c| il(g.iter().map(|r| r[c]).collect::<Vec<_>>()))
+                .collect())
         }
         "spiral-order" => {
             let g = grid(&a[0]);
@@ -545,7 +645,10 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
                     }
                     for (nr, nc) in [(r + 1, c), (r, c + 1)] {
                         if nr < rows && nc < cols && g[nr][nc] == '1' {
-                            let (x, y) = (dsu_find(&mut p, r * cols + c), dsu_find(&mut p, nr * cols + nc));
+                            let (x, y) = (
+                                dsu_find(&mut p, r * cols + c),
+                                dsu_find(&mut p, nr * cols + nc),
+                            );
                             p[x] = y;
                         }
                     }
@@ -576,8 +679,12 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
                 let mut next = Vec::new();
                 for (r, c) in frontier {
                     let mut nb = vec![(r + 1, c), (r, c + 1)];
-                    if r > 0 { nb.push((r - 1, c)); }
-                    if c > 0 { nb.push((r, c - 1)); }
+                    if r > 0 {
+                        nb.push((r - 1, c));
+                    }
+                    if c > 0 {
+                        nb.push((r, c - 1));
+                    }
                     for (nr, nc) in nb {
                         if nr < rows && nc < cols && g[nr][nc] == '.' && dist[nr][nc] == i64::MAX {
                             dist[nr][nc] = d;
@@ -587,10 +694,19 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
                 }
                 frontier = next;
             }
-            I(if dist[rows - 1][cols - 1] == i64::MAX { -1 } else { dist[rows - 1][cols - 1] })
+            I(if dist[rows - 1][cols - 1] == i64::MAX {
+                -1
+            } else {
+                dist[rows - 1][cols - 1]
+            })
         }
         "shortest-route" => {
-            let (n, e, s, t) = (int(&a[0]) as usize, grid(&a[1]), int(&a[2]) as usize, int(&a[3]) as usize);
+            let (n, e, s, t) = (
+                int(&a[0]) as usize,
+                grid(&a[1]),
+                int(&a[2]) as usize,
+                int(&a[3]) as usize,
+            );
             let mut adj = vec![vec![]; n];
             for p in &e {
                 adj[p[0] as usize].push(p[1] as usize);
@@ -646,7 +762,10 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
             let mut p: Vec<usize> = (0..n).collect();
             let mut comps = n as i64;
             for x in &e {
-                let (u, v) = (dsu_find(&mut p, x[0] as usize), dsu_find(&mut p, x[1] as usize));
+                let (u, v) = (
+                    dsu_find(&mut p, x[0] as usize),
+                    dsu_find(&mut p, x[1] as usize),
+                );
                 if u != v {
                     p[u] = v;
                     comps -= 1;
@@ -721,7 +840,11 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
             let mut cur: Vec<usize> = if t.val.is_empty() { vec![] } else { vec![0] };
             while !cur.is_empty() {
                 out.push(il(cur.iter().map(|&i| t.val[i]).collect::<Vec<_>>()));
-                cur = cur.iter().flat_map(|&i| [t.left[i], t.right[i]]).flatten().collect();
+                cur = cur
+                    .iter()
+                    .flat_map(|&i| [t.left[i], t.right[i]])
+                    .flatten()
+                    .collect();
             }
             L(out)
         }
@@ -763,14 +886,19 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
             I(best.into_iter().max().unwrap_or(0))
         }
         "edit-distance" => {
-            let (x, y): (Vec<char>, Vec<char>) = (st(&a[0]).chars().collect(), st(&a[1]).chars().collect());
+            let (x, y): (Vec<char>, Vec<char>) =
+                (st(&a[0]).chars().collect(), st(&a[1]).chars().collect());
             let mut row: Vec<i64> = (0..=y.len() as i64).collect();
             for i in 1..=x.len() {
                 let mut prev = row[0];
                 row[0] = i as i64;
                 for j in 1..=y.len() {
                     let tmp = row[j];
-                    row[j] = if x[i - 1] == y[j - 1] { prev } else { 1 + prev.min(row[j]).min(row[j - 1]) };
+                    row[j] = if x[i - 1] == y[j - 1] {
+                        prev
+                    } else {
+                        1 + prev.min(row[j]).min(row[j - 1])
+                    };
                     prev = tmp;
                 }
             }
@@ -785,11 +913,16 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
             I(best[0])
         }
         "common-subsequence" => {
-            let (x, y): (Vec<char>, Vec<char>) = (st(&a[0]).chars().collect(), st(&a[1]).chars().collect());
+            let (x, y): (Vec<char>, Vec<char>) =
+                (st(&a[0]).chars().collect(), st(&a[1]).chars().collect());
             let mut dp = vec![vec![0i64; y.len() + 1]; x.len() + 1];
             for i in (0..x.len()).rev() {
                 for j in (0..y.len()).rev() {
-                    dp[i][j] = if x[i] == y[j] { 1 + dp[i + 1][j + 1] } else { dp[i + 1][j].max(dp[i][j + 1]) };
+                    dp[i][j] = if x[i] == y[j] {
+                        1 + dp[i + 1][j + 1]
+                    } else {
+                        dp[i + 1][j].max(dp[i][j + 1])
+                    };
                 }
             }
             I(dp[0][0])
@@ -886,7 +1019,14 @@ fn oracle(id: &str, a: &[V]) -> Option<V> {
         }
         "subsets" => {
             let n = ints(&a[0]);
-            L((0..1u32 << n.len()).map(|m| il((0..n.len()).filter(|i| m >> i & 1 == 1).map(|i| n[i]).collect::<Vec<_>>())).collect())
+            L((0..1u32 << n.len())
+                .map(|m| {
+                    il((0..n.len())
+                        .filter(|i| m >> i & 1 == 1)
+                        .map(|i| n[i])
+                        .collect::<Vec<_>>())
+                })
+                .collect())
         }
         _ => return None,
     })
@@ -927,14 +1067,37 @@ fn every_level_matches_its_independent_oracle() {
                 .params
                 .iter()
                 .zip(&case.args)
-                .map(|(p, lit)| conv(&parse_value(lit, &p.ty, &mut nodes).unwrap_or_else(|e| panic!("{}: arg: {e}", level.id)), &p.ty, &nodes))
+                .map(|(p, lit)| {
+                    conv(
+                        &parse_value(lit, &p.ty, &mut nodes)
+                            .unwrap_or_else(|e| panic!("{}: arg: {e}", level.id)),
+                        &p.ty,
+                        &nodes,
+                    )
+                })
                 .collect();
-            let Some(expect) = oracle(&level.id, &args) else { continue };
+            let Some(expect) = oracle(&level.id, &args) else {
+                continue;
+            };
             any = true;
             let mut enodes = vec![NodeData::default()];
-            let want = conv(&parse_value(&case.expect, &level.signature.ret, &mut enodes).unwrap_or_else(|e| panic!("{}: expect: {e}", level.id)), &level.signature.ret, &enodes);
+            let want = conv(
+                &parse_value(&case.expect, &level.signature.ret, &mut enodes)
+                    .unwrap_or_else(|e| panic!("{}: expect: {e}", level.id)),
+                &level.signature.ret,
+                &enodes,
+            );
             if canon(expect.clone(), level.compare) != canon(want.clone(), level.compare) {
-                problems.push(format!("{}: args {:?}: oracle says {:?}, expected {:?}", level.id, case.args.iter().map(|a| a.chars().take(60).collect::<String>()).collect::<Vec<_>>(), expect, want));
+                problems.push(format!(
+                    "{}: args {:?}: oracle says {:?}, expected {:?}",
+                    level.id,
+                    case.args
+                        .iter()
+                        .map(|a| a.chars().take(60).collect::<String>())
+                        .collect::<Vec<_>>(),
+                    expect,
+                    want
+                ));
                 break;
             }
         }
@@ -943,8 +1106,20 @@ fn every_level_matches_its_independent_oracle() {
         }
         checked += 1;
     }
-    assert!(problems.is_empty(), "{} of {checked} levels disagree:\n{}", problems.len(), problems.iter().map(|p| p.chars().take(400).collect::<String>()).collect::<Vec<_>>().join("\n"));
+    assert!(
+        problems.is_empty(),
+        "{} of {checked} levels disagree:\n{}",
+        problems.len(),
+        problems
+            .iter()
+            .map(|p| p.chars().take(400).collect::<String>())
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
     if filter.is_none() {
-        assert!(checked >= 60, "campaign must have at least 60 levels, has {checked}");
+        assert!(
+            checked >= 60,
+            "campaign must have at least 60 levels, has {checked}"
+        );
     }
 }

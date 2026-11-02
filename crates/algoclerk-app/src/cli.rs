@@ -32,15 +32,28 @@ pub const HELP: &str = "algoclerk [options]\n\
   --version, --help\n";
 
 pub fn parse(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
-    let mut a = Args { window_shot_after: 8.0, ..Args::default() };
+    let mut a = Args {
+        window_shot_after: 8.0,
+        ..Args::default()
+    };
     let mut it = args.into_iter();
     while let Some(arg) = it.next() {
         let mut value = |name: &str| it.next().ok_or(format!("{name} needs a value"));
         match arg.as_str() {
-            "--autoquit" => a.autoquit = Some(value("--autoquit")?.parse().map_err(|_| "--autoquit needs a number")?),
+            "--autoquit" => {
+                a.autoquit = Some(
+                    value("--autoquit")?
+                        .parse()
+                        .map_err(|_| "--autoquit needs a number")?,
+                )
+            }
             "--smoke" => a.smoke = true,
             "--window-shot" => a.window_shot = Some(PathBuf::from(value("--window-shot")?)),
-            "--window-shot-after" => a.window_shot_after = value("--window-shot-after")?.parse().map_err(|_| "needs a number")?,
+            "--window-shot-after" => {
+                a.window_shot_after = value("--window-shot-after")?
+                    .parse()
+                    .map_err(|_| "needs a number")?
+            }
             "--touch" => a.touch = true,
             "--fullscreen" => a.fullscreen = true,
             "--data-dir" => a.data_dir = Some(PathBuf::from(value("--data-dir")?)),

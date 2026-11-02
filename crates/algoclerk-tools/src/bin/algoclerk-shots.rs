@@ -9,7 +9,9 @@ use std::path::PathBuf;
 fn main() {
     let mut args = std::env::args().skip(1);
     let Some(out) = args.next() else {
-        eprintln!("usage: algoclerk-shots OUT_DIR [--scale N] [--only a,b] [--portrait] [--palette P] [--text-size N]");
+        eprintln!(
+            "usage: algoclerk-shots OUT_DIR [--scale N] [--only a,b] [--portrait] [--palette P] [--text-size N]"
+        );
         std::process::exit(2);
     };
     let out = PathBuf::from(out);
@@ -23,7 +25,11 @@ fn main() {
     while let Some(a) = args.next() {
         match a.as_str() {
             "--scale" => scale = args.next().and_then(|v| v.parse().ok()).unwrap_or(3),
-            "--only" => only = args.next().map(|v| v.split(',').map(String::from).collect()),
+            "--only" => {
+                only = args
+                    .next()
+                    .map(|v| v.split(',').map(String::from).collect())
+            }
             "--portrait" => portrait_only = true,
             "--palette" => {
                 palette = args.next().unwrap_or_else(|| "warm".into());
@@ -47,16 +53,41 @@ fn main() {
             if portrait_only && !portrait {
                 continue;
             }
-            if !portrait_only && portrait && only.is_none() && !matches!(name, "play" | "victory" | "title" | "select" | "settings" | "code-rust" | "brief" | "play-keyboard") {
+            if !portrait_only
+                && portrait
+                && only.is_none()
+                && !matches!(
+                    name,
+                    "play"
+                        | "victory"
+                        | "title"
+                        | "select"
+                        | "settings"
+                        | "code-rust"
+                        | "brief"
+                        | "play-keyboard"
+                )
+            {
                 continue;
             }
-            let spec = Spec { name: name.to_string(), portrait, palette: palette.clone(), text_size, reduce_motion: reduce, touch: portrait };
+            let spec = Spec {
+                name: name.to_string(),
+                portrait,
+                palette: palette.clone(),
+                text_size,
+                reduce_motion: reduce,
+                touch: portrait,
+            };
             match render(&spec) {
                 Ok(c) => {
                     let file = format!(
                         "{name}{}{}.png",
                         if portrait { "-portrait" } else { "" },
-                        if suffix_palette { format!("-{palette}") } else { String::new() }
+                        if suffix_palette {
+                            format!("-{palette}")
+                        } else {
+                            String::new()
+                        }
                     );
                     let path = out.join(file);
                     if let Err(e) = std::fs::write(&path, c.upscaled(scale).to_png()) {

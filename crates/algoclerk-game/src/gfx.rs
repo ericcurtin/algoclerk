@@ -64,7 +64,11 @@ pub fn ease_out(t: f32) -> f32 {
 /// Ease-in-out quadratic.
 pub fn ease_in_out(t: f32) -> f32 {
     let t = t.clamp(0.0, 1.0);
-    if t < 0.5 { 2.0 * t * t } else { 1.0 - (-2.0 * t + 2.0).powi(2) / 2.0 }
+    if t < 0.5 {
+        2.0 * t * t
+    } else {
+        1.0 - (-2.0 * t + 2.0).powi(2) / 2.0
+    }
 }
 
 impl Gfx<'_> {
@@ -77,13 +81,15 @@ impl Gfx<'_> {
     /// Filled rectangle.
     pub fn rect(&mut self, r: Rect, ch: char) {
         let c = self.col(ch);
-        self.c.rect_fill(r.x + self.off.0, r.y + self.off.1, r.w, r.h, c);
+        self.c
+            .rect_fill(r.x + self.off.0, r.y + self.off.1, r.w, r.h, c);
     }
 
     /// One-pixel outline.
     pub fn frame(&mut self, r: Rect, ch: char) {
         let c = self.col(ch);
-        self.c.rect_outline(r.x + self.off.0, r.y + self.off.1, r.w, r.h, c);
+        self.c
+            .rect_outline(r.x + self.off.0, r.y + self.off.1, r.w, r.h, c);
     }
 
     /// Horizontal line.
@@ -114,23 +120,36 @@ impl Gfx<'_> {
     /// A rectangle filled with a checkerboard of two letters (`b` may be `'.'` for transparent).
     pub fn checker(&mut self, r: Rect, a: char, b: char, phase: i32) {
         let (ca, cb) = (self.col(a), self.col(b));
-        self.c.checker_fill(r.offset(self.off.0, self.off.1), ca, cb, phase);
+        self.c
+            .checker_fill(r.offset(self.off.0, self.off.1), ca, cb, phase);
     }
 
     /// Text at 1:1 (top-left at `x`,`y`). Returns the x after the text.
     pub fn text(&mut self, x: i32, y: i32, s: &str, ch: char) -> i32 {
         let c = self.col(ch);
-        self.bank.font.draw(self.c, s, x + self.off.0, y + self.off.1, c, 1)
+        self.bank
+            .font
+            .draw(self.c, s, x + self.off.0, y + self.off.1, c, 1)
     }
 
     /// Text at an integer scale.
     pub fn text_s(&mut self, x: i32, y: i32, s: &str, ch: char, scale: i32) -> i32 {
         let c = self.col(ch);
-        self.bank.font.draw(self.c, s, x + self.off.0, y + self.off.1, c, scale)
+        self.bank
+            .font
+            .draw(self.c, s, x + self.off.0, y + self.off.1, c, scale)
     }
 
     /// Text with a one-pixel (scaled) drop shadow.
-    pub fn text_shadow(&mut self, x: i32, y: i32, s: &str, ch: char, shadow: char, scale: i32) -> i32 {
+    pub fn text_shadow(
+        &mut self,
+        x: i32,
+        y: i32,
+        s: &str,
+        ch: char,
+        shadow: char,
+        scale: i32,
+    ) -> i32 {
         self.text_s(x + scale, y + scale, s, shadow, scale);
         self.text_s(x, y, s, ch, scale)
     }
@@ -163,7 +182,9 @@ impl Gfx<'_> {
     pub fn tiny(&mut self, x: i32, y: i32, s: &str, ch: char) -> i32 {
         let c = self.col(ch);
         let up: String = s.chars().map(|c| c.to_ascii_uppercase()).collect();
-        self.bank.tiny.draw(self.c, &up, x + self.off.0, y + self.off.1, c, 1)
+        self.bank
+            .tiny
+            .draw(self.c, &up, x + self.off.0, y + self.off.1, c, 1)
     }
 
     /// Tiny text centred on `cx`.
@@ -175,26 +196,42 @@ impl Gfx<'_> {
     /// Draw a sprite frame.
     pub fn sprite(&mut self, key: &str, frame: usize, x: i32, y: i32) {
         let s = self.bank.sp(key);
-        self.c.blit(s, frame, x + self.off.0, y + self.off.1, false, self.pal);
+        self.c
+            .blit(s, frame, x + self.off.0, y + self.off.1, false, self.pal);
     }
 
     /// Draw a sprite frame mirrored.
     pub fn sprite_flip(&mut self, key: &str, frame: usize, x: i32, y: i32, flip: bool) {
         let s = self.bank.sp(key);
-        self.c.blit(s, frame, x + self.off.0, y + self.off.1, flip, self.pal);
+        self.c
+            .blit(s, frame, x + self.off.0, y + self.off.1, flip, self.pal);
     }
 
     /// Draw a sprite frame with letters remapped.
     pub fn sprite_map(&mut self, key: &str, frame: usize, x: i32, y: i32, map: &[(char, char)]) {
         let s = self.bank.sp(key);
-        self.c.blit_map(s, frame, (x + self.off.0, y + self.off.1), false, self.pal, map);
+        self.c.blit_map(
+            s,
+            frame,
+            (x + self.off.0, y + self.off.1),
+            false,
+            self.pal,
+            map,
+        );
     }
 
     /// Draw an ink icon (`icons/<name>`) recoloured to `ch`.
     pub fn icon(&mut self, name: &str, x: i32, y: i32, ch: char) {
         let key = format!("icons/{name}");
         let s = self.bank.sp(&key);
-        self.c.blit_map(s, 0, (x + self.off.0, y + self.off.1), false, self.pal, &[('K', ch)]);
+        self.c.blit_map(
+            s,
+            0,
+            (x + self.off.0, y + self.off.1),
+            false,
+            self.pal,
+            &[('K', ch)],
+        );
     }
 
     /// Draw an icon centred in a rectangle.
@@ -304,7 +341,11 @@ impl Gfx<'_> {
     /// Marching-dashes focus ring around a rectangle.
     pub fn focus_ring(&mut self, r: Rect) {
         let g = r.grow(2).offset(self.off.0, self.off.1);
-        let phase = if self.reduce_motion { 0 } else { (self.tick / 6) as i32 };
+        let phase = if self.reduce_motion {
+            0
+        } else {
+            (self.tick / 6) as i32
+        };
         let (a, b) = (self.col('y'), self.col('K'));
         for x in g.x..g.right() {
             let c = if (x + phase) % 4 < 2 { a } else { b };
@@ -355,13 +396,21 @@ impl Gfx<'_> {
 
     /// The marching selection arrow, pointing right, with its tip near `(x, y)`.
     pub fn cursor(&mut self, x: i32, y: i32) {
-        let bob = if self.reduce_motion { 0 } else { ((self.tick / 20) % 2) as i32 };
+        let bob = if self.reduce_motion {
+            0
+        } else {
+            ((self.tick / 20) % 2) as i32
+        };
         self.sprite("ui/cursor", 0, x + bob, y);
     }
 
     /// A star (`big` = 17x17, otherwise 11x11).
     pub fn star(&mut self, x: i32, y: i32, on: bool, big: bool) {
-        let key = format!("ui/star_{}_{}", if big { "big" } else { "small" }, if on { "on" } else { "off" });
+        let key = format!(
+            "ui/star_{}_{}",
+            if big { "big" } else { "small" },
+            if on { "on" } else { "off" }
+        );
         self.sprite(&key, 0, x, y);
     }
 
@@ -370,7 +419,13 @@ impl Gfx<'_> {
         self.round_rect(r, fill, border);
         let tx = tip_x.clamp(r.x + 4, r.right() - 11);
         self.rect(Rect::new(tx, r.bottom() - 1, 7, 1), fill);
-        self.sprite_map("ui/bubble_tail", 0, tx, r.bottom() - 1, &[('K', border), ('W', fill)]);
+        self.sprite_map(
+            "ui/bubble_tail",
+            0,
+            tx,
+            r.bottom() - 1,
+            &[('K', border), ('W', fill)],
+        );
     }
 
     /// A small coloured pill with text (labels, counters).

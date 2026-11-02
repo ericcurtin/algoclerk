@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn english_loads() {
-        assert!(english().get("run.empty_hand").is_some());
+        assert!(english().get("play.memo").is_some());
     }
 
     #[test]
@@ -130,8 +130,15 @@ mod tests {
         let s = Strings::from_toml("[a]\nb = \"x {n} y\"").unwrap();
         assert_eq!(s.format("a.b", &[("n", "5".into())]), "x 5 y");
         assert!(
-            s.format("run.empty_tile", &[("slot", "3".into())])
-                .contains('3')
+            s.format(
+                "play.step_of",
+                &[
+                    ("pos", "3".into()),
+                    ("total", "9".into()),
+                    ("cost", "7".into())
+                ]
+            )
+            .contains("3/9")
         );
         assert_eq!(s.format("no.such.key", &[]), "no.such.key");
     }

@@ -66,24 +66,41 @@ impl Value {
     }
     /// Integer payload.
     pub fn as_int(&self) -> Option<i64> {
-        if let Value::Int(i) = self { Some(*i) } else { None }
+        if let Value::Int(i) = self {
+            Some(*i)
+        } else {
+            None
+        }
     }
     /// Boolean payload.
     pub fn as_bool(&self) -> Option<bool> {
-        if let Value::Bool(b) = self { Some(*b) } else { None }
+        if let Value::Bool(b) = self {
+            Some(*b)
+        } else {
+            None
+        }
     }
     /// Is this a collection that costs something to copy?
     pub fn is_bulky(&self) -> bool {
         matches!(
             self,
-            Value::Str(_) | Value::Vec(_) | Value::Set(_) | Value::Map(_) | Value::Tuple(_) | Value::Stack(_) | Value::Queue(_) | Value::Heap(_)
+            Value::Str(_)
+                | Value::Vec(_)
+                | Value::Set(_)
+                | Value::Map(_)
+                | Value::Tuple(_)
+                | Value::Stack(_)
+                | Value::Queue(_)
+                | Value::Heap(_)
         )
     }
     /// Number of cells (leaf values) held, recursively; scalars count 1.
     pub fn cells(&self) -> u64 {
         match self {
             Value::Str(s) => s.len() as u64 + 1,
-            Value::Vec(v) | Value::Stack(v) | Value::Heap(v) | Value::Tuple(v) => 1 + v.iter().map(Value::cells).sum::<u64>(),
+            Value::Vec(v) | Value::Stack(v) | Value::Heap(v) | Value::Tuple(v) => {
+                1 + v.iter().map(Value::cells).sum::<u64>()
+            }
             Value::Set(s) => 1 + s.iter().map(Value::cells).sum::<u64>(),
             Value::Map(m) => 1 + m.iter().map(|(k, v)| k.cells() + v.cells()).sum::<u64>(),
             Value::Queue(q) => 1 + q.iter().map(Value::cells).sum::<u64>(),
@@ -147,7 +164,9 @@ fn render_into(v: &Value, ty: &Ty, nodes: &[NodeData], out: &mut String) {
             }
             out.push('"');
         }
-        (Value::Vec(items), Ty::Vec(t)) | (Value::Stack(items), Ty::Stack(t)) | (Value::Heap(items), Ty::Heap(t)) => {
+        (Value::Vec(items), Ty::Vec(t))
+        | (Value::Stack(items), Ty::Stack(t))
+        | (Value::Heap(items), Ty::Heap(t)) => {
             out.push('[');
             for (i, x) in items.iter().enumerate() {
                 if i > 0 {
@@ -223,7 +242,9 @@ fn render_list(head: u32, nodes: &[NodeData], out: &mut String) {
             return;
         }
         seen.insert(cur, i);
-        let Some(n) = nodes.get(cur as usize) else { break };
+        let Some(n) = nodes.get(cur as usize) else {
+            break;
+        };
         if i > 0 {
             out.push_str(", ");
         }
@@ -253,7 +274,10 @@ fn render_tree(root: u32, nodes: &[NodeData], out: &mut String) {
             items.push(None);
             continue;
         }
-        let Some(d) = nodes.get(n as usize) else { items.push(None); continue };
+        let Some(d) = nodes.get(n as usize) else {
+            items.push(None);
+            continue;
+        };
         items.push(Some(d.val));
         q.push_back(d.a);
         q.push_back(d.b);
@@ -302,7 +326,10 @@ impl Lit<'_> {
     fn word(&mut self, w: &str) -> bool {
         self.ws();
         if self.s[self.i..].starts_with(w.as_bytes())
-            && !self.s.get(self.i + w.len()).is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_')
+            && !self
+                .s
+                .get(self.i + w.len())
+                .is_some_and(|c| c.is_ascii_alphanumeric() || *c == b'_')
         {
             self.i += w.len();
             true
@@ -313,13 +340,17 @@ impl Lit<'_> {
     fn quoted(&mut self, q: u8) -> R<Vec<u8>> {
         let mut out = Vec::new();
         loop {
-            let Some(&c) = self.s.get(self.i) else { return Err("unterminated quote".into()) };
+            let Some(&c) = self.s.get(self.i) else {
+                return Err("unterminated quote".into());
+            };
             self.i += 1;
             if c == q {
                 return Ok(out);
             }
             if c == b'\\' {
-                let Some(&e) = self.s.get(self.i) else { return Err("bad escape".into()) };
+                let Some(&e) = self.s.get(self.i) else {
+                    return Err("bad escape".into());
+                };
                 self.i += 1;
                 out.push(match e {
                     b'n' => b'\n',
@@ -329,7 +360,8 @@ impl Lit<'_> {
                     b'x' => {
                         let h = self.s.get(self.i..self.i + 2).ok_or("bad escape")?;
                         self.i += 2;
-                        u8::from_str_radix(std::str::from_utf8(h).map_err(|e| e.to_string())?, 16).map_err(|e| e.to_string())?
+                        u8::from_str_radix(std::str::from_utf8(h).map_err(|e| e.to_string())?, 16)
+                            .map_err(|e| e.to_string())?
                     }
                     o => o,
                 });
@@ -377,7 +409,10 @@ impl Lit<'_> {
             if self.eat(close) {
                 break;
             }
-            return Err(format!("expected ',' or closing bracket at position {}", self.i));
+            return Err(format!(
+                "expected ',' or closing bracket at position {}",
+                self.i
+            ));
         }
         Ok(out)
     }
@@ -442,7 +477,9 @@ impl Lit<'_> {
                 if !self.eat(b'{') {
                     return Err("expected '{'".into());
                 }
-                Ok(Value::Set(Rc::new(self.seq(b'}', t, nodes)?.into_iter().collect())))
+                Ok(Value::Set(Rc::new(
+                    self.seq(b'}', t, nodes)?.into_iter().collect(),
+                )))
             }
             Ty::Map(kt, vt) => {
                 if !self.eat(b'{') {
@@ -512,7 +549,11 @@ impl Lit<'_> {
                 let vals = self.seq(b']', &Ty::Int, nodes)?;
                 let mut handles = Vec::new();
                 for v in &vals {
-                    nodes.push(NodeData { val: v.as_int().unwrap_or(0), a: 0, b: 0 });
+                    nodes.push(NodeData {
+                        val: v.as_int().unwrap_or(0),
+                        a: 0,
+                        b: 0,
+                    });
                     handles.push(nodes.len() as u32 - 1);
                 }
                 for w in handles.windows(2) {
@@ -565,8 +606,14 @@ impl Lit<'_> {
 
 /// Build a binary tree from level-order values with `None` holes; returns the root handle (0 when empty).
 pub fn build_tree(items: &[Option<i64>], nodes: &mut Vec<NodeData>) -> u32 {
-    let Some(Some(root_v)) = items.first() else { return 0 };
-    nodes.push(NodeData { val: *root_v, a: 0, b: 0 });
+    let Some(Some(root_v)) = items.first() else {
+        return 0;
+    };
+    nodes.push(NodeData {
+        val: *root_v,
+        a: 0,
+        b: 0,
+    });
     let root = nodes.len() as u32 - 1;
     let mut q: VecDeque<u32> = VecDeque::new();
     q.push_back(root);
@@ -598,11 +645,18 @@ pub fn parse_value(text: &str, ty: &Ty, nodes: &mut Vec<NodeData>) -> Result<Val
     if nodes.is_empty() {
         nodes.push(NodeData::default());
     }
-    let mut l = Lit { s: text.as_bytes(), i: 0, depth: 0 };
+    let mut l = Lit {
+        s: text.as_bytes(),
+        i: 0,
+        depth: 0,
+    };
     let v = l.value(ty, nodes)?;
     l.ws();
     if l.i != l.s.len() {
-        return Err(format!("unexpected text after the value at position {}", l.i));
+        return Err(format!(
+            "unexpected text after the value at position {}",
+            l.i
+        ));
     }
     Ok(v)
 }

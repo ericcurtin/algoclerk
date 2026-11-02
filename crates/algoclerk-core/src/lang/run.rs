@@ -37,15 +37,29 @@ pub struct Called {
 
 impl Compiled {
     /// Parse the argument literals for `entry` using its declared parameter types.
-    pub fn parse_args(&self, entry: &str, args: &[String]) -> Result<(Vec<Value>, Vec<NodeData>), String> {
-        let f = self.program.find(entry).ok_or_else(|| format!("no function named {entry}"))?;
+    pub fn parse_args(
+        &self,
+        entry: &str,
+        args: &[String],
+    ) -> Result<(Vec<Value>, Vec<NodeData>), String> {
+        let f = self
+            .program
+            .find(entry)
+            .ok_or_else(|| format!("no function named {entry}"))?;
         if f.params.len() != args.len() {
-            return Err(format!("{entry} takes {} arguments, got {}", f.params.len(), args.len()));
+            return Err(format!(
+                "{entry} takes {} arguments, got {}",
+                f.params.len(),
+                args.len()
+            ));
         }
         let mut nodes = vec![NodeData::default()];
         let mut vals = Vec::new();
         for (p, a) in f.params.iter().zip(args) {
-            vals.push(parse_value(a, &p.ty, &mut nodes).map_err(|e| format!("argument {}: {e}", p.name))?);
+            vals.push(
+                parse_value(a, &p.ty, &mut nodes)
+                    .map_err(|e| format!("argument {}: {e}", p.name))?,
+            );
         }
         Ok((vals, nodes))
     }
@@ -53,9 +67,21 @@ impl Compiled {
     /// Run `entry` on literal text arguments.
     pub fn call(&self, entry: &str, args: &[String], limits: &Limits) -> Result<Called, String> {
         let (vals, nodes) = self.parse_args(entry, args)?;
-        let ret = self.program.find(entry).map(|f| f.ret.clone()).unwrap_or(Ty::Unit);
+        let ret = self
+            .program
+            .find(entry)
+            .map(|f| f.ret.clone())
+            .unwrap_or(Ty::Unit);
         let report = run(&self.program, &self.info, entry, vals, nodes, limits);
-        let output = report.result.as_ref().ok().map(|v| render(v, &ret, &report.nodes));
-        Ok(Called { report, output, ret })
+        let output = report
+            .result
+            .as_ref()
+            .ok()
+            .map(|v| render(v, &ret, &report.nodes));
+        Ok(Called {
+            report,
+            output,
+            ret,
+        })
     }
 }

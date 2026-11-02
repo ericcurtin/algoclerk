@@ -16,7 +16,7 @@ PROFILE_FLAG=""
 cargo ndk \
     -t arm64-v8a -t armeabi-v7a -t x86_64 \
     -o android/app/src/main/jniLibs \
-    build $PROFILE_FLAG -p algoclerk-app --lib
+    build $PROFILE_FLAG -p algoclerk-app --lib --features android-game-activity
 
 cd android
 if [ "$MODE" = "release" ]; then

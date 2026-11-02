@@ -106,7 +106,11 @@ fn default_n0() -> i64 {
 
 impl Default for Budgets {
     fn default() -> Self {
-        Budgets { steps: default_steps(), large_steps: default_large(), sweep_n0: default_n0() }
+        Budgets {
+            steps: default_steps(),
+            large_steps: default_large(),
+            sweep_n0: default_n0(),
+        }
     }
 }
 
@@ -186,7 +190,12 @@ impl PackInfo {
     /// Parse `pack.toml`.
     pub fn from_toml(text: &str, id: &str) -> Result<PackInfo, String> {
         let r: RawPack = toml::from_str(text).map_err(|e| e.to_string())?;
-        Ok(PackInfo { id: id.to_string(), title: r.title, blurb: r.blurb, order: r.order })
+        Ok(PackInfo {
+            id: id.to_string(),
+            title: r.title,
+            blurb: r.blurb,
+            order: r.order,
+        })
     }
 }
 
@@ -252,11 +261,18 @@ impl Level {
         let header = format!("{} {{}}", r.signature.trim());
         let prog = parse(&header).map_err(|d| format!("signature: {}", d.msg))?;
         let f = prog.fns.first().ok_or("signature: no function")?;
-        let signature = EntrySig { name: f.name.clone(), params: f.params.clone(), ret: f.ret.clone() };
+        let signature = EntrySig {
+            name: f.name.clone(),
+            params: f.params.clone(),
+            ret: f.ret.clone(),
+        };
         if r.title.trim().is_empty() {
             return Err("empty title".into());
         }
-        let u = r.unlock.unwrap_or(Unlock { helpers: false, recursion: false });
+        let u = r.unlock.unwrap_or(Unlock {
+            helpers: false,
+            recursion: false,
+        });
         Ok(Level {
             id: String::new(),
             pack: pack.to_string(),
@@ -308,8 +324,16 @@ impl Level {
         let everything = self.builtins.iter().any(|b| b == "*");
         CheckOpts {
             allowed: Allowed {
-                types: if everything { None } else { Some(self.allowed_types()) },
-                builtins: if everything { None } else { Some(self.builtins.iter().cloned().collect()) },
+                types: if everything {
+                    None
+                } else {
+                    Some(self.allowed_types())
+                },
+                builtins: if everything {
+                    None
+                } else {
+                    Some(self.builtins.iter().cloned().collect())
+                },
                 helpers: self.helpers,
                 recursion: self.recursion,
             },

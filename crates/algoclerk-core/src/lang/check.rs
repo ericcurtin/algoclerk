@@ -22,7 +22,12 @@ pub struct Allowed {
 impl Allowed {
     /// Everything unlocked.
     pub fn all() -> Allowed {
-        Allowed { types: None, builtins: None, helpers: true, recursion: true }
+        Allowed {
+            types: None,
+            builtins: None,
+            helpers: true,
+            recursion: true,
+        }
     }
 }
 
@@ -40,7 +45,13 @@ pub struct EntrySig {
 impl EntrySig {
     /// The header as text.
     pub fn text(&self) -> String {
-        let f = FnDecl { id: 0, name: self.name.clone(), params: self.params.clone(), ret: self.ret.clone(), body: Block::default() };
+        let f = FnDecl {
+            id: 0,
+            name: self.name.clone(),
+            params: self.params.clone(),
+            ret: self.ret.clone(),
+            body: Block::default(),
+        };
         super::print::signature_text(&f)
     }
 }
@@ -154,7 +165,9 @@ struct Checker<'a> {
 
 type R<T> = Result<T, ()>;
 
-const MUTATING_VEC: &[&str] = &["push", "pop", "insert", "remove", "reverse", "sort", "swap", "clear", "extend"];
+const MUTATING_VEC: &[&str] = &[
+    "push", "pop", "insert", "remove", "reverse", "sort", "swap", "clear", "extend",
+];
 
 /// Does calling this method on a value of this type change the value?
 pub fn is_mutating(recv: &Ty, name: &str) -> bool {
@@ -164,25 +177,104 @@ pub fn is_mutating(recv: &Ty, name: &str) -> bool {
         Ty::Set(_) => matches!(name, "add" | "remove" | "clear"),
         Ty::Map(..) => matches!(name, "remove" | "clear"),
         Ty::Stack(_) | Ty::Queue(_) | Ty::Heap(_) => matches!(name, "push" | "pop" | "clear"),
-        Ty::Deque(_) => matches!(name, "push_front" | "push_back" | "pop_front" | "pop_back" | "clear"),
+        Ty::Deque(_) => matches!(
+            name,
+            "push_front" | "push_back" | "pop_front" | "pop_back" | "clear"
+        ),
         _ => false,
     }
 }
 
 /// Names callable as plain functions: `len(x)`, `min(a, b)` ...
 pub const FREE_BUILTINS: &[&str] = &[
-    "len", "min", "max", "abs", "sum", "sorted", "reversed", "to_string", "to_int", "ord", "chr", "join", "from_chars",
-    "enumerate", "zip", "some", "lnode", "tnode",
+    "len",
+    "min",
+    "max",
+    "abs",
+    "sum",
+    "sorted",
+    "reversed",
+    "to_string",
+    "to_int",
+    "ord",
+    "chr",
+    "join",
+    "from_chars",
+    "enumerate",
+    "zip",
+    "some",
+    "lnode",
+    "tnode",
 ];
 
 /// Names of every built-in function and method (for the unlock lists, the picker and tests).
 pub const ALL_BUILTINS: &[&str] = &[
-    "len", "min", "max", "abs", "sum", "sorted", "reversed", "to_string", "to_int", "ord", "chr", "join", "from_chars",
-    "enumerate", "zip", "some", "lnode", "tnode", "push", "pop", "insert", "remove", "contains", "index_of", "reverse",
-    "sort", "swap", "clear", "is_empty", "extend", "count", "upper", "lower", "find", "starts_with", "ends_with",
-    "split", "chars", "trim", "replace", "repeat", "is_digit", "is_alpha", "is_alnum", "is_upper", "is_lower",
-    "is_space", "add", "union", "intersection", "difference", "get", "keys", "values", "items", "is_some", "is_none",
-    "unwrap", "unwrap_or", "peek", "front", "back", "push_front", "push_back", "pop_front", "pop_back",
+    "len",
+    "min",
+    "max",
+    "abs",
+    "sum",
+    "sorted",
+    "reversed",
+    "to_string",
+    "to_int",
+    "ord",
+    "chr",
+    "join",
+    "from_chars",
+    "enumerate",
+    "zip",
+    "some",
+    "lnode",
+    "tnode",
+    "push",
+    "pop",
+    "insert",
+    "remove",
+    "contains",
+    "index_of",
+    "reverse",
+    "sort",
+    "swap",
+    "clear",
+    "is_empty",
+    "extend",
+    "count",
+    "upper",
+    "lower",
+    "find",
+    "starts_with",
+    "ends_with",
+    "split",
+    "chars",
+    "trim",
+    "replace",
+    "repeat",
+    "is_digit",
+    "is_alpha",
+    "is_alnum",
+    "is_upper",
+    "is_lower",
+    "is_space",
+    "add",
+    "union",
+    "intersection",
+    "difference",
+    "get",
+    "keys",
+    "values",
+    "items",
+    "is_some",
+    "is_none",
+    "unwrap",
+    "unwrap_or",
+    "peek",
+    "front",
+    "back",
+    "push_front",
+    "push_back",
+    "pop_front",
+    "pop_back",
 ];
 
 impl<'a> Checker<'a> {
@@ -210,7 +302,11 @@ impl<'a> Checker<'a> {
             self.err(
                 node,
                 "type.mismatch",
-                format!("Mix-up! I need {} here, but this holds {}.", plural(&e), plural(&f)),
+                format!(
+                    "Mix-up! I need {} here, but this holds {}.",
+                    plural(&e),
+                    plural(&f)
+                ),
             )
         }
     }
@@ -233,8 +329,17 @@ impl<'a> Checker<'a> {
             return Ok(u32::MAX);
         }
         let slot = self.cx.locals.len() as u32;
-        if self.cx.scopes.last().is_some_and(|s| s.names.contains_key(name)) {
-            return self.err(node, "name.dup", format!("You already have a drawer labelled `{name}` here. Use a new name."));
+        if self
+            .cx
+            .scopes
+            .last()
+            .is_some_and(|s| s.names.contains_key(name))
+        {
+            return self.err(
+                node,
+                "name.dup",
+                format!("You already have a drawer labelled `{name}` here. Use a new name."),
+            );
         }
         self.cx.locals.push((name.to_string(), ty.clone()));
         self.cx.mutated.push(false);
@@ -245,7 +350,11 @@ impl<'a> Checker<'a> {
     }
 
     fn lookup(&self, name: &str) -> Option<(Ty, u32)> {
-        self.cx.scopes.iter().rev().find_map(|s| s.names.get(name).cloned())
+        self.cx
+            .scopes
+            .iter()
+            .rev()
+            .find_map(|s| s.names.get(name).cloned())
     }
 
     fn bind_pat(&mut self, node: NodeId, pat: &Pat, ty: &Ty, out: &mut Vec<u32>) -> R<()> {
@@ -339,16 +448,26 @@ impl<'a> Checker<'a> {
             ExprKind::NoneLit => Ok(Ty::Option(Box::new(self.inf.fresh()))),
             ExprKind::Var(n) => match self.lookup(n) {
                 Some((t, s)) => {
-                    self.slots.resize(self.slots.len().max(e.id as usize + 1), u32::MAX);
+                    self.slots
+                        .resize(self.slots.len().max(e.id as usize + 1), u32::MAX);
                     self.slots[e.id as usize] = s;
                     Ok(t)
                 }
                 None => {
-                    let names: Vec<String> = self.cx.scopes.iter().flat_map(|s| s.names.keys().cloned()).collect();
+                    let names: Vec<String> = self
+                        .cx
+                        .scopes
+                        .iter()
+                        .flat_map(|s| s.names.keys().cloned())
+                        .collect();
                     let hint = did_you_mean(n, names.iter().map(String::as_str))
                         .map(|h| format!(" Did you mean `{h}`?"))
                         .unwrap_or_default();
-                    self.err(e.id, "name.unknown", format!("I cannot find a drawer labelled `{n}`.{hint}"))
+                    self.err(
+                        e.id,
+                        "name.unknown",
+                        format!("I cannot find a drawer labelled `{n}`.{hint}"),
+                    )
                 }
             },
             ExprKind::Unary(op, a) => {
@@ -378,7 +497,10 @@ impl<'a> Checker<'a> {
                     other => self.err(
                         e.id,
                         "index.type",
-                        format!("You cannot look inside {} with [..].", plural(&self.inf.resolve(&other))),
+                        format!(
+                            "You cannot look inside {} with [..].",
+                            plural(&self.inf.resolve(&other))
+                        ),
                     ),
                 }
             }
@@ -392,7 +514,10 @@ impl<'a> Checker<'a> {
                     other => self.err(
                         e.id,
                         "slice.type",
-                        format!("Only shelves and words can be sliced, not {}.", plural(&self.inf.resolve(&other))),
+                        format!(
+                            "Only shelves and words can be sliced, not {}.",
+                            plural(&self.inf.resolve(&other))
+                        ),
                     ),
                 }
             }
@@ -402,14 +527,23 @@ impl<'a> Checker<'a> {
                     (Ty::LNode, "val") | (Ty::TNode, "val") => Ok(Ty::Int),
                     (Ty::LNode, "next") => Ok(Ty::LNode),
                     (Ty::TNode, "left" | "right") => Ok(Ty::TNode),
-                    (Ty::LNode, _) => self.err(e.id, "field.unknown", format!("A list tag has `val` and `next`, not `{f}`.")),
-                    (Ty::TNode, _) => {
-                        self.err(e.id, "field.unknown", format!("A tree node has `val`, `left` and `right`, not `{f}`."))
-                    }
+                    (Ty::LNode, _) => self.err(
+                        e.id,
+                        "field.unknown",
+                        format!("A list tag has `val` and `next`, not `{f}`."),
+                    ),
+                    (Ty::TNode, _) => self.err(
+                        e.id,
+                        "field.unknown",
+                        format!("A tree node has `val`, `left` and `right`, not `{f}`."),
+                    ),
                     (other, _) => self.err(
                         e.id,
                         "field.type",
-                        format!("Only list and tree nodes have fields; this is {}.", plural(&self.inf.resolve(&other))),
+                        format!(
+                            "Only list and tree nodes have fields; this is {}.",
+                            plural(&self.inf.resolve(&other))
+                        ),
                     ),
                 }
             }
@@ -417,13 +551,22 @@ impl<'a> Checker<'a> {
                 let at = self.expr(a)?;
                 match self.inf.shallow(&at) {
                     Ty::Tuple(ts) if *n < ts.len() => Ok(ts[*n].clone()),
-                    Ty::Tuple(ts) => {
-                        self.err(e.id, "tuple.index", format!("That tuple only has {} parts (.0 to .{}).", ts.len(), ts.len() - 1))
-                    }
+                    Ty::Tuple(ts) => self.err(
+                        e.id,
+                        "tuple.index",
+                        format!(
+                            "That tuple only has {} parts (.0 to .{}).",
+                            ts.len(),
+                            ts.len() - 1
+                        ),
+                    ),
                     other => self.err(
                         e.id,
                         "tuple.type",
-                        format!("`.{n}` only works on tuples, not {}.", plural(&self.inf.resolve(&other))),
+                        format!(
+                            "`.{n}` only works on tuples, not {}.",
+                            plural(&self.inf.resolve(&other))
+                        ),
                     ),
                 }
             }
@@ -463,9 +606,13 @@ impl<'a> Checker<'a> {
             _ => {}
         }
         match t {
-            Ty::Vec(a) | Ty::Set(a) | Ty::Option(a) | Ty::Stack(a) | Ty::Queue(a) | Ty::Deque(a) | Ty::Heap(a) => {
-                self.need_ty_checks(node, a)
-            }
+            Ty::Vec(a)
+            | Ty::Set(a)
+            | Ty::Option(a)
+            | Ty::Stack(a)
+            | Ty::Queue(a)
+            | Ty::Deque(a)
+            | Ty::Heap(a) => self.need_ty_checks(node, a),
             Ty::Map(k, v) => {
                 self.need_ty_checks(node, k);
                 self.need_ty_checks(node, v);
@@ -517,7 +664,10 @@ impl<'a> Checker<'a> {
                     other => self.err(
                         id,
                         "op.type",
-                        format!("`+` adds numbers, words or shelves, not {}.", plural(&self.inf.resolve(&other))),
+                        format!(
+                            "`+` adds numbers, words or shelves, not {}.",
+                            plural(&self.inf.resolve(&other))
+                        ),
                     ),
                 }
             }
@@ -533,15 +683,28 @@ impl<'a> Checker<'a> {
         let id = e.id;
         // user functions first
         if let Some((idx, params, ret)) = self.sigs.get(name).cloned() {
-            if !self.opts.allowed.helpers && self.opts.entry.as_ref().is_some_and(|s| s.name != name) {
-                return self.err(id, "locked.helpers", "Helper functions are locked on this floor; do it all in one function.");
+            if !self.opts.allowed.helpers
+                && self.opts.entry.as_ref().is_some_and(|s| s.name != name)
+            {
+                return self.err(
+                    id,
+                    "locked.helpers",
+                    "Helper functions are locked on this floor; do it all in one function.",
+                );
             }
             self.args_n(id, name, args, params.len())?;
             self.cx.calls.insert(name.to_string());
             for (a, p) in args.iter().zip(params.iter()) {
                 if p.by_ref {
                     if !matches!(a.kind, ExprKind::Var(_)) {
-                        return self.err(a.id, "call.ref", format!("`{}` changes its `{}`, so pass a plain variable here.", name, p.name));
+                        return self.err(
+                            a.id,
+                            "call.ref",
+                            format!(
+                                "`{}` changes its `{}`, so pass a plain variable here.",
+                                name, p.name
+                            ),
+                        );
                     }
                     self.expect(a, &p.ty)?;
                     self.mark_mutated(a);
@@ -549,17 +712,33 @@ impl<'a> Checker<'a> {
                     self.expect(a, &p.ty)?;
                 }
             }
-            self.slots.resize(self.slots.len().max(id as usize + 1), u32::MAX);
+            self.slots
+                .resize(self.slots.len().max(id as usize + 1), u32::MAX);
             self.slots[id as usize] = idx as u32;
             return Ok(ret);
         }
         if name == "range" {
-            return self.err(id, "range.place", "`range` only works right after `for x in`.");
+            return self.err(
+                id,
+                "range.place",
+                "`range` only works right after `for x in`.",
+            );
         }
         if !FREE_BUILTINS.contains(&name) {
-            let names: Vec<&str> = self.sigs.keys().map(String::as_str).chain(FREE_BUILTINS.iter().copied()).collect();
-            let hint = did_you_mean(name, names.into_iter()).map(|h| format!(" Did you mean `{h}`?")).unwrap_or_default();
-            return self.err(id, "call.unknown", format!("I do not know a tool called `{name}`.{hint}"));
+            let names: Vec<&str> = self
+                .sigs
+                .keys()
+                .map(String::as_str)
+                .chain(FREE_BUILTINS.iter().copied())
+                .collect();
+            let hint = did_you_mean(name, names.into_iter())
+                .map(|h| format!(" Did you mean `{h}`?"))
+                .unwrap_or_default();
+            return self.err(
+                id,
+                "call.unknown",
+                format!("I do not know a tool called `{name}`.{hint}"),
+            );
         }
         self.builtin_ok(id, name)?;
         match name {
@@ -567,8 +746,22 @@ impl<'a> Checker<'a> {
                 self.args_n(id, name, args, 1)?;
                 let t = self.expr(&args[0])?;
                 match self.inf.shallow(&t) {
-                    Ty::Str | Ty::Vec(_) | Ty::Set(_) | Ty::Map(..) | Ty::Stack(_) | Ty::Queue(_) | Ty::Deque(_) | Ty::Heap(_) => Ok(Ty::Int),
-                    other => self.err(id, "len.type", format!("`len` counts the items of a drawer, not {}.", plural(&self.inf.resolve(&other)))),
+                    Ty::Str
+                    | Ty::Vec(_)
+                    | Ty::Set(_)
+                    | Ty::Map(..)
+                    | Ty::Stack(_)
+                    | Ty::Queue(_)
+                    | Ty::Deque(_)
+                    | Ty::Heap(_) => Ok(Ty::Int),
+                    other => self.err(
+                        id,
+                        "len.type",
+                        format!(
+                            "`len` counts the items of a drawer, not {}.",
+                            plural(&self.inf.resolve(&other))
+                        ),
+                    ),
                 }
             }
             "min" | "max" => {
@@ -616,7 +809,15 @@ impl<'a> Checker<'a> {
                     (other, _) => self.err(
                         id,
                         "sort.type",
-                        format!("`{name}` works on shelves{}, not {}.", if name == "sorted" { ", words and bins" } else { " and words" }, plural(&self.inf.resolve(&other))),
+                        format!(
+                            "`{name}` works on shelves{}, not {}.",
+                            if name == "sorted" {
+                                ", words and bins"
+                            } else {
+                                " and words"
+                            },
+                            plural(&self.inf.resolve(&other))
+                        ),
                     ),
                 }
             }
@@ -629,7 +830,14 @@ impl<'a> Checker<'a> {
                         self.unify_at(args[0].id, &Ty::Int, &t)?;
                         Ok(Ty::Str)
                     }
-                    other => self.err(id, "tostring.type", format!("`to_string` turns a number or a letter into a word, not {}.", plural(&self.inf.resolve(&other)))),
+                    other => self.err(
+                        id,
+                        "tostring.type",
+                        format!(
+                            "`to_string` turns a number or a letter into a word, not {}.",
+                            plural(&self.inf.resolve(&other))
+                        ),
+                    ),
                 }
             }
             "to_int" => {
@@ -661,7 +869,9 @@ impl<'a> Checker<'a> {
             "enumerate" | "zip" => self.err(
                 id,
                 "iter.place",
-                format!("`{name}` only works right after `for ... in`, like: for (i, x) in {name}(..)."),
+                format!(
+                    "`{name}` only works right after `for ... in`, like: for (i, x) in {name}(..)."
+                ),
             ),
             "some" => {
                 self.args_n(id, name, args, 1)?;
@@ -681,7 +891,11 @@ impl<'a> Checker<'a> {
                 self.expect(&args[2], &Ty::TNode)?;
                 Ok(Ty::TNode)
             }
-            _ => self.err(id, "call.method", format!("`{name}` is used on something, like x.{name}(..), not on its own.")),
+            _ => self.err(
+                id,
+                "call.method",
+                format!("`{name}` is used on something, like x.{name}(..), not on its own."),
+            ),
         }
     }
 
@@ -698,21 +912,36 @@ impl<'a> Checker<'a> {
         }
         let known = ALL_BUILTINS.contains(&name);
         if !known {
-            return self.err(id, "method.unknown", format!("I do not know a tool called `{name}`."));
+            return self.err(
+                id,
+                "method.unknown",
+                format!("I do not know a tool called `{name}`."),
+            );
         }
         let sig: Option<Vec<(Vec<Ty>, Ty)>> = method_sigs(&rt, name);
         let Some(sigs) = sig else {
             return self.err(
                 id,
                 "method.type",
-                format!("{} has no `{name}` tool.", capital(&plural(&self.inf.resolve(&rt)))),
+                format!(
+                    "{} has no `{name}` tool.",
+                    capital(&plural(&self.inf.resolve(&rt)))
+                ),
             );
         };
         self.builtin_ok(id, name)?;
         let chosen = sigs.iter().find(|(ps, _)| ps.len() == args.len());
         let Some((params, ret)) = chosen.cloned() else {
             let n = sigs[0].0.len();
-            return self.err(id, "call.arity", format!("`{name}` needs {n} thing{} but you gave it {}.", if n == 1 { "" } else { "s" }, args.len()));
+            return self.err(
+                id,
+                "call.arity",
+                format!(
+                    "`{name}` needs {n} thing{} but you gave it {}.",
+                    if n == 1 { "" } else { "s" },
+                    args.len()
+                ),
+            );
         };
         if is_mutating(&rt, name) {
             if !Self::is_place(recv) {
@@ -732,7 +961,14 @@ impl<'a> Checker<'a> {
                 match self.inf.shallow(&t) {
                     Ty::Char | Ty::Str => {}
                     other => {
-                        return self.err(a.id, "type.mismatch", format!("I need a letter or a word here, but this holds {}.", plural(&self.inf.resolve(&other))))
+                        return self.err(
+                            a.id,
+                            "type.mismatch",
+                            format!(
+                                "I need a letter or a word here, but this holds {}.",
+                                plural(&self.inf.resolve(&other))
+                            ),
+                        );
                     }
                 }
             } else {
@@ -753,7 +989,9 @@ impl<'a> Checker<'a> {
     // ----- statements -----
     fn block(&mut self, b: &Block, scope: bool) -> R<()> {
         if scope {
-            self.cx.scopes.push(Scope { names: HashMap::new() });
+            self.cx.scopes.push(Scope {
+                names: HashMap::new(),
+            });
         }
         let mut ok = true;
         for s in &b.stmts {
@@ -789,12 +1027,22 @@ impl<'a> Checker<'a> {
                 if let ExprKind::Index(a, _) = &target.kind {
                     let at = self.types[a.id as usize].clone();
                     if matches!(self.inf.shallow(&at), Ty::Str) {
-                        return self.err(target.id, "assign.str", "Words cannot be edited letter by letter. Build a new word instead.");
+                        return self.err(
+                            target.id,
+                            "assign.str",
+                            "Words cannot be edited letter by letter. Build a new word instead.",
+                        );
                     }
                 }
                 match &target.kind {
                     ExprKind::Var(_) | ExprKind::Index(..) | ExprKind::Field(..) => {}
-                    _ => return self.err(target.id, "assign.place", "You can only store into a variable, a shelf slot or a node field."),
+                    _ => {
+                        return self.err(
+                            target.id,
+                            "assign.place",
+                            "You can only store into a variable, a shelf slot or a node field.",
+                        );
+                    }
                 }
                 match op {
                     None => self.expect(value, &tt)?,
@@ -837,25 +1085,39 @@ impl<'a> Checker<'a> {
                 self.cx.loops -= 1;
                 r
             }
-            StmtKind::ForRange { var, start, end, step, body } => {
+            StmtKind::ForRange {
+                var,
+                start,
+                end,
+                step,
+                body,
+            } => {
                 for x in [start, step].into_iter().flatten() {
                     self.expect(x, &Ty::Int)?;
                 }
                 if let Some(st) = step
                     && !matches!(st.kind, ExprKind::Int(k) if k != 0)
                 {
-                    return self.err(st.id, "range.step", "The step of a range must be a plain number other than 0, like 2 or -1.");
+                    return self.err(
+                        st.id,
+                        "range.step",
+                        "The step of a range must be a plain number other than 0, like 2 or -1.",
+                    );
                 }
                 self.expect(end, &Ty::Int)?;
-                self.cx.scopes.push(Scope { names: HashMap::new() });
+                self.cx.scopes.push(Scope {
+                    names: HashMap::new(),
+                });
                 let slot = self.declare(s.id, var, Ty::Int);
                 self.cx.loops += 1;
                 let r = match slot {
                     Ok(slot) => {
-                        self.slots.resize(self.slots.len().max(s.id as usize + 1), u32::MAX);
+                        self.slots
+                            .resize(self.slots.len().max(s.id as usize + 1), u32::MAX);
                         self.slots[s.id as usize] = slot;
                         let r = self.block(body, false);
-                        if r.is_ok() && self.cx.mutated.get(slot as usize).copied().unwrap_or(false) {
+                        if r.is_ok() && self.cx.mutated.get(slot as usize).copied().unwrap_or(false)
+                        {
                             return self.err(s.id, "range.mutate", format!("Do not change the counter `{var}` inside its own loop; make a copy if you need to."));
                         }
                         r
@@ -869,8 +1131,16 @@ impl<'a> Checker<'a> {
             StmtKind::ForEach { pat, iter, body } => self.for_each(s, pat, iter, body),
             StmtKind::Break | StmtKind::Continue => {
                 if self.cx.loops == 0 {
-                    let w = if matches!(s.kind, StmtKind::Break) { "break" } else { "continue" };
-                    return self.err(s.id, "loop.outside", format!("`{w}` only makes sense inside a loop."));
+                    let w = if matches!(s.kind, StmtKind::Break) {
+                        "break"
+                    } else {
+                        "continue"
+                    };
+                    return self.err(
+                        s.id,
+                        "loop.outside",
+                        format!("`{w}` only makes sense inside a loop."),
+                    );
                 }
                 Ok(())
             }
@@ -879,13 +1149,21 @@ impl<'a> Checker<'a> {
                 match v {
                     Some(e) => {
                         if ret == Ty::Unit {
-                            return self.err(s.id, "return.unit", "This function hands back nothing, so `return` takes no value.");
+                            return self.err(
+                                s.id,
+                                "return.unit",
+                                "This function hands back nothing, so `return` takes no value.",
+                            );
                         }
                         self.expect(e, &ret)
                     }
                     None => {
                         if ret != Ty::Unit {
-                            return self.err(s.id, "return.missing", format!("This function must hand back {}.", plural(&ret)));
+                            return self.err(
+                                s.id,
+                                "return.missing",
+                                format!("This function must hand back {}.", plural(&ret)),
+                            );
                         }
                         Ok(())
                     }
@@ -902,7 +1180,9 @@ impl<'a> Checker<'a> {
         let elem: Ty;
         let mut iter_root: Option<u32> = None;
         match &iter.kind {
-            ExprKind::Call(n, args) if (n == "enumerate" || n == "zip") && !self.sigs.contains_key(n) => {
+            ExprKind::Call(n, args)
+                if (n == "enumerate" || n == "zip") && !self.sigs.contains_key(n) =>
+            {
                 self.builtin_ok(iter.id, n)?;
                 if n == "enumerate" {
                     self.args_n(iter.id, n, args, 1)?;
@@ -920,7 +1200,11 @@ impl<'a> Checker<'a> {
                     elem = Ty::Tuple(vec![a, b]);
                 }
                 if !matches!(pat, Pat::Tuple(ps) if ps.len() == 2) {
-                    return self.err(s.id, "iter.pattern", format!("`{n}` hands out pairs, so write `for (a, b) in {n}(..)`."));
+                    return self.err(
+                        s.id,
+                        "iter.pattern",
+                        format!("`{n}` hands out pairs, so write `for (a, b) in {n}(..)`."),
+                    );
                 }
                 self.set_ty(iter.id, Ty::Vec(Box::new(elem.clone())));
             }
@@ -931,7 +1215,11 @@ impl<'a> Checker<'a> {
                     Ty::Vec(el) => elem = *el,
                     Ty::Str => elem = Ty::Char,
                     other @ (Ty::Set(_) | Ty::Map(..)) => {
-                        let what = if matches!(other, Ty::Set(_)) { "sorted(bin)" } else { "m.keys(), m.values() or m.items()" };
+                        let what = if matches!(other, Ty::Set(_)) {
+                            "sorted(bin)"
+                        } else {
+                            "m.keys(), m.values() or m.items()"
+                        };
                         return self.err(
                             iter.id,
                             "iter.unordered",
@@ -942,13 +1230,18 @@ impl<'a> Checker<'a> {
                         return self.err(
                             iter.id,
                             "iter.type",
-                            format!("I can walk along a shelf or a word, but not {}.", plural(&self.inf.resolve(&other))),
-                        )
+                            format!(
+                                "I can walk along a shelf or a word, but not {}.",
+                                plural(&self.inf.resolve(&other))
+                            ),
+                        );
                     }
                 }
             }
         }
-        self.cx.scopes.push(Scope { names: HashMap::new() });
+        self.cx.scopes.push(Scope {
+            names: HashMap::new(),
+        });
         let mut slots = Vec::new();
         let b = self.bind_pat(s.id, pat, &elem, &mut slots);
         self.pat_slots.insert(s.id, slots);
@@ -973,7 +1266,9 @@ impl<'a> Checker<'a> {
 
 fn capital(s: &str) -> String {
     let mut c = s.chars();
-    c.next().map_or(String::new(), |f| f.to_uppercase().collect::<String>() + c.as_str())
+    c.next().map_or(String::new(), |f| {
+        f.to_uppercase().collect::<String>() + c.as_str()
+    })
 }
 
 /// Signatures of a method for a receiver type: `(param types, return type)` per arity.
@@ -1013,7 +1308,9 @@ pub fn method_sigs(recv: &Ty, name: &str) -> Option<std::vec::Vec<(std::vec::Vec
             _ => None,
         },
         Char => match name {
-            "is_digit" | "is_alpha" | "is_alnum" | "is_upper" | "is_lower" | "is_space" => one(vec![], Bool),
+            "is_digit" | "is_alpha" | "is_alnum" | "is_upper" | "is_lower" | "is_space" => {
+                one(vec![], Bool)
+            }
             "upper" | "lower" => one(vec![], Char),
             _ => None,
         },
@@ -1026,7 +1323,10 @@ pub fn method_sigs(recv: &Ty, name: &str) -> Option<std::vec::Vec<(std::vec::Vec
             _ => None,
         },
         Map(k, v) => match name {
-            "get" => Some(vec![(vec![(**k).clone(), (**v).clone()], (**v).clone()), (vec![(**k).clone()], Option(v.clone()))]),
+            "get" => Some(vec![
+                (vec![(**k).clone(), (**v).clone()], (**v).clone()),
+                (vec![(**k).clone()], Option(v.clone())),
+            ]),
             "contains" => one(vec![(**k).clone()], Bool),
             "remove" => one(vec![(**k).clone()], Unit),
             "keys" => one(vec![], Vec(k.clone())),
@@ -1077,7 +1377,9 @@ pub fn method_sigs(recv: &Ty, name: &str) -> Option<std::vec::Vec<(std::vec::Vec
 fn always_returns(b: &Block) -> bool {
     match b.stmts.last().map(|s| &s.kind) {
         Some(StmtKind::Return(_)) => true,
-        Some(StmtKind::If { then, els: Some(e), .. }) => always_returns(then) && always_returns(e),
+        Some(StmtKind::If {
+            then, els: Some(e), ..
+        }) => always_returns(then) && always_returns(e),
         _ => false,
     }
 }
@@ -1088,17 +1390,41 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
     let mut errors = Vec::new();
     for (i, f) in prog.fns.iter().enumerate() {
         if FREE_BUILTINS.contains(&f.name.as_str()) || f.name == "range" {
-            errors.push(Diag::node(f.id, "fn.builtin", format!("`{}` is already the name of a built-in tool. Pick another name.", f.name)));
+            errors.push(Diag::node(
+                f.id,
+                "fn.builtin",
+                format!(
+                    "`{}` is already the name of a built-in tool. Pick another name.",
+                    f.name
+                ),
+            ));
         }
-        if sigs.insert(f.name.clone(), (i, f.params.clone(), f.ret.clone())).is_some() {
-            errors.push(Diag::node(f.id, "fn.dup", format!("There are two functions called `{}`.", f.name)));
+        if sigs
+            .insert(f.name.clone(), (i, f.params.clone(), f.ret.clone()))
+            .is_some()
+        {
+            errors.push(Diag::node(
+                f.id,
+                "fn.dup",
+                format!("There are two functions called `{}`.", f.name),
+            ));
         }
     }
     if let Some(entry) = &opts.entry {
         match prog.find(&entry.name) {
-            None => errors.push(Diag::plain("fn.missing", format!("Your answer needs a function with this header: {}", entry.text()))),
+            None => errors.push(Diag::plain(
+                "fn.missing",
+                format!(
+                    "Your answer needs a function with this header: {}",
+                    entry.text()
+                ),
+            )),
             Some(f) => {
-                let got = EntrySig { name: f.name.clone(), params: f.params.clone(), ret: f.ret.clone() };
+                let got = EntrySig {
+                    name: f.name.clone(),
+                    params: f.params.clone(),
+                    ret: f.ret.clone(),
+                };
                 if got != *entry {
                     errors.push(Diag::node(
                         f.id,
@@ -1111,7 +1437,11 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
         if !opts.allowed.helpers && prog.fns.len() > 1 {
             let extra = prog.fns.iter().find(|f| f.name != entry.name);
             if let Some(f) = extra {
-                errors.push(Diag::node(f.id, "locked.helpers", "Helper functions are locked on this floor; do it all in one function."));
+                errors.push(Diag::node(
+                    f.id,
+                    "locked.helpers",
+                    "Helper functions are locked on this floor; do it all in one function.",
+                ));
             }
         }
     }
@@ -1126,7 +1456,15 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
         slots: vec![u32::MAX; prog.next_id as usize],
         pat_slots: HashMap::new(),
         sigs,
-        cx: FnCx { scopes: vec![], locals: vec![], mutated: vec![], ret: Ty::Unit, loops: 0, mut_stack: vec![], calls: HashSet::new() },
+        cx: FnCx {
+            scopes: vec![],
+            locals: vec![],
+            mutated: vec![],
+            ret: Ty::Unit,
+            loops: 0,
+            mut_stack: vec![],
+            calls: HashSet::new(),
+        },
         errors: Vec::new(),
         need_ord: vec![],
         need_hash: vec![],
@@ -1137,7 +1475,9 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
     let mut call_graph: Vec<HashSet<String>> = Vec::new();
     for f in &prog.fns {
         ck.cx = FnCx {
-            scopes: vec![Scope { names: HashMap::new() }],
+            scopes: vec![Scope {
+                names: HashMap::new(),
+            }],
             locals: vec![],
             mutated: vec![],
             ret: f.ret.clone(),
@@ -1153,11 +1493,35 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
         }
         let _ = ck.block(&f.body, false);
         if f.ret != Ty::Unit && !always_returns(&f.body) && ck.errors.is_empty() {
-            ck.errors.push(Diag::node(f.id, "return.path", format!("`{}` must hand back {} on every path. Finish with a `return`.", f.name, plural(&f.ret))));
+            ck.errors.push(Diag::node(
+                f.id,
+                "return.path",
+                format!(
+                    "`{}` must hand back {} on every path. Finish with a `return`.",
+                    f.name,
+                    plural(&f.ret)
+                ),
+            ));
         }
-        let cx = std::mem::replace(&mut ck.cx, FnCx { scopes: vec![], locals: vec![], mutated: vec![], ret: Ty::Unit, loops: 0, mut_stack: vec![], calls: HashSet::new() });
+        let cx = std::mem::replace(
+            &mut ck.cx,
+            FnCx {
+                scopes: vec![],
+                locals: vec![],
+                mutated: vec![],
+                ret: Ty::Unit,
+                loops: 0,
+                mut_stack: vec![],
+                calls: HashSet::new(),
+            },
+        );
         call_graph.push(cx.calls.clone());
-        fn_infos.push(FnInfo { nslots: cx.locals.len() as u32, locals: cx.locals, mutated: cx.mutated, recursive: false });
+        fn_infos.push(FnInfo {
+            nslots: cx.locals.len() as u32,
+            locals: cx.locals,
+            mutated: cx.mutated,
+            recursive: false,
+        });
     }
     if !ck.errors.is_empty() {
         return Err(std::mem::take(&mut ck.errors));
@@ -1165,10 +1529,14 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
     // final resolution
     let mut errs: Vec<Diag> = Vec::new();
     let allowed_types = |t: &Ty| -> Option<&'static str> {
-        let Some(allowed) = &opts.allowed.types else { return None };
+        let Some(allowed) = &opts.allowed.types else {
+            return None;
+        };
         let mut fams = Vec::new();
         t.families(&mut fams);
-        fams.into_iter().find(|f| !matches!(*f, "int" | "bool" | "unit" | "null" | "?") && !allowed.contains(*f))
+        fams.into_iter().find(|f| {
+            !matches!(*f, "int" | "bool" | "unit" | "null" | "?") && !allowed.contains(*f)
+        })
     };
     for &id in &ck.node_tys.clone() {
         let t = ck.inf.resolve(&ck.types[id as usize]);
@@ -1190,7 +1558,11 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
     for (id, t) in &ck.null_vars {
         let t = ck.inf.resolve(t);
         if !matches!(t, Ty::LNode | Ty::TNode) {
-            errs.push(Diag::node(*id, "null.type", "`null` can only stand for a missing list node or tree node."));
+            errs.push(Diag::node(
+                *id,
+                "null.type",
+                "`null` can only stand for a missing list node or tree node.",
+            ));
         }
     }
     for (id, t) in ck.need_ord.clone() {
@@ -1210,17 +1582,28 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
     for (i, calls) in call_graph.iter().enumerate() {
         // reachability of i from itself
         let mut seen: HashSet<usize> = HashSet::new();
-        let mut stack: Vec<usize> = calls.iter().filter_map(|c| names.iter().position(|n| n == c)).collect();
+        let mut stack: Vec<usize> = calls
+            .iter()
+            .filter_map(|c| names.iter().position(|n| n == c))
+            .collect();
         while let Some(j) = stack.pop() {
             if j == i {
                 fn_infos[i].recursive = true;
             }
             if seen.insert(j) {
-                stack.extend(call_graph[j].iter().filter_map(|c| names.iter().position(|n| n == c)));
+                stack.extend(
+                    call_graph[j]
+                        .iter()
+                        .filter_map(|c| names.iter().position(|n| n == c)),
+                );
             }
         }
         if fn_infos[i].recursive && !opts.allowed.recursion {
-            errs.push(Diag::node(prog.fns[i].id, "locked.recursion", "Calling a function from itself is locked on this floor. Use a loop!"));
+            errs.push(Diag::node(
+                prog.fns[i].id,
+                "locked.recursion",
+                "Calling a function from itself is locked on this floor. Use a loop!",
+            ));
         }
     }
     if !errs.is_empty() {
@@ -1232,5 +1615,10 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
             *t = ck.inf.resolve(t);
         }
     }
-    Ok(TypeInfo { types: ck.types, slots: ck.slots, pat_slots: ck.pat_slots, fns: fn_infos })
+    Ok(TypeInfo {
+        types: ck.types,
+        slots: ck.slots,
+        pat_slots: ck.pat_slots,
+        fns: fn_infos,
+    })
 }

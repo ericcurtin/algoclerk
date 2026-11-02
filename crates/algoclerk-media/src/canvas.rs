@@ -301,7 +301,11 @@ impl Canvas {
             for sx in rx..(rx + rw).min(s.w) {
                 let ch = f[sy * s.w + sx];
                 if ch != b'.' {
-                    self.set(pos.0 + (sx - rx) as i32, pos.1 + (sy - ry) as i32, pal.col(ch as char));
+                    self.set(
+                        pos.0 + (sx - rx) as i32,
+                        pos.1 + (sy - ry) as i32,
+                        pal.col(ch as char),
+                    );
                 }
             }
         }

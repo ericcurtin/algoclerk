@@ -1,6 +1,6 @@
 # ADR 0003: Levels are TOML data, test expectations come from reference solutions
 
-- Status: accepted
+- Status: accepted (levels are still TOML data; the level format changed with ClerkScript, see docs/LEVEL_FORMAT.md and ADR 0006)
 
 ## Context
 

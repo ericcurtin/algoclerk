@@ -104,7 +104,10 @@ pub fn default_data_dir() -> PathBuf {
             return PathBuf::from(x).join("algoclerk");
         }
         if let Some(h) = var("HOME") {
-            return PathBuf::from(h).join(".local").join("share").join("algoclerk");
+            return PathBuf::from(h)
+                .join(".local")
+                .join("share")
+                .join("algoclerk");
         }
     }
     PathBuf::from(".algoclerk-data")

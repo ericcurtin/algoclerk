@@ -41,7 +41,11 @@ pub struct Viewport {
 impl Viewport {
     /// A viewport with no unsafe margins.
     pub fn new(portrait: bool, touch: bool) -> Viewport {
-        let (w, h) = if portrait { (PORT_W, PORT_H) } else { (LAND_W, LAND_H) };
+        let (w, h) = if portrait {
+            (PORT_W, PORT_H)
+        } else {
+            (LAND_W, LAND_H)
+        };
         Viewport {
             w,
             h,
@@ -86,7 +90,11 @@ pub struct Display {
 /// Integer scale that fits `vw`x`vh` into the available space (never below 1 unless the window is smaller).
 pub fn fit_scale(avail_w: f32, avail_h: f32, vw: i32, vh: i32) -> f32 {
     let fit = (avail_w / vw as f32).min(avail_h / vh as f32);
-    if fit >= 1.0 { fit.floor() } else { fit.max(0.1) }
+    if fit >= 1.0 {
+        fit.floor()
+    } else {
+        fit.max(0.1)
+    }
 }
 
 /// Pick orientation and scale for a window of `win_w` x `win_h` physical pixels with safe-area insets
@@ -223,6 +231,9 @@ mod tests {
         let cs = columns(Rect::new(0, 0, 100, 10), 4, 4);
         assert_eq!(cs.len(), 4);
         assert!(cs.iter().all(|c| c.inside(&Rect::new(0, 0, 100, 10))));
-        assert_eq!(centered(Rect::new(0, 0, 100, 100), 20, 10), Rect::new(40, 45, 20, 10));
+        assert_eq!(
+            centered(Rect::new(0, 0, 100, 100), 20, 10),
+            Rect::new(40, 45, 20, 10)
+        );
     }
 }

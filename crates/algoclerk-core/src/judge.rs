@@ -14,7 +14,9 @@ use crate::testgen::expand;
 use serde::{Deserialize, Serialize};
 
 /// A medal tier. The names are the office's own.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub enum Medal {
     /// Nothing yet.
     #[default]
@@ -129,6 +131,10 @@ pub struct Verdict {
     pub complexity: Option<Complexity>,
 }
 
+/// Why a case failed: kind, what was returned, runtime error.
+type CaseFailure = (FailKind, Option<String>, Option<RtError>);
+type CaseResult = Result<(), CaseFailure>;
+
 /// A level with its reference compiled and its full test suite expanded.
 #[derive(Debug)]
 pub struct Judge {
@@ -143,7 +149,9 @@ pub struct Judge {
 /// Compare outputs, honouring the level's comparison mode.
 pub fn canonical(text: &str, ty: &Ty, mode: Compare) -> String {
     let mut nodes = Vec::new();
-    let Ok(v) = parse_value(text, ty, &mut nodes) else { return text.to_string() };
+    let Ok(v) = parse_value(text, ty, &mut nodes) else {
+        return text.to_string();
+    };
     let v = match mode {
         Compare::Exact => v,
         Compare::SortOuter => sort_value(v, false),
@@ -155,7 +163,11 @@ pub fn canonical(text: &str, ty: &Ty, mode: Compare) -> String {
 fn sort_value(v: Value, deep: bool) -> Value {
     match v {
         Value::Vec(items) => {
-            let mut xs: Vec<Value> = items.iter().cloned().map(|x| if deep { sort_value(x, true) } else { x }).collect();
+            let mut xs: Vec<Value> = items
+                .iter()
+                .cloned()
+                .map(|x| if deep { sort_value(x, true) } else { x })
+                .collect();
             xs.sort();
             Value::vec(xs)
         }
@@ -167,16 +179,30 @@ impl Judge {
     /// Prepare a level: compile the reference and expand every test (hand-written and generated).
     pub fn new(level: &Level) -> Result<Judge, String> {
         let opts = level.check_opts();
-        let reference = compile(&level.reference, &opts)
-            .map_err(|d| format!("reference does not compile: {}", d.first().map_or(String::new(), |d| d.msg.clone())))?;
+        let reference = compile(&level.reference, &opts).map_err(|d| {
+            format!(
+                "reference does not compile: {}",
+                d.first().map_or(String::new(), |d| d.msg.clone())
+            )
+        })?;
         let ret = level.signature.ret.clone();
         let mut suite: Vec<Case> = Vec::new();
-        let limits = Limits { steps: level.budgets.large_steps * 4, ..Limits::default() };
-        let mut push = |args: Vec<String>, expect: Option<String>, large: bool, example: bool, note: String| -> Result<(), String> {
+        let limits = Limits {
+            steps: level.budgets.large_steps * 4,
+            ..Limits::default()
+        };
+        let mut push = |args: Vec<String>,
+                        expect: Option<String>,
+                        large: bool,
+                        example: bool,
+                        note: String|
+         -> Result<(), String> {
             let expect = match expect {
                 Some(e) if !e.is_empty() => canonical(&e, &ret, level.compare),
                 _ => {
-                    let r = reference.call(&level.signature.name, &args, &limits).map_err(|e| format!("bad test args {args:?}: {e}"))?;
+                    let r = reference
+                        .call(&level.signature.name, &args, &limits)
+                        .map_err(|e| format!("bad test args {args:?}: {e}"))?;
                     match r.output {
                         Some(o) => canonical(&o, &ret, level.compare),
                         None => {
@@ -188,21 +214,43 @@ impl Judge {
                     }
                 }
             };
-            suite.push(Case { args, expect, large, example, note });
+            suite.push(Case {
+                args,
+                expect,
+                large,
+                example,
+                note,
+            });
             Ok(())
         };
         for c in &level.examples {
-            push(c.args.clone(), Some(c.expect.clone()), false, true, c.note.clone())?;
+            push(
+                c.args.clone(),
+                Some(c.expect.clone()),
+                false,
+                true,
+                c.note.clone(),
+            )?;
         }
         for c in &level.tests {
-            push(c.args.clone(), Some(c.expect.clone()), false, false, c.note.clone())?;
+            push(
+                c.args.clone(),
+                Some(c.expect.clone()),
+                false,
+                false,
+                c.note.clone(),
+            )?;
         }
         for g in &level.generate {
             for args in expand(g, None)? {
                 push(args, None, g.large, false, String::new())?;
             }
         }
-        Ok(Judge { level: level.clone(), reference, suite })
+        Ok(Judge {
+            level: level.clone(),
+            reference,
+            suite,
+        })
     }
 
     /// Standard (non-large) test count.
@@ -212,24 +260,43 @@ impl Judge {
 
     fn limits_for(&self, case: &Case, measure: bool) -> Limits {
         Limits {
-            steps: if case.large { self.level.budgets.large_steps } else { self.level.budgets.steps },
+            steps: if case.large {
+                self.level.budgets.large_steps
+            } else {
+                self.level.budgets.steps
+            },
             measure,
             ..Limits::default()
         }
     }
 
     /// Run a compiled solution on one case; returns `(passed, cost, report)`.
-    fn run_case(&self, sol: &Compiled, case: &Case) -> (Result<(), (FailKind, Option<String>, Option<RtError>)>, u64) {
+    fn run_case(&self, sol: &Compiled, case: &Case) -> (CaseResult, u64) {
         let name = &self.level.signature.name;
         let ret = &self.level.signature.ret;
         match sol.call(name, &case.args, &self.limits_for(case, false)) {
-            Err(e) => (Err((FailKind::Error, None, Some(RtError { kind: RtKind::Internal, node: 0, msg: e }))), 0),
+            Err(e) => (
+                Err((
+                    FailKind::Error,
+                    None,
+                    Some(RtError {
+                        kind: RtKind::Internal,
+                        node: 0,
+                        msg: e,
+                    }),
+                )),
+                0,
+            ),
             Ok(r) => {
                 let cost = r.report.cost;
                 match r.report.result {
                     Ok(_) => {
                         let got = canonical(&r.output.unwrap_or_default(), ret, self.level.compare);
-                        if got == case.expect { (Ok(()), cost) } else { (Err((FailKind::Wrong, Some(got), None)), cost) }
+                        if got == case.expect {
+                            (Ok(()), cost)
+                        } else {
+                            (Err((FailKind::Wrong, Some(got), None)), cost)
+                        }
                     }
                     Err(e) => {
                         let k = match e.kind {
@@ -248,14 +315,24 @@ impl Judge {
     pub fn judge(&self, text: &str) -> Verdict {
         let sol = match compile(text, &self.level.check_opts()) {
             Ok(c) => c,
-            Err(d) => return Verdict { diags: d, tests_total: self.suite.len(), ..Verdict::default() },
+            Err(d) => {
+                return Verdict {
+                    diags: d,
+                    tests_total: self.suite.len(),
+                    ..Verdict::default()
+                };
+            }
         };
         self.judge_compiled(&sol, true)
     }
 
     /// Judge an already compiled solution.
     pub fn judge_compiled(&self, sol: &Compiled, with_complexity: bool) -> Verdict {
-        let mut v = Verdict { tests_total: self.suite.len(), size: sol.program.size(), ..Verdict::default() };
+        let mut v = Verdict {
+            tests_total: self.suite.len(),
+            size: sol.program.size(),
+            ..Verdict::default()
+        };
         let mut total = 0u64;
         let mut std_n = 0u64;
         for (i, case) in self.suite.iter().enumerate() {
@@ -272,13 +349,23 @@ impl Judge {
                     }
                 }
                 Err((kind, got, error)) => {
-                    v.failure = Some(Failure { index: i, case: case.clone(), kind, got, error });
+                    v.failure = Some(Failure {
+                        index: i,
+                        case: case.clone(),
+                        kind,
+                        got,
+                        error,
+                    });
                     return v;
                 }
             }
         }
         v.passed = true;
-        v.avg_cost = if std_n == 0 { 0.0 } else { total as f64 / std_n as f64 };
+        v.avg_cost = if std_n == 0 {
+            0.0
+        } else {
+            total as f64 / std_n as f64
+        };
         v.medals = self.medals_for(v.size, v.avg_cost);
         if with_complexity {
             v.complexity = self.complexity(sol);
@@ -308,7 +395,11 @@ impl Judge {
 
     /// Run the solution at n0, 2 n0, 4 n0, 8 n0 using the first large generator and classify.
     pub fn complexity(&self, sol: &Compiled) -> Option<Complexity> {
-        let spec = self.level.sweep.as_ref().or_else(|| self.level.generate.iter().find(|g| g.large))?;
+        let spec = self
+            .level
+            .sweep
+            .as_ref()
+            .or_else(|| self.level.generate.iter().find(|g| g.large))?;
         if self.level.budgets.sweep_n0 <= 0 {
             return None;
         }
@@ -320,14 +411,27 @@ impl Judge {
             let mut one = spec.clone();
             one.count = 1;
             let args = expand(&one, Some(n)).ok()?.into_iter().next()?;
-            let limits = Limits { steps: 400_000_000, measure: true, cells: 40_000_000, ..Limits::default() };
+            let limits = Limits {
+                steps: 400_000_000,
+                measure: true,
+                cells: 40_000_000,
+                ..Limits::default()
+            };
             let r = sol.call(name, &args, &limits).ok()?;
             r.report.result.as_ref().ok()?;
-            samples.push((n, r.report.cost, r.report.peak_cells.saturating_sub(r.report.input_cells)));
+            samples.push((
+                n,
+                r.report.cost,
+                r.report.peak_cells.saturating_sub(r.report.input_cells),
+            ));
         }
         let time = classify(&samples.iter().map(|s| s.1 as f64).collect::<Vec<_>>());
         let space = classify(&samples.iter().map(|s| s.2 as f64).collect::<Vec<_>>());
-        Some(Complexity { time, space, samples })
+        Some(Complexity {
+            time,
+            space,
+            samples,
+        })
     }
 
     /// The reference verdict (used by validation and the CLI).

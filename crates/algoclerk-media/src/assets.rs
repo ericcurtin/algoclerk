@@ -68,7 +68,9 @@ impl Assets {
         if let Ok(dir) = std::env::var("ALGOCLERK_ASSETS") {
             match Assets::from_dir(Path::new(&dir)) {
                 Ok(a) => return a,
-                Err(e) => eprintln!("ALGOCLERK_ASSETS={dir} unreadable ({e}); using embedded assets"),
+                Err(e) => {
+                    eprintln!("ALGOCLERK_ASSETS={dir} unreadable ({e}); using embedded assets")
+                }
             }
         }
         Assets::embedded()

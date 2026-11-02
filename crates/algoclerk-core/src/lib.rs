@@ -5,9 +5,9 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
-pub mod i18n;
 pub mod codegen;
 pub mod complexity;
+pub mod i18n;
 pub mod judge;
 pub mod lang;
 pub mod level;

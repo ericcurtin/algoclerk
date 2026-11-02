@@ -10,18 +10,93 @@ use algoclerk_core::lang::run::compile;
 use proptest::prelude::*;
 
 const TOKENS: &[&str] = &[
-    "fn", "f", "(", ")", "{", "}", "[", "]", ",", ";", ":", "->", "let", "x", "y", "=", "==", "+", "-", "*", "/", "%", "<", ">", ">>", "<<",
-    "if", "else", "while", "for", "in", "range", "return", "break", "continue", "true", "false", "null", "none", "int", "vec", "<int>",
-    "map<int, int>", "stack<int>", "1", "0", "-5", "\"s\"", "'c'", ".", "..", "len", "push", "pop", "get", "and", "or", "not", "&mut", "_",
-    "x.push(1)", "v[0]", "(1, 2)", ".0", "&", "|", "^", "~", "!", "#", "//", "\n",
+    "fn",
+    "f",
+    "(",
+    ")",
+    "{",
+    "}",
+    "[",
+    "]",
+    ",",
+    ";",
+    ":",
+    "->",
+    "let",
+    "x",
+    "y",
+    "=",
+    "==",
+    "+",
+    "-",
+    "*",
+    "/",
+    "%",
+    "<",
+    ">",
+    ">>",
+    "<<",
+    "if",
+    "else",
+    "while",
+    "for",
+    "in",
+    "range",
+    "return",
+    "break",
+    "continue",
+    "true",
+    "false",
+    "null",
+    "none",
+    "int",
+    "vec",
+    "<int>",
+    "map<int, int>",
+    "stack<int>",
+    "1",
+    "0",
+    "-5",
+    "\"s\"",
+    "'c'",
+    ".",
+    "..",
+    "len",
+    "push",
+    "pop",
+    "get",
+    "and",
+    "or",
+    "not",
+    "&mut",
+    "_",
+    "x.push(1)",
+    "v[0]",
+    "(1, 2)",
+    ".0",
+    "&",
+    "|",
+    "^",
+    "~",
+    "!",
+    "#",
+    "//",
+    "\n",
 ];
 
 fn run_everything(src: &str) {
-    let opts = CheckOpts { allowed: Allowed::all(), entry: None };
+    let opts = CheckOpts {
+        allowed: Allowed::all(),
+        entry: None,
+    };
     if let Ok(prog) = parse(src) {
         let printed = print(&prog);
         let again = parse(&printed).map(|p| print(&p));
-        assert_eq!(again.as_deref(), Ok(printed.as_str()), "printing is not stable for {src:?}");
+        assert_eq!(
+            again.as_deref(),
+            Ok(printed.as_str()),
+            "printing is not stable for {src:?}"
+        );
     }
     if let Ok(c) = compile(src, &opts) {
         for f in &c.program.fns {
@@ -37,7 +112,11 @@ fn run_everything(src: &str) {
                 })
                 .collect();
             if let Some(args) = args {
-                let limits = Limits { steps: 20_000, cells: 10_000, ..Limits::default() };
+                let limits = Limits {
+                    steps: 20_000,
+                    cells: 10_000,
+                    ..Limits::default()
+                };
                 let _ = c.call(&f.name, &args, &limits);
             }
         }
@@ -107,10 +186,26 @@ fn deep_recursion_fits_in_a_small_stack() {
 
 #[test]
 fn memory_bombs_are_stopped() {
-    let c = compile("fn f(n: int) -> int { let v = [0; n]; let w = [v; 1000]; return len(w); }", &CheckOpts { allowed: Allowed::all(), entry: None }).unwrap();
-    let r = c.call("f", &["100000000".to_string()], &Limits::default()).unwrap();
+    let c = compile(
+        "fn f(n: int) -> int { let v = [0; n]; let w = [v; 1000]; return len(w); }",
+        &CheckOpts {
+            allowed: Allowed::all(),
+            entry: None,
+        },
+    )
+    .unwrap();
+    let r = c
+        .call("f", &["100000000".to_string()], &Limits::default())
+        .unwrap();
     assert!(r.report.result.is_err());
-    let c = compile("fn f() -> int { let s = \"ab\"; while true { s = s + s; } return 0; }", &CheckOpts { allowed: Allowed::all(), entry: None }).unwrap();
+    let c = compile(
+        "fn f() -> int { let s = \"ab\"; while true { s = s + s; } return 0; }",
+        &CheckOpts {
+            allowed: Allowed::all(),
+            entry: None,
+        },
+    )
+    .unwrap();
     let r = c.call("f", &[], &Limits::default()).unwrap();
     assert!(r.report.result.is_err());
 }

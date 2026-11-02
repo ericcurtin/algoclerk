@@ -2,6 +2,13 @@
 //! Compile the generated C, C++ and Rust of every reference solution, run it on the level's
 //! tests through a generated harness, and compare with the interpreter.
 
+#![allow(
+    clippy::ptr_arg,
+    clippy::needless_range_loop,
+    clippy::type_complexity,
+    clippy::manual_range_contains
+)]
+
 use algoclerk_core::codegen::compile::{Compiler, available, compile_and_run};
 use algoclerk_core::codegen::{Lang, generate, harness};
 use algoclerk_core::judge::{Judge, canonical};
@@ -16,7 +23,12 @@ fn scratch(tag: &str) -> PathBuf {
     d
 }
 
-fn check_level(level: &algoclerk_core::level::Level, lang: Lang, compilers: &[Compiler], dir: &PathBuf) -> Vec<String> {
+fn check_level(
+    level: &algoclerk_core::level::Level,
+    lang: Lang,
+    compilers: &[Compiler],
+    dir: &PathBuf,
+) -> Vec<String> {
     let mut problems = Vec::new();
     let judge = Judge::new(level).expect("judge");
     let sol = compile(&level.reference, &level.check_opts()).expect("reference compiles");
@@ -34,13 +46,22 @@ fn check_level(level: &algoclerk_core::level::Level, lang: Lang, compilers: &[Co
             Ok(out) => {
                 let lines: Vec<&str> = out.lines().collect();
                 if lines.len() != cases.len() {
-                    problems.push(format!("{} [{}]: {} output lines for {} cases", level.id, comp.exe, lines.len(), cases.len()));
+                    problems.push(format!(
+                        "{} [{}]: {} output lines for {} cases",
+                        level.id,
+                        comp.exe,
+                        lines.len(),
+                        cases.len()
+                    ));
                     continue;
                 }
                 for (c, l) in cases.iter().zip(lines) {
                     let got = canonical(l, &level.signature.ret, level.compare);
                     if got != c.expect {
-                        problems.push(format!("{} [{}]: args {:?}: expected {} got {}", level.id, comp.exe, c.args, c.expect, got));
+                        problems.push(format!(
+                            "{} [{}]: args {:?}: expected {} got {}",
+                            level.id, comp.exe, c.args, c.expect, got
+                        ));
                         break;
                     }
                 }
@@ -64,25 +85,32 @@ fn run_lang(lang: Lang) {
     let filter = std::env::var("ALGOCLERK_LEVEL").ok();
     std::thread::scope(|s| {
         for _ in 0..6 {
-            s.spawn(|| loop {
-                let i = {
-                    let mut n = next.lock().unwrap();
-                    let i = *n;
-                    *n += 1;
-                    i
-                };
-                let Some(l) = levels.get(i) else { break };
-                if filter.as_ref().is_some_and(|f| f != &l.id) {
-                    continue;
+            s.spawn(|| {
+                loop {
+                    let i = {
+                        let mut n = next.lock().unwrap();
+                        let i = *n;
+                        *n += 1;
+                        i
+                    };
+                    let Some(l) = levels.get(i) else { break };
+                    if filter.as_ref().is_some_and(|f| f != &l.id) {
+                        continue;
+                    }
+                    let p = check_level(l, lang, &compilers, &dir);
+                    problems.lock().unwrap().extend(p);
                 }
-                let p = check_level(l, lang, &compilers, &dir);
-                problems.lock().unwrap().extend(p);
             });
         }
     });
     let _ = std::fs::remove_dir_all(&dir);
     let problems = problems.into_inner().unwrap();
-    assert!(problems.is_empty(), "{} problems:\n{}", problems.len(), problems.join("\n---\n"));
+    assert!(
+        problems.is_empty(),
+        "{} problems:\n{}",
+        problems.len(),
+        problems.join("\n---\n")
+    );
 }
 
 #[test]

@@ -74,13 +74,20 @@ impl Font {
                 let mut cs = key.chars();
                 let c = cs.next().ok_or("empty key")?;
                 if cs.next().is_some() {
-                    return Err(format!("line {}: key `{key}` must be one character or U+XXXX", n + 1));
+                    return Err(format!(
+                        "line {}: key `{key}` must be one character or U+XXXX",
+                        n + 1
+                    ));
                 }
                 c
             };
             let rws: Vec<&str> = it.collect();
             if rws.len() != rows {
-                return Err(format!("line {}: glyph `{key}` needs {rows} rows, has {}", n + 1, rws.len()));
+                return Err(format!(
+                    "line {}: glyph `{key}` needs {rows} rows, has {}",
+                    n + 1,
+                    rws.len()
+                ));
             }
             let mut bits = vec![0u8; rows];
             for (r, row) in rws.iter().enumerate() {

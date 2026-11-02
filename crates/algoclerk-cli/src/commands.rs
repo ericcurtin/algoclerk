@@ -55,7 +55,9 @@ pub fn dispatch(argv: &[String]) -> Result<u8, String> {
         "uses" => uses(&args),
         "tune" => tune(&args),
         "codegen" => crate::codegen_cmd::codegen(&args),
-        other => Err(format!("unknown command \"{other}\" (try `algoclerk-cli help`)")),
+        other => Err(format!(
+            "unknown command \"{other}\" (try `algoclerk-cli help`)"
+        )),
     }
 }
 
@@ -74,7 +76,8 @@ pub fn campaign(args: &Args) -> Campaign {
 /// Find a level by id.
 pub fn find_level<'a>(c: &'a Campaign, id: &str) -> Result<&'a Level, String> {
     let bare = id.rsplit('/').next().unwrap_or(id);
-    c.find(bare).ok_or_else(|| format!("no level called \"{id}\" (see `algoclerk-cli list`)"))
+    c.find(bare)
+        .ok_or_else(|| format!("no level called \"{id}\" (see `algoclerk-cli list`)"))
 }
 
 fn read(path: &str) -> Result<String, String> {
@@ -84,7 +87,12 @@ fn read(path: &str) -> Result<String, String> {
 fn list(args: &Args) -> Result<u8, String> {
     let c = campaign(args);
     for p in &c.packs {
-        println!("{}  ({} levels)  {}", p.info.title, p.levels.len(), p.info.blurb);
+        println!(
+            "{}  ({} levels)  {}",
+            p.info.title,
+            p.levels.len(),
+            p.info.blurb
+        );
         for l in &p.levels {
             println!("  {:<28} {}", l.id, l.title);
         }
@@ -100,19 +108,38 @@ fn show(args: &Args) -> Result<u8, String> {
     println!("\n{}\n\n{}\n", l.story, l.statement);
     println!("    {}\n", l.signature.text());
     for (i, e) in l.examples.iter().enumerate() {
-        println!("example {}: ({}) -> {}   {}", i + 1, e.args.join(", "), e.expect, e.note);
+        println!(
+            "example {}: ({}) -> {}   {}",
+            i + 1,
+            e.args.join(", "),
+            e.expect,
+            e.note
+        );
     }
     println!("\nconstraints:");
     for x in &l.constraints {
         println!("  - {x}");
     }
-    println!("\nunlocked types: {}", l.allowed_types().into_iter().collect::<Vec<_>>().join(", "));
-    println!("unlocked tools: {}", if l.builtins.is_empty() { "(none)".into() } else { l.builtins.join(", ") });
+    println!(
+        "\nunlocked types: {}",
+        l.allowed_types().into_iter().collect::<Vec<_>>().join(", ")
+    );
+    println!(
+        "unlocked tools: {}",
+        if l.builtins.is_empty() {
+            "(none)".into()
+        } else {
+            l.builtins.join(", ")
+        }
+    );
     for k in &l.locked {
         println!("locked: {} ({})", k.name, k.why);
     }
     println!("technique: {}   {}", l.technique, l.big_o);
-    println!("medal targets: size {:?}  speed {:?}", l.medals.size, l.medals.speed);
+    println!(
+        "medal targets: size {:?}  speed {:?}",
+        l.medals.size, l.medals.speed
+    );
     Ok(0)
 }
 
@@ -131,15 +158,25 @@ fn reference(args: &Args) -> Result<u8, String> {
 }
 
 fn check(args: &Args) -> Result<u8, String> {
-    let file = args.positional.first().ok_or("usage: check FILE [--level LEVEL]")?;
+    let file = args
+        .positional
+        .first()
+        .ok_or("usage: check FILE [--level LEVEL]")?;
     let text = read(file)?;
     let opts = match args.opt("level") {
         Some(id) => find_level(&campaign(args), id)?.check_opts(),
-        None => CheckOpts { allowed: Allowed::all(), entry: None },
+        None => CheckOpts {
+            allowed: Allowed::all(),
+            entry: None,
+        },
     };
     match compile(&text, &opts) {
         Ok(c) => {
-            println!("ok: {} functions, size {}", c.program.fns.len(), c.program.size());
+            println!(
+                "ok: {} functions, size {}",
+                c.program.fns.len(),
+                c.program.size()
+            );
             Ok(0)
         }
         Err(ds) => {
@@ -159,10 +196,25 @@ fn check(args: &Args) -> Result<u8, String> {
 }
 
 fn run(args: &Args) -> Result<u8, String> {
-    let [file, func, rest @ ..] = args.positional.as_slice() else { return Err("usage: run FILE FUNCTION [ARG...]".into()) };
+    let [file, func, rest @ ..] = args.positional.as_slice() else {
+        return Err("usage: run FILE FUNCTION [ARG...]".into());
+    };
     let text = read(file)?;
-    let c = compile(&text, &CheckOpts { allowed: Allowed::all(), entry: None }).map_err(|d| d.first().map(|d| d.msg.clone()).unwrap_or_default())?;
-    let limits = Limits { steps: args.opt("steps").and_then(|s| s.parse().ok()).unwrap_or(50_000_000), ..Limits::default() };
+    let c = compile(
+        &text,
+        &CheckOpts {
+            allowed: Allowed::all(),
+            entry: None,
+        },
+    )
+    .map_err(|d| d.first().map(|d| d.msg.clone()).unwrap_or_default())?;
+    let limits = Limits {
+        steps: args
+            .opt("steps")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(50_000_000),
+        ..Limits::default()
+    };
     let r = c.call(func, rest, &limits)?;
     match r.report.result {
         Ok(_) => {
@@ -178,7 +230,9 @@ fn run(args: &Args) -> Result<u8, String> {
 }
 
 fn judge(args: &Args) -> Result<u8, String> {
-    let [id, file] = args.positional.as_slice() else { return Err("usage: judge LEVEL FILE".into()) };
+    let [id, file] = args.positional.as_slice() else {
+        return Err("usage: judge LEVEL FILE".into());
+    };
     let c = campaign(args);
     let level = find_level(&c, id)?;
     let text = read(file)?;
@@ -202,7 +256,13 @@ fn judge(args: &Args) -> Result<u8, String> {
         }
         println!("{o}");
     } else if v.passed {
-        println!("ACCEPTED  size {} ({})  speed {:.1} ({})", v.size, v.medals.size.name(), v.avg_cost, v.medals.speed.name());
+        println!(
+            "ACCEPTED  size {} ({})  speed {:.1} ({})",
+            v.size,
+            v.medals.size.name(),
+            v.avg_cost,
+            v.medals.speed.name()
+        );
         if let Some(cx) = &v.complexity {
             println!("measured: time {}, space {}", cx.time, cx.space);
         }
@@ -211,9 +271,21 @@ fn judge(args: &Args) -> Result<u8, String> {
     } else if let Some(f) = &v.failure {
         let args = f.case.args.join(", ");
         match f.kind {
-            FailKind::Wrong => println!("WRONG ANSWER on ({args}): expected {}, got {}", f.case.expect, f.got.clone().unwrap_or_default()),
-            FailKind::TimeLimit => println!("TIME LIMIT EXCEEDED on {} test ({}): {}", if f.case.large { "a large" } else { "a" }, args.chars().take(60).collect::<String>(), f.error.as_ref().map_or("", |e| e.msg.as_str())),
-            _ => println!("ERROR on ({args}): {}", f.error.as_ref().map_or("", |e| e.msg.as_str())),
+            FailKind::Wrong => println!(
+                "WRONG ANSWER on ({args}): expected {}, got {}",
+                f.case.expect,
+                f.got.clone().unwrap_or_default()
+            ),
+            FailKind::TimeLimit => println!(
+                "TIME LIMIT EXCEEDED on {} test ({}): {}",
+                if f.case.large { "a large" } else { "a" },
+                args.chars().take(60).collect::<String>(),
+                f.error.as_ref().map_or("", |e| e.msg.as_str())
+            ),
+            _ => println!(
+                "ERROR on ({args}): {}",
+                f.error.as_ref().map_or("", |e| e.msg.as_str())
+            ),
         }
     }
     Ok(u8::from(!v.passed))
@@ -224,7 +296,10 @@ fn validate(args: &Args) -> Result<u8, String> {
     let ids: Vec<&Level> = if args.positional.is_empty() {
         c.all_levels().collect()
     } else {
-        args.positional.iter().map(|i| find_level(&c, i)).collect::<Result<_, _>>()?
+        args.positional
+            .iter()
+            .map(|i| find_level(&c, i))
+            .collect::<Result<_, _>>()?
     };
     let mut bad = 0;
     for l in ids {
@@ -249,7 +324,9 @@ fn table(args: &Args) -> Result<u8, String> {
         for l in &p.levels {
             let j = Judge::new(l)?;
             let v = j.reference_verdict();
-            let (t, s) = v.complexity.as_ref().map_or(("-".into(), "-".into()), |x| (x.time.to_string(), x.space.to_string()));
+            let (t, s) = v.complexity.as_ref().map_or(("-".into(), "-".into()), |x| {
+                (x.time.to_string(), x.space.to_string())
+            });
             let naive = match &l.naive {
                 None => "-".to_string(),
                 Some(n) => compile(n, &l.check_opts()).ok().map_or("?".into(), |sol| {
@@ -261,7 +338,10 @@ fn table(args: &Args) -> Result<u8, String> {
                     }
                 }),
             };
-            println!("| {} | {} | {} | {:.0} | {} | {} | {} |", p.info.title, l.title, v.size, v.avg_cost, t, s, naive);
+            println!(
+                "| {} | {} | {} | {:.0} | {} | {} | {} |",
+                p.info.title, l.title, v.size, v.avg_cost, t, s, naive
+            );
         }
     }
     Ok(0)
@@ -269,13 +349,24 @@ fn table(args: &Args) -> Result<u8, String> {
 
 fn tune(args: &Args) -> Result<u8, String> {
     let c = campaign(args);
-    let levels: Vec<&Level> = if args.flag("all") { c.all_levels().collect() } else { vec![find_level(&c, args.positional.first().ok_or("usage: tune LEVEL|--all")?)?] };
+    let levels: Vec<&Level> = if args.flag("all") {
+        c.all_levels().collect()
+    } else {
+        vec![find_level(
+            &c,
+            args.positional.first().ok_or("usage: tune LEVEL|--all")?,
+        )?]
+    };
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels");
     for l in levels {
         let j = match Judge::new(l) {
             Ok(j) => j,
             Err(e) => {
-                println!("{}: cannot build the test suite: {}", l.id, e.chars().take(300).collect::<String>());
+                println!(
+                    "{}: cannot build the test suite: {}",
+                    l.id,
+                    e.chars().take(300).collect::<String>()
+                );
                 continue;
             }
         };
@@ -286,17 +377,29 @@ fn tune(args: &Args) -> Result<u8, String> {
         }
         let size = v.size;
         let avg = v.avg_cost;
-        let sz = [(f64::from(size) * 1.6).ceil() as u32, (f64::from(size) * 1.25).ceil() as u32, size];
-        let sp = [(avg * 3.0).ceil() as u64, (avg * 1.6).ceil() as u64, (avg * 1.1).ceil() as u64 + 1];
+        let sz = [
+            (f64::from(size) * 1.6).ceil() as u32,
+            (f64::from(size) * 1.25).ceil() as u32,
+            size,
+        ];
+        let sp = [
+            (avg * 3.0).ceil() as u64,
+            (avg * 1.6).ceil() as u64,
+            (avg * 1.1).ceil() as u64 + 1,
+        ];
         let line = format!("size {sz:?}  speed {sp:?}");
         if args.flag("write") {
             let path = root.join(&l.pack).join(format!("{}.toml", l.id));
             let text = read(&path.to_string_lossy())?;
             let mut out = String::new();
             for ln in text.lines() {
-                if ln.starts_with("size = [") && text[..text.find(ln).unwrap_or(0)].contains("[medals]") {
+                if ln.starts_with("size = [")
+                    && text[..text.find(ln).unwrap_or(0)].contains("[medals]")
+                {
                     let _ = writeln!(out, "size = [{}, {}, {}]", sz[0], sz[1], sz[2]);
-                } else if ln.starts_with("speed = [") && text[..text.find(ln).unwrap_or(0)].contains("[medals]") {
+                } else if ln.starts_with("speed = [")
+                    && text[..text.find(ln).unwrap_or(0)].contains("[medals]")
+                {
                     let _ = writeln!(out, "speed = [{}, {}, {}]", sp[0], sp[1], sp[2]);
                 } else {
                     let _ = writeln!(out, "{ln}");
@@ -317,7 +420,14 @@ fn uses(args: &Args) -> Result<u8, String> {
     use algoclerk_core::lang::ast::{ExprKind, StmtKind, stmt_exprs, walk_expr, walk_stmts};
     let file = args.positional.first().ok_or("usage: uses FILE")?;
     let text = read(file)?;
-    let c = compile(&text, &CheckOpts { allowed: Allowed::all(), entry: None }).map_err(|d| d.first().map(|d| d.msg.clone()).unwrap_or_default())?;
+    let c = compile(
+        &text,
+        &CheckOpts {
+            allowed: Allowed::all(),
+            entry: None,
+        },
+    )
+    .map_err(|d| d.first().map(|d| d.msg.clone()).unwrap_or_default())?;
     let mut tools = std::collections::BTreeSet::new();
     let mut types = std::collections::BTreeSet::new();
     let user: Vec<&str> = c.program.fns.iter().map(|f| f.name.as_str()).collect();
@@ -344,16 +454,31 @@ fn uses(args: &Args) -> Result<u8, String> {
     for t in &c.info.types {
         let mut fams = Vec::new();
         t.families(&mut fams);
-        types.extend(fams.into_iter().filter(|f| !matches!(*f, "int" | "bool" | "unit" | "?" | "null")).map(String::from));
+        types.extend(
+            fams.into_iter()
+                .filter(|f| !matches!(*f, "int" | "bool" | "unit" | "?" | "null"))
+                .map(String::from),
+        );
     }
     for f in &c.info.fns {
         for (_, t) in &f.locals {
             let mut fams = Vec::new();
             t.families(&mut fams);
-            types.extend(fams.into_iter().filter(|f| !matches!(*f, "int" | "bool" | "unit" | "?" | "null")).map(String::from));
+            types.extend(
+                fams.into_iter()
+                    .filter(|f| !matches!(*f, "int" | "bool" | "unit" | "?" | "null"))
+                    .map(String::from),
+            );
         }
     }
     println!("types: {}", types.into_iter().collect::<Vec<_>>().join(","));
-    println!("tools: {}", tools.into_iter().filter(|t| t != "range").collect::<Vec<_>>().join(","));
+    println!(
+        "tools: {}",
+        tools
+            .into_iter()
+            .filter(|t| t != "range")
+            .collect::<Vec<_>>()
+            .join(",")
+    );
     Ok(0)
 }

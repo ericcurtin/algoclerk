@@ -1,43 +1,26 @@
 # Roadmap
 
-AlgoClerk v0.1 is playable on five platforms with 48 levels. This is where it could go; priorities
-follow what the community contributes.
+AlgoClerk 0.2 teaches ClerkScript with 80 levels on five platforms. Where it could go next:
 
-## 0.2: polish and reach
+## Language and levels
 
-- Level text translations (overlay files `levels/<pack>/<id>.<lang>.toml`), more UI languages, fallback fonts for CJK/Arabic/Indic scripts.
-- Screen reader support through AccessKit on desktop and mobile; full keyboard navigation of the program list.
-- Sound effects on by default where the platform audio stack builds without extra system packages (Windows, macOS, Android, iOS), music-free by design.
-- In-game level browser for extra packs and a "import pack from file" action on mobile.
-- More themes (user-defined palettes from a TOML file).
-- Better mobile text input for the program text panel.
+- More wings: tries and union-find, intervals and sweep lines, backtracking packs, system-design flavoured
+  "office tools" (an LRU cache as a level with methods), string matching (KMP), graph weights (Dijkstra with
+  `heap`).
+- User-defined struct types and methods in the sandbox; first-class lambdas for custom sort keys.
+- Level text translations (overlay files `levels/<pack>/<id>.<lang>.toml`) and translated diagnostics.
+- A level editor in the game that writes the TOML (generators, oracle skeleton, naive solution).
 
-## 0.3: language features
+## Front end
 
-- `CALL` / `RET` and a visible call stack; matching translation to functions in the generated code.
-- A "labelled data" mode: tiles with names usable in the text syntax (`COPYTO total`).
-- Strings as first-class belts (`display = "char"` everywhere) with word-level puzzles.
-- Optional "constants" instruction for tutorials that should not need prefilled tiles.
+- Screen reader support through AccessKit; full keyboard navigation of the card editor.
+- Drag and drop of cards between blocks (today a card moves among its siblings and can be re-created inside
+  another card with the palette).
+- Larger clerk wardrobe (hats, glasses) and more office decorations unlocked by wings.
+- A real "step into helper function" animation with a second tray row for the callee.
+- More languages and bitmap-font glyphs for accented Latin, Greek and Cyrillic.
 
-## 0.4: community
+## Platforms
 
-- **Level of the week**: a weekly community puzzle merged as a pull request, announced in the
-  discussions, solutions shared as text and re-judged by anyone with the CLI.
-- Community packs repository with a stable level-format version and a CI template that validates packs.
-- `algoclerk-cli compare` to verify a directory of shared solutions and print a leaderboard table
-  (see [docs/SHARING.md](docs/SHARING.md)); no hosting required.
-- Daily puzzle generated from a seeded generator.
-- Achievements for optimal size / speed, and a gallery of beautiful solutions.
-
-## Later ideas
-
-- Challenge levels with "minimise memory", "no jumps" or "at most N steps" rules.
-- A level editor inside the game.
-- A pack for graph and tree algorithms using pointer tiles.
-- A teacher mode: share a set of levels and a verification script for a classroom.
-
-## Non-goals
-
-- A web or browser build, WebAssembly, embedding another scripting language: player programs run in
-  the built-in interpreter by design.
-- Online accounts and servers in the core game.
+- Published store builds for Android and iOS, signed desktop installers, Flatpak.
+- iOS and Android safe-area queries from the OS when winit exposes them.

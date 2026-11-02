@@ -48,9 +48,13 @@ impl Infer {
     pub fn has_var(&self, t: &Ty) -> bool {
         match self.shallow(t) {
             Ty::Var(_) => true,
-            Ty::Vec(a) | Ty::Set(a) | Ty::Option(a) | Ty::Stack(a) | Ty::Queue(a) | Ty::Deque(a) | Ty::Heap(a) => {
-                self.has_var(&a)
-            }
+            Ty::Vec(a)
+            | Ty::Set(a)
+            | Ty::Option(a)
+            | Ty::Stack(a)
+            | Ty::Queue(a)
+            | Ty::Deque(a)
+            | Ty::Heap(a) => self.has_var(&a),
             Ty::Map(k, v) => self.has_var(&k) || self.has_var(&v),
             Ty::Tuple(ts) => ts.iter().any(|t| self.has_var(t)),
             _ => false,
@@ -60,9 +64,13 @@ impl Infer {
     fn occurs(&self, v: u32, t: &Ty) -> bool {
         match self.shallow(t) {
             Ty::Var(w) => v == w,
-            Ty::Vec(a) | Ty::Set(a) | Ty::Option(a) | Ty::Stack(a) | Ty::Queue(a) | Ty::Deque(a) | Ty::Heap(a) => {
-                self.occurs(v, &a)
-            }
+            Ty::Vec(a)
+            | Ty::Set(a)
+            | Ty::Option(a)
+            | Ty::Stack(a)
+            | Ty::Queue(a)
+            | Ty::Deque(a)
+            | Ty::Heap(a) => self.occurs(v, &a),
             Ty::Map(k, x) => self.occurs(v, &k) || self.occurs(v, &x),
             Ty::Tuple(ts) => ts.iter().any(|t| self.occurs(v, t)),
             _ => false,

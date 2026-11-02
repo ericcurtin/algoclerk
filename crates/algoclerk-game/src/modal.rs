@@ -50,7 +50,11 @@ impl Modal {
     /// Rectangles: `(panel, yes, no)`.
     pub fn rects(vp: &Viewport) -> (Rect, Rect, Rect) {
         let w = if vp.portrait { vp.safe.w - 20 } else { 300 };
-        let h = if vp.portrait { 150 + vp.btn_h() } else { 110 + vp.btn_h() };
+        let h = if vp.portrait {
+            150 + vp.btn_h()
+        } else {
+            110 + vp.btn_h()
+        };
         let panel = centered(vp.safe, w.min(vp.safe.w), h.min(vp.safe.h));
         let bh = vp.btn_h();
         let bw = (panel.w - 24) / 2;
@@ -78,7 +82,11 @@ impl Modal {
             self.focus_yes = !self.focus_yes;
         }
         if cx.input.key(Key::Enter) || cx.input.key(Key::Space) {
-            return if self.focus_yes { Answer::Yes } else { Answer::No };
+            return if self.focus_yes {
+                Answer::Yes
+            } else {
+                Answer::No
+            };
         }
         Answer::Open
     }
@@ -92,8 +100,27 @@ impl Modal {
         g.header(head, &self.title, true);
         let cols = ((panel.w - 24) / 6) as usize;
         let n = Font::wrap(&self.body, cols).len();
-        g.paragraph(panel.x + 12, head.bottom() + 8, cols, &self.body, 'K', 1, 11, n.min(8));
-        g.button(yes, &self.yes, Kind::Good, widget_state(v.ptr, &yes, self.focus_yes, false));
-        g.button(no, &self.no, Kind::Normal, widget_state(v.ptr, &no, !self.focus_yes, false));
+        g.paragraph(
+            panel.x + 12,
+            head.bottom() + 8,
+            cols,
+            &self.body,
+            'K',
+            1,
+            11,
+            n.min(8),
+        );
+        g.button(
+            yes,
+            &self.yes,
+            Kind::Good,
+            widget_state(v.ptr, &yes, self.focus_yes, false),
+        );
+        g.button(
+            no,
+            &self.no,
+            Kind::Normal,
+            widget_state(v.ptr, &no, !self.focus_yes, false),
+        );
     }
 }

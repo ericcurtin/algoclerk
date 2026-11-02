@@ -55,11 +55,22 @@ pub fn header_text(s: &Stmt) -> String {
             format!("let {}{t} = {};", pat_text(pat), expr_text(init))
         }
         StmtKind::Assign { target, op, value } => {
-            format!("{} {}= {};", expr_text(target), op.map_or(String::new(), |o| o.text().to_string()), expr_text(value))
+            format!(
+                "{} {}= {};",
+                expr_text(target),
+                op.map_or(String::new(), |o| o.text().to_string()),
+                expr_text(value)
+            )
         }
         StmtKind::If { cond, .. } => format!("if {}", expr_text(cond)),
         StmtKind::While { cond, .. } => format!("while {}", expr_text(cond)),
-        StmtKind::ForRange { var, start, end, step, .. } => {
+        StmtKind::ForRange {
+            var,
+            start,
+            end,
+            step,
+            ..
+        } => {
             let mut a = Vec::new();
             if let Some(x) = start {
                 a.push(expr_text(x));
@@ -72,7 +83,9 @@ pub fn header_text(s: &Stmt) -> String {
             }
             format!("for {var} in range({})", a.join(", "))
         }
-        StmtKind::ForEach { pat, iter, .. } => format!("for {} in {}", pat_text(pat), expr_text(iter)),
+        StmtKind::ForEach { pat, iter, .. } => {
+            format!("for {} in {}", pat_text(pat), expr_text(iter))
+        }
         StmtKind::Break => "break;".into(),
         StmtKind::Continue => "continue;".into(),
         StmtKind::Return(Some(e)) => format!("return {};", expr_text(e)),
@@ -83,17 +96,41 @@ pub fn header_text(s: &Stmt) -> String {
 
 fn rows_block(b: &Block, depth: usize, out: &mut Vec<Row>) {
     for s in &b.stmts {
-        let compound = matches!(s.kind, StmtKind::If { .. } | StmtKind::While { .. } | StmtKind::ForRange { .. } | StmtKind::ForEach { .. });
-        out.push(Row { node: s.id, depth, text: header_text(s), icon: icon_of(&s.kind), kind: if compound { CardKind::Compound } else { CardKind::Simple } });
+        let compound = matches!(
+            s.kind,
+            StmtKind::If { .. }
+                | StmtKind::While { .. }
+                | StmtKind::ForRange { .. }
+                | StmtKind::ForEach { .. }
+        );
+        out.push(Row {
+            node: s.id,
+            depth,
+            text: header_text(s),
+            icon: icon_of(&s.kind),
+            kind: if compound {
+                CardKind::Compound
+            } else {
+                CardKind::Simple
+            },
+        });
         match &s.kind {
             StmtKind::If { then, els, .. } => {
                 rows_block(then, depth + 1, out);
                 if let Some(e) = els {
-                    out.push(Row { node: s.id, depth, text: "else".into(), icon: "signpost", kind: CardKind::Else });
+                    out.push(Row {
+                        node: s.id,
+                        depth,
+                        text: "else".into(),
+                        icon: "signpost",
+                        kind: CardKind::Else,
+                    });
                     rows_block(e, depth + 1, out);
                 }
             }
-            StmtKind::While { body, .. } | StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. } => rows_block(body, depth + 1, out),
+            StmtKind::While { body, .. }
+            | StmtKind::ForRange { body, .. }
+            | StmtKind::ForEach { body, .. } => rows_block(body, depth + 1, out),
             _ => {}
         }
     }
@@ -103,7 +140,13 @@ fn rows_block(b: &Block, depth: usize, out: &mut Vec<Row>) {
 pub fn rows(p: &Program) -> Vec<Row> {
     let mut out = Vec::new();
     for f in &p.fns {
-        out.push(Row { node: f.id, depth: 0, text: algoclerk_core::lang::print::signature_text(f), icon: "code", kind: CardKind::Header });
+        out.push(Row {
+            node: f.id,
+            depth: 0,
+            text: algoclerk_core::lang::print::signature_text(f),
+            icon: "code",
+            kind: CardKind::Header,
+        });
         rows_block(&f.body, 1, &mut out);
     }
     out
@@ -124,7 +167,9 @@ fn locate<'a>(b: &'a mut Block, id: NodeId) -> Option<(&'a mut Block, usize)> {
                     None
                 }
             }
-            StmtKind::While { body, .. } | StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. } => locate(body, id),
+            StmtKind::While { body, .. }
+            | StmtKind::ForRange { body, .. }
+            | StmtKind::ForEach { body, .. } => locate(body, id),
             _ => None,
         };
         if found.is_some() {
@@ -139,8 +184,15 @@ fn contains(s: &Stmt, id: NodeId) -> bool {
         return true;
     }
     match &s.kind {
-        StmtKind::If { then, els, .. } => then.stmts.iter().any(|x| contains(x, id)) || els.as_ref().is_some_and(|e| e.stmts.iter().any(|x| contains(x, id))),
-        StmtKind::While { body, .. } | StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. } => body.stmts.iter().any(|x| contains(x, id)),
+        StmtKind::If { then, els, .. } => {
+            then.stmts.iter().any(|x| contains(x, id))
+                || els
+                    .as_ref()
+                    .is_some_and(|e| e.stmts.iter().any(|x| contains(x, id)))
+        }
+        StmtKind::While { body, .. }
+        | StmtKind::ForRange { body, .. }
+        | StmtKind::ForEach { body, .. } => body.stmts.iter().any(|x| contains(x, id)),
         _ => false,
     }
 }
@@ -184,13 +236,21 @@ pub fn delete_stmt(p: &mut Program, id: NodeId) -> Option<String> {
 /// Parse a statement from header text (compound statements get an empty body).
 pub fn parse_stmt(text: &str) -> Result<Stmt, String> {
     let t = text.trim();
-    let wrapped = if t.ends_with(';') || t.ends_with('}') { format!("fn w() {{ {t} }}") } else { format!("fn w() {{ {t} {{ }} }}") };
+    let wrapped = if t.ends_with(';') || t.ends_with('}') {
+        format!("fn w() {{ {t} }}")
+    } else {
+        format!("fn w() {{ {t} {{ }} }}")
+    };
     let p = parse(&wrapped).map_err(|d| d.msg)?;
     let f = p.fns.into_iter().next().ok_or("empty")?;
     if f.body.stmts.len() != 1 {
         return Err("A card holds exactly one sentence.".into());
     }
-    f.body.stmts.into_iter().next().ok_or_else(|| "empty".to_string())
+    f.body
+        .stmts
+        .into_iter()
+        .next()
+        .ok_or_else(|| "empty".to_string())
 }
 
 /// Replace the header of a statement, keeping its body.
@@ -201,21 +261,52 @@ pub fn edit_stmt(p: &mut Program, id: NodeId, text: &str) -> Result<String, Stri
         if let Some(s) = find_stmt(&mut f.body, id) {
             let old = std::mem::replace(&mut s.kind, StmtKind::Break);
             s.kind = match (old, new.kind) {
-                (StmtKind::If { then, els, .. }, StmtKind::If { cond, .. }) => StmtKind::If { cond, then, els },
-                (StmtKind::While { body, .. }, StmtKind::While { cond, .. }) => StmtKind::While { cond, body },
-                (StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. }, StmtKind::ForRange { var, start, end, step, .. }) => StmtKind::ForRange { var, start, end, step, body },
-                (StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. }, StmtKind::ForEach { pat, iter, .. }) => StmtKind::ForEach { pat, iter, body },
+                (StmtKind::If { then, els, .. }, StmtKind::If { cond, .. }) => {
+                    StmtKind::If { cond, then, els }
+                }
+                (StmtKind::While { body, .. }, StmtKind::While { cond, .. }) => {
+                    StmtKind::While { cond, body }
+                }
+                (
+                    StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. },
+                    StmtKind::ForRange {
+                        var,
+                        start,
+                        end,
+                        step,
+                        ..
+                    },
+                ) => StmtKind::ForRange {
+                    var,
+                    start,
+                    end,
+                    step,
+                    body,
+                },
+                (
+                    StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. },
+                    StmtKind::ForEach { pat, iter, .. },
+                ) => StmtKind::ForEach { pat, iter, body },
                 (_, other) => other,
             };
             done = true;
             break;
         }
     }
-    if done { Ok(reprint(p)) } else { Err("That card is gone.".into()) }
+    if done {
+        Ok(reprint(p))
+    } else {
+        Err("That card is gone.".into())
+    }
 }
 
 /// Insert a new statement after `id` (or at the start of its body when `inside`).
-pub fn insert_stmt(p: &mut Program, anchor: Option<NodeId>, inside: bool, text: &str) -> Result<String, String> {
+pub fn insert_stmt(
+    p: &mut Program,
+    anchor: Option<NodeId>,
+    inside: bool,
+    text: &str,
+) -> Result<String, String> {
     let mut new = parse_stmt(text)?;
     new.id = p.fresh_id();
     match anchor {
@@ -230,7 +321,9 @@ pub fn insert_stmt(p: &mut Program, anchor: Option<NodeId>, inside: bool, text: 
                     if let Some(s) = find_stmt(&mut f.body, id) {
                         match &mut s.kind {
                             StmtKind::If { then, .. } => then.stmts.insert(0, new.clone()),
-                            StmtKind::While { body, .. } | StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. } => body.stmts.insert(0, new.clone()),
+                            StmtKind::While { body, .. }
+                            | StmtKind::ForRange { body, .. }
+                            | StmtKind::ForEach { body, .. } => body.stmts.insert(0, new.clone()),
                             _ => return Err("That card has no inside.".into()),
                         }
                         placed = true;

@@ -7,9 +7,9 @@ use crate::clerk::{ClerkArt, ClerkState, Dir, Pose};
 use crate::gfx::{Gfx, Kind, State, clip};
 use crate::input::Key;
 use crate::layout::{Hit, Viewport};
+use crate::modal::{Answer, Modal, Purpose};
 use crate::play::{outfit_of, tap_rect};
 use crate::result::blit_scaled;
-use crate::modal::{Answer, Modal, Purpose};
 use crate::ui::{Ctx, GameEvent, Nav, View, widget_state};
 use algoclerk_core::i18n;
 use algoclerk_media::bank::PALETTES;
@@ -110,7 +110,15 @@ impl Settings {
 
     /// The rows shown (fullscreen only on desktop).
     pub fn rows(can_quit: bool) -> Vec<Row> {
-        let mut v = vec![Row::Palette, Row::TextSize, Row::Reduce, Row::Speed, Row::Music, Row::Sfx, Row::Lang];
+        let mut v = vec![
+            Row::Palette,
+            Row::TextSize,
+            Row::Reduce,
+            Row::Speed,
+            Row::Music,
+            Row::Sfx,
+            Row::Lang,
+        ];
         if can_quit {
             v.push(Row::Fullscreen);
         }
@@ -143,7 +151,13 @@ impl Settings {
         let (mut ly, mut ry) = (4, 4);
         for row in Settings::rows(can_quit) {
             let right = matches!(row, Row::Preset | Row::Body | Row::Role(_));
-            let (x, y) = if two && right { (8 + colw, &mut ry) } else if two { (4, &mut ly) } else { (4, &mut ly) };
+            let (x, y) = if two && right {
+                (8 + colw, &mut ry)
+            } else if two {
+                (4, &mut ly)
+            } else {
+                (4, &mut ly)
+            };
             if matches!(row, Row::Palette | Row::Preset | Row::Music) {
                 *y += 14;
             }
@@ -153,7 +167,10 @@ impl Settings {
             if !two && right && row == Row::Preset {
                 // single column: continue below the left rows
             }
-            out.push(Placed { row, rect: Rect::new(x, *y, colw, rh) });
+            out.push(Placed {
+                row,
+                rect: Rect::new(x, *y, colw, rh),
+            });
             *y += rh + 2;
             if !two {
                 ry = ly;
@@ -170,7 +187,14 @@ impl Settings {
         for p in rows.iter().take(4) {
             v.push(Hit::tap("row", p.rect.offset(area.x, area.y)));
         }
-        v.push(Hit::tap("home", tap_rect(Rect::new(vp.safe.x + 3, vp.safe.y + 2, 26, 16), vp.hit_min(), vp.screen())));
+        v.push(Hit::tap(
+            "home",
+            tap_rect(
+                Rect::new(vp.safe.x + 3, vp.safe.y + 2, 26, 16),
+                vp.hit_min(),
+                vp.screen(),
+            ),
+        ));
         v
     }
 
@@ -178,15 +202,23 @@ impl Settings {
         let w = if vp.touch { vp.hit_min() } else { 18 };
         let h = r.h - 2;
         let value_w = if r.w < 260 { 64 } else { 80 };
-        (Rect::new(r.right() - 2 * w - value_w - 6, r.y + 1, w, h), Rect::new(r.right() - w - 2, r.y + 1, w, h))
+        (
+            Rect::new(r.right() - 2 * w - value_w - 6, r.y + 1, w, h),
+            Rect::new(r.right() - w - 2, r.y + 1, w, h),
+        )
     }
 
     fn adjust(&mut self, cx: &mut Ctx<'_>, row: Row, delta: i32) {
         let s = &mut cx.progress.settings;
         match row {
             Row::Palette => {
-                let cur = PALETTES.iter().position(|(id, _)| *id == s.palette).unwrap_or(0) as i32;
-                s.palette = PALETTES[(cur + delta).rem_euclid(PALETTES.len() as i32) as usize].0.to_string();
+                let cur = PALETTES
+                    .iter()
+                    .position(|(id, _)| *id == s.palette)
+                    .unwrap_or(0) as i32;
+                s.palette = PALETTES[(cur + delta).rem_euclid(PALETTES.len() as i32) as usize]
+                    .0
+                    .to_string();
             }
             Row::TextSize => s.text_size = if s.text_size >= 2 { 1 } else { 2 },
             Row::Reduce => s.reduce_motion = !s.reduce_motion,
@@ -202,7 +234,8 @@ impl Settings {
             Row::Lang => {
                 let langs = i18n::available_languages();
                 let cur = langs.iter().position(|l| *l == s.language).unwrap_or(0) as i32;
-                s.language = langs[(cur + delta).rem_euclid(langs.len() as i32) as usize].to_string();
+                s.language =
+                    langs[(cur + delta).rem_euclid(langs.len() as i32) as usize].to_string();
             }
             Row::Fullscreen => {
                 s.fullscreen = !s.fullscreen;
@@ -213,7 +246,12 @@ impl Settings {
             Row::Preset => {
                 let n = cx.bank.outfits.len() as i32;
                 let cur = outfit_of_settings(&s.outfit, cx.bank);
-                let idx = cx.bank.outfits.iter().position(|(_, o)| *o == cur).map_or(-1, |i| i as i32);
+                let idx = cx
+                    .bank
+                    .outfits
+                    .iter()
+                    .position(|(_, o)| *o == cur)
+                    .map_or(-1, |i| i as i32);
                 let next = (idx + delta).rem_euclid(n.max(1)) as usize;
                 s.outfit = cx.bank.outfits[next].1.to_code();
             }
@@ -221,14 +259,19 @@ impl Settings {
                 let mut o = outfit_of_settings(&s.outfit, cx.bank);
                 let bodies = cx.bank.bodies();
                 let cur = bodies.iter().position(|b| *b == o.body).unwrap_or(0) as i32;
-                o.body = bodies[(cur + delta).rem_euclid(bodies.len().max(1) as i32) as usize].clone();
+                o.body =
+                    bodies[(cur + delta).rem_euclid(bodies.len().max(1) as i32) as usize].clone();
                 s.outfit = o.to_code();
             }
             Row::Role(i) => {
                 let mut o = outfit_of_settings(&s.outfit, cx.bank);
                 let opts = role_options(i);
                 let cur = opts.iter().position(|c| *c == role_get(&o, i)).unwrap_or(0) as i32;
-                role_set(&mut o, i, opts[(cur + delta).rem_euclid(opts.len() as i32) as usize]);
+                role_set(
+                    &mut o,
+                    i,
+                    opts[(cur + delta).rem_euclid(opts.len() as i32) as usize],
+                );
                 s.outfit = o.to_code();
             }
             Row::Reset | Row::Back => {}
@@ -263,7 +306,12 @@ impl Settings {
             return None;
         }
         let min = vp.hit_min();
-        if ptr.tapped_in(&tap_rect(Rect::new(vp.safe.x + 3, vp.safe.y + 2, 26, 16), min, vp.screen())) || cx.input.key(Key::Escape) {
+        if ptr.tapped_in(&tap_rect(
+            Rect::new(vp.safe.x + 3, vp.safe.y + 2, 26, 16),
+            min,
+            vp.screen(),
+        )) || cx.input.key(Key::Escape)
+        {
             cx.sfx("button");
             return Some(Nav::Title);
         }
@@ -303,7 +351,10 @@ impl Settings {
                 cx.sfx("button");
                 return Some(Nav::Title);
             }
-            if matches!(row, Row::TextSize | Row::Reduce | Row::Fullscreen | Row::Unlock) {
+            if matches!(
+                row,
+                Row::TextSize | Row::Reduce | Row::Fullscreen | Row::Unlock
+            ) {
                 self.adjust(cx, row, 1);
             }
             if row == Row::Reset {
@@ -329,7 +380,10 @@ impl Settings {
                     cx.sfx("button");
                     return Some(Nav::Title);
                 }
-                if matches!(p.row, Row::TextSize | Row::Reduce | Row::Fullscreen | Row::Unlock) {
+                if matches!(
+                    p.row,
+                    Row::TextSize | Row::Reduce | Row::Fullscreen | Row::Unlock
+                ) {
                     self.adjust(cx, p.row, 1);
                 }
                 if p.row == Row::Reset {
@@ -386,7 +440,16 @@ impl Settings {
         g.rect(vp.screen(), 'k');
         for ty in 0..=(vp.h / 16) {
             for tx in 0..=(vp.w / 16) {
-                g.sprite(if (tx + ty) % 2 == 0 { "tiles/wall_a" } else { "tiles/wall_b" }, 0, tx * 16, ty * 16);
+                g.sprite(
+                    if (tx + ty) % 2 == 0 {
+                        "tiles/wall_a"
+                    } else {
+                        "tiles/wall_b"
+                    },
+                    0,
+                    tx * 16,
+                    ty * 16,
+                );
             }
         }
         // top bar
@@ -394,7 +457,17 @@ impl Settings {
         g.rect(top, 'K');
         g.hline(top.x, top.bottom() - 1, top.w, 'm');
         let home = Rect::new(vp.safe.x + 3, vp.safe.y + 2, 26, 16);
-        g.icon_button(home, "home", Kind::Normal, widget_state(v.ptr, &tap_rect(home, vp.hit_min(), vp.screen()), false, false));
+        g.icon_button(
+            home,
+            "home",
+            Kind::Normal,
+            widget_state(
+                v.ptr,
+                &tap_rect(home, vp.hit_min(), vp.screen()),
+                false,
+                false,
+            ),
+        );
         g.text(home.right() + 6, top.y + 6, &v.tr.t("title.settings"), 'W');
         g.panel(area.grow(2), 'W');
         let saved = g.c.set_clip(area.offset(g.off.0, g.off.1));
@@ -425,11 +498,21 @@ impl Settings {
                 g.rect(r, 'y');
                 g.cursor(r.x + 2, r.y + (r.h - 9) / 2);
             }
-            g.text(r.x + 14, r.y + (r.h - 7) / 2, &clip(&Settings::label(p.row, v), if r.w < 260 { 12 } else { 18 }), 'K');
+            g.text(
+                r.x + 14,
+                r.y + (r.h - 7) / 2,
+                &clip(&Settings::label(p.row, v), if r.w < 260 { 12 } else { 18 }),
+                'K',
+            );
             self.draw_value(g, v, p.row, r, s);
         }
         g.c.set_clip(saved);
-        g.scrollbar(Rect::new(area.right() - 2, area.y + 1, 3, area.h - 2), self.scroll, total, area.h);
+        g.scrollbar(
+            Rect::new(area.right() - 2, area.y + 1, 3, area.h - 2),
+            self.scroll,
+            total,
+            area.h,
+        );
         if let Some(m) = &self.modal {
             m.draw(g, v);
         }
@@ -440,7 +523,16 @@ impl Settings {
         g.frame(r, 'K');
         for tx in 0..(r.w / 16 + 1) {
             for ty in 0..(r.h / 16 + 1) {
-                g.sprite(if (tx + ty) % 2 == 0 { "tiles/carpet_a" } else { "tiles/carpet_b" }, 0, r.x + 1 + tx * 16, r.y + 1 + ty * 16);
+                g.sprite(
+                    if (tx + ty) % 2 == 0 {
+                        "tiles/carpet_a"
+                    } else {
+                        "tiles/carpet_b"
+                    },
+                    0,
+                    r.x + 1 + tx * 16,
+                    r.y + 1 + ty * 16,
+                );
             }
         }
         g.frame(r, 'K');
@@ -453,59 +545,120 @@ impl Settings {
         let (frame, _) = c.frame(!v.progress.settings.reduce_motion);
         let cx = r.x + r.w / 2;
         g.rect(Rect::new(cx - 20, r.bottom() - 10, 40, 5), 't');
-        blit_scaled(g, &self.art, frame, cx - 24, r.bottom() - 6 - 60 + c.hop() * 3, 3);
+        blit_scaled(
+            g,
+            &self.art,
+            frame,
+            cx - 24,
+            r.bottom() - 6 - 60 + c.hop() * 3,
+            3,
+        );
     }
 
-    fn draw_value(&self, g: &mut Gfx<'_>, v: &View<'_>, row: Row, r: Rect, s: &algoclerk_core::progress::Settings) {
+    fn draw_value(
+        &self,
+        g: &mut Gfx<'_>,
+        v: &View<'_>,
+        row: Row,
+        r: Rect,
+        s: &algoclerk_core::progress::Settings,
+    ) {
         let ptr = v.ptr;
         let (l, rr) = Settings::arrows(&r, &v.vp);
         let vr = Rect::new(l.right(), r.y, rr.x - l.right(), r.h);
         let toggle = |g: &mut Gfx<'_>, on: bool| {
             let b = Rect::new(r.right() - 56, r.y + 1, 52, r.h - 2);
-            g.button(b, &if on { v.tr.t("common.on") } else { v.tr.t("common.off") }, if on { Kind::On } else { Kind::Normal }, State::default());
+            g.button(
+                b,
+                &if on {
+                    v.tr.t("common.on")
+                } else {
+                    v.tr.t("common.off")
+                },
+                if on { Kind::On } else { Kind::Normal },
+                State::default(),
+            );
             let _ = ptr;
         };
         let arrows = |g: &mut Gfx<'_>| {
             g.icon_button(l, "left", Kind::Normal, widget_state(ptr, &l, false, false));
-            g.icon_button(rr, "right", Kind::Normal, widget_state(ptr, &rr, false, false));
+            g.icon_button(
+                rr,
+                "right",
+                Kind::Normal,
+                widget_state(ptr, &rr, false, false),
+            );
         };
         match row {
             Row::Palette => {
                 arrows(g);
-                let (id, _) = PALETTES.iter().find(|(id, _)| *id == s.palette).copied().unwrap_or(PALETTES[0]);
+                let (id, _) = PALETTES
+                    .iter()
+                    .find(|(id, _)| *id == s.palette)
+                    .copied()
+                    .unwrap_or(PALETTES[0]);
                 g.text_in(vr, &v.tr.t(&format!("palette.{id}")), 'K', 1);
             }
             Row::TextSize => {
                 let b = Rect::new(r.right() - 56, r.y + 1, 52, r.h - 2);
-                g.button(b, if s.text_size >= 2 { "2x" } else { "1x" }, Kind::Normal, State::default());
+                g.button(
+                    b,
+                    if s.text_size >= 2 { "2x" } else { "1x" },
+                    Kind::Normal,
+                    State::default(),
+                );
             }
             Row::Reduce => toggle(g, s.reduce_motion),
             Row::Fullscreen => toggle(g, s.fullscreen),
             Row::Unlock => toggle(g, s.unlock_all),
             Row::Speed => {
                 arrows(g);
-                g.text_in(vr, ["1x", "2x", "4x", "8x", "MAX"][usize::from(s.speed_level.min(4))], 'K', 1);
+                g.text_in(
+                    vr,
+                    ["1x", "2x", "4x", "8x", "MAX"][usize::from(s.speed_level.min(4))],
+                    'K',
+                    1,
+                );
             }
             Row::Music | Row::Sfx => {
                 arrows(g);
-                let n = if row == Row::Music { s.music_volume } else { s.sfx_volume };
+                let n = if row == Row::Music {
+                    s.music_volume
+                } else {
+                    s.sfx_volume
+                };
                 let bw = (vr.w - 8) / 10;
                 for i in 0..10 {
-                    let bar = Rect::new(vr.x + 4 + i * bw, vr.y + r.h / 2 - 2 - i / 3, bw - 1, 5 + i / 3);
+                    let bar = Rect::new(
+                        vr.x + 4 + i * bw,
+                        vr.y + r.h / 2 - 2 - i / 3,
+                        bw - 1,
+                        5 + i / 3,
+                    );
                     g.rect(bar, if i < i32::from(n) { 'g' } else { 'A' });
                 }
             }
             Row::Lang => {
                 arrows(g);
                 let langs = i18n::available_languages();
-                let code = langs.iter().find(|c| **c == s.language).copied().unwrap_or("en");
-                let name = i18n::load_language(code).map_or_else(|| code.to_string(), |t| t.t("meta.language"));
+                let code = langs
+                    .iter()
+                    .find(|c| **c == s.language)
+                    .copied()
+                    .unwrap_or("en");
+                let name = i18n::load_language(code)
+                    .map_or_else(|| code.to_string(), |t| t.t("meta.language"));
                 g.text_in(vr, &name, 'K', 1);
             }
             Row::Preset => {
                 arrows(g);
                 let cur = outfit_of_settings(&s.outfit, g.bank);
-                let name = g.bank.outfits.iter().find(|(_, o)| *o == cur).map_or_else(|| v.tr.t("settings.custom"), |(n, _)| n.clone());
+                let name = g
+                    .bank
+                    .outfits
+                    .iter()
+                    .find(|(_, o)| *o == cur)
+                    .map_or_else(|| v.tr.t("settings.custom"), |(n, _)| n.clone());
                 g.text_in(vr, &clip(&name, (vr.w / 6).max(3) as usize), 'K', 1);
             }
             Row::Body => {
@@ -522,7 +675,12 @@ impl Settings {
             }
             Row::Reset => {
                 let b = Rect::new(r.right() - 86, r.y + 1, 82, r.h - 2);
-                g.button(b, &v.tr.t("settings.reset_short"), Kind::Danger, State::default());
+                g.button(
+                    b,
+                    &v.tr.t("settings.reset_short"),
+                    Kind::Danger,
+                    State::default(),
+                );
             }
             Row::Back => {
                 let b = Rect::new(r.right() - 90, r.y + 1, 86, r.h - 2);

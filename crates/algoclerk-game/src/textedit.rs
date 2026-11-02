@@ -113,12 +113,15 @@ impl TextEdit {
 
     /// The selection as an ordered range.
     pub fn selection(&self) -> Option<(usize, usize)> {
-        self.anchor.filter(|a| *a != self.cursor).map(|a| (a.min(self.cursor), a.max(self.cursor)))
+        self.anchor
+            .filter(|a| *a != self.cursor)
+            .map(|a| (a.min(self.cursor), a.max(self.cursor)))
     }
 
     /// The selected text.
     pub fn selected_text(&self) -> Option<String> {
-        self.selection().map(|(a, b)| self.chars[a..b].iter().collect())
+        self.selection()
+            .map(|(a, b)| self.chars[a..b].iter().collect())
     }
 
     fn delete_selection(&mut self) -> bool {
@@ -220,16 +223,26 @@ impl TextEdit {
                 Key::Left => self.move_to(self.cursor.saturating_sub(1), input.shift),
                 Key::Right => self.move_to(self.cursor + 1, input.shift),
                 Key::Up => {
-                    let idx = if line == 0 { 0 } else { self.index_at(line - 1, col) };
+                    let idx = if line == 0 {
+                        0
+                    } else {
+                        self.index_at(line - 1, col)
+                    };
                     self.move_to(idx, input.shift);
                 }
                 Key::Down => {
-                    let idx = if line + 1 >= self.line_count() { self.chars.len() } else { self.index_at(line + 1, col) };
+                    let idx = if line + 1 >= self.line_count() {
+                        self.chars.len()
+                    } else {
+                        self.index_at(line + 1, col)
+                    };
                     self.move_to(idx, input.shift);
                 }
                 Key::Home => self.move_to(self.index_at(line, 0), input.shift),
                 Key::End => self.move_to(self.index_at(line, usize::MAX / 2), input.shift),
-                Key::PageUp => self.move_to(self.index_at(line.saturating_sub(6), col), input.shift),
+                Key::PageUp => {
+                    self.move_to(self.index_at(line.saturating_sub(6), col), input.shift)
+                }
                 Key::PageDown => self.move_to(self.index_at(line + 6, col), input.shift),
                 Key::Backspace => out.changed |= self.backspace(),
                 Key::Delete => out.changed |= self.delete(),
@@ -305,16 +318,22 @@ impl TextEdit {
     }
 }
 
-const KEYWORDS: &[&str] = &["fn", "let", "if", "else", "while", "for", "in", "break", "continue", "return", "and", "or", "not", "mut"];
+const KEYWORDS: &[&str] = &[
+    "fn", "let", "if", "else", "while", "for", "in", "break", "continue", "return", "and", "or",
+    "not", "mut",
+];
 const CONSTS: &[&str] = &["true", "false", "null", "none"];
-const TYPES: &[&str] = &["int", "bool", "char", "string", "vec", "set", "map", "option", "stack", "queue", "deque", "heap", "lnode", "tnode"];
+const TYPES: &[&str] = &[
+    "int", "bool", "char", "string", "vec", "set", "map", "option", "stack", "queue", "deque",
+    "heap", "lnode", "tnode",
+];
 
 /// ClerkScript colouring of one line: `(text, colour letter)` spans covering the whole line.
 pub fn cs_spans(line: &str) -> Vec<(String, char)> {
     let chars: Vec<char> = line.chars().collect();
     let mut spans: Vec<(String, char)> = Vec::new();
     let mut i = 0;
-    let mut push = |s: String, c: char, spans: &mut Vec<(String, char)>| spans.push((s, c));
+    let push = |s: String, c: char, spans: &mut Vec<(String, char)>| spans.push((s, c));
     while i < chars.len() {
         let c = chars[i];
         let start = i;
@@ -356,7 +375,11 @@ pub fn cs_spans(line: &str) -> Vec<(String, char)> {
             push(chars[start..i].iter().collect(), 'r', &mut spans);
         } else {
             i += 1;
-            push(c.to_string(), if "{}()[];,".contains(c) { 'k' } else { 'K' }, &mut spans);
+            push(
+                c.to_string(),
+                if "{}()[];,".contains(c) { 'k' } else { 'K' },
+                &mut spans,
+            );
         }
     }
     spans
@@ -415,7 +438,11 @@ pub fn draw_editor(
                     let sx = inner.x + 1 + (*c0 as i32 - ed.scroll_col as i32) * 6 * scale;
                     let ex = inner.x + 1 + (*c1 as i32 - ed.scroll_col as i32) * 6 * scale;
                     for px in (sx..ex.max(sx + 3)).step_by(1) {
-                        g.px(px, y + 8 * scale + if (px / 2) % 2 == 0 { 0 } else { 1 }, 'R');
+                        g.px(
+                            px,
+                            y + 8 * scale + if (px / 2) % 2 == 0 { 0 } else { 1 },
+                            'R',
+                        );
                     }
                 }
             }
@@ -424,7 +451,11 @@ pub fn draw_editor(
     }
     if ed.focused && (tick / 30) % 2 == 0 {
         let (line, col) = ed.line_col(ed.cursor);
-        if line >= ed.scroll_line && line < ed.scroll_line + rows && col >= ed.scroll_col && col <= ed.scroll_col + cols {
+        if line >= ed.scroll_line
+            && line < ed.scroll_line + rows
+            && col >= ed.scroll_col
+            && col <= ed.scroll_col + cols
+        {
             let x = inner.x + 1 + (col - ed.scroll_col) as i32 * 6 * scale;
             let y = inner.y + (line - ed.scroll_line) as i32 * line_h;
             g.rect(Rect::new(x, y - 1, 1, 8 * scale + 1), 'R');
@@ -432,7 +463,12 @@ pub fn draw_editor(
     }
     g.c.set_clip(saved);
     let content = ed.line_count() as i32 * line_h;
-    g.scrollbar(Rect::new(r.right() - 5, r.y + 2, 3, r.h - 4), ed.scroll_line as i32 * line_h, content, rows as i32 * line_h);
+    g.scrollbar(
+        Rect::new(r.right() - 5, r.y + 2, 3, r.h - 4),
+        ed.scroll_line as i32 * line_h,
+        content,
+        rows as i32 * line_h,
+    );
 }
 
 // ---------------------------------------------------------------------------------------------- keyboard
@@ -498,23 +534,54 @@ impl Keyboard {
         for r in if sym { SYM_ROWS } else { ROWS } {
             let mut row = Vec::new();
             for c in r.chars() {
-                let ch = if up && c.is_ascii_lowercase() { c.to_ascii_uppercase() } else { c };
-                row.push(KeySpec { label: ch.to_string(), action: Some(KbAction::Char(ch)), shift: false, sym: false, span: 1 });
+                let ch = if up && c.is_ascii_lowercase() {
+                    c.to_ascii_uppercase()
+                } else {
+                    c
+                };
+                row.push(KeySpec {
+                    label: ch.to_string(),
+                    action: Some(KbAction::Char(ch)),
+                    shift: false,
+                    sym: false,
+                    span: 1,
+                });
             }
             rows.push(row);
         }
-        let mk = |label: &str, action: Option<KbAction>, shift: bool, symk: bool, span: i32| KeySpec {
-            label: label.to_string(),
-            action,
-            shift,
-            sym: symk,
-            span,
-        };
+        let mk =
+            |label: &str, action: Option<KbAction>, shift: bool, symk: bool, span: i32| KeySpec {
+                label: label.to_string(),
+                action,
+                shift,
+                sym: symk,
+                span,
+            };
         rows.push(vec![
-            if sym { mk("abc", None, true, false, 2) } else { mk("Aa", None, true, false, 2) },
-            if sym { mk("", Some(KbAction::Char('\t')), false, false, 0) } else { mk("#+=", None, false, true, 2) },
-            mk("space", Some(KbAction::Char(' ')), false, false, if sym { 4 } else { 3 }),
-            mk("<-", Some(KbAction::Backspace), false, false, if sym { 2 } else { 1 }),
+            if sym {
+                mk("abc", None, true, false, 2)
+            } else {
+                mk("Aa", None, true, false, 2)
+            },
+            if sym {
+                mk("", Some(KbAction::Char('\t')), false, false, 0)
+            } else {
+                mk("#+=", None, false, true, 2)
+            },
+            mk(
+                "space",
+                Some(KbAction::Char(' ')),
+                false,
+                false,
+                if sym { 4 } else { 3 },
+            ),
+            mk(
+                "<-",
+                Some(KbAction::Backspace),
+                false,
+                false,
+                if sym { 2 } else { 1 },
+            ),
             mk("Enter", Some(KbAction::Enter), false, false, 2),
         ]);
         rows
@@ -541,7 +608,9 @@ impl Keyboard {
     pub fn update(&mut self, ptr: &Pointer, area: Rect) -> Vec<KbAction> {
         let mut out = Vec::new();
         let rects = self.rects(area);
-        self.pressed = rects.iter().position(|(r, _)| ptr.held_in(r) && ptr.over(r));
+        self.pressed = rects
+            .iter()
+            .position(|(r, _)| ptr.held_in(r) && ptr.over(r));
         for (r, k) in &rects {
             if k.span == 0 {
                 continue;
@@ -552,10 +621,16 @@ impl Keyboard {
                 } else if k.shift && self.layer == Layer::Sym {
                     self.layer = Layer::Lower;
                 } else if k.shift {
-                    self.layer = if self.layer == Layer::Lower { Layer::Upper } else { Layer::Lower };
+                    self.layer = if self.layer == Layer::Lower {
+                        Layer::Upper
+                    } else {
+                        Layer::Lower
+                    };
                 } else if let Some(a) = &k.action {
                     out.push(a.clone());
-                    if self.layer == Layer::Upper && matches!(a, KbAction::Char(c) if c.is_ascii_alphabetic()) {
+                    if self.layer == Layer::Upper
+                        && matches!(a, KbAction::Char(c) if c.is_ascii_alphabetic())
+                    {
                         self.layer = Layer::Lower;
                     }
                 }
@@ -681,7 +756,6 @@ mod tests {
         let r = Rect::new(0, 0, 100, 40);
         assert_eq!(e.index_at_pixel(r, 1, 10, 7, 12), 4 + 1);
     }
-
 
     #[test]
     fn keyboard_layers_and_actions() {

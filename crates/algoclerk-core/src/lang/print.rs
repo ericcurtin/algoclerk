@@ -23,7 +23,10 @@ pub fn pat_text(p: &Pat) -> String {
     match p {
         Pat::Var(v) => v.clone(),
         Pat::Wild => "_".into(),
-        Pat::Tuple(ps) => format!("({})", ps.iter().map(pat_text).collect::<Vec<_>>().join(", ")),
+        Pat::Tuple(ps) => format!(
+            "({})",
+            ps.iter().map(pat_text).collect::<Vec<_>>().join(", ")
+        ),
     }
 }
 
@@ -226,7 +229,13 @@ fn stmt(s: &Stmt, d: usize, out: &mut String) {
             indent(d, out);
             out.push_str("}\n");
         }
-        StmtKind::ForRange { var, start, end, step, body } => {
+        StmtKind::ForRange {
+            var,
+            start,
+            end,
+            step,
+            body,
+        } => {
             out.push_str("for ");
             out.push_str(var);
             out.push_str(" in range(");
@@ -277,7 +286,9 @@ fn stmt(s: &Stmt, d: usize, out: &mut String) {
 }
 
 fn if_chain(s: &Stmt, d: usize, out: &mut String) {
-    let StmtKind::If { cond, then, els } = &s.kind else { return };
+    let StmtKind::If { cond, then, els } = &s.kind else {
+        return;
+    };
     out.push_str("if ");
     expr(cond, out);
     out.push_str(" {\n");
@@ -307,7 +318,14 @@ pub fn signature_text(f: &FnDecl) -> String {
     let ps: Vec<String> = f
         .params
         .iter()
-        .map(|p| format!("{}: {}{}", p.name, if p.by_ref { "&mut " } else { "" }, p.ty))
+        .map(|p| {
+            format!(
+                "{}: {}{}",
+                p.name,
+                if p.by_ref { "&mut " } else { "" },
+                p.ty
+            )
+        })
         .collect();
     let mut s = format!("fn {}({})", f.name, ps.join(", "));
     if f.ret != Ty::Unit {

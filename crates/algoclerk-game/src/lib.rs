@@ -11,7 +11,26 @@
 //! Because all drawing goes through a software canvas, the whole game can run (and be screenshotted) with no
 //! window and no GPU. See `docs/ARCHITECTURE.md`.
 #![forbid(unsafe_code)]
-#![allow(missing_docs, missing_debug_implementations, clippy::too_many_lines, clippy::too_many_arguments)]
+#![allow(
+    missing_docs,
+    missing_debug_implementations,
+    clippy::too_many_lines,
+    clippy::too_many_arguments,
+    clippy::collapsible_if,
+    clippy::collapsible_else_if,
+    clippy::needless_lifetimes,
+    clippy::type_complexity,
+    clippy::needless_range_loop,
+    clippy::if_same_then_else,
+    clippy::useless_format,
+    clippy::manual_range_contains,
+    clippy::manual_is_multiple_of,
+    clippy::assertions_on_constants,
+    clippy::single_match,
+    clippy::erasing_op,
+    clippy::identity_op,
+    clippy::needless_return
+)]
 
 pub mod about;
 pub mod blocks;
@@ -122,17 +141,25 @@ pub struct Game {
 fn extra_levels(campaign: &mut Campaign) {
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        let dir = std::env::var_os("ALGOCLERK_LEVELS").map(std::path::PathBuf::from).or_else(|| {
-            let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))?;
-            let base = std::path::PathBuf::from(home);
-            Some(if cfg!(target_os = "macos") {
-                base.join("Library/Application Support/AlgoClerk/levels")
-            } else if cfg!(windows) {
-                std::env::var_os("APPDATA").map_or_else(|| base.join("AlgoClerk/levels"), |a| std::path::PathBuf::from(a).join("AlgoClerk/levels"))
-            } else {
-                std::env::var_os("XDG_DATA_HOME").map_or_else(|| base.join(".local/share/algoclerk/levels"), |x| std::path::PathBuf::from(x).join("algoclerk/levels"))
-            })
-        });
+        let dir = std::env::var_os("ALGOCLERK_LEVELS")
+            .map(std::path::PathBuf::from)
+            .or_else(|| {
+                let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE"))?;
+                let base = std::path::PathBuf::from(home);
+                Some(if cfg!(target_os = "macos") {
+                    base.join("Library/Application Support/AlgoClerk/levels")
+                } else if cfg!(windows) {
+                    std::env::var_os("APPDATA").map_or_else(
+                        || base.join("AlgoClerk/levels"),
+                        |a| std::path::PathBuf::from(a).join("AlgoClerk/levels"),
+                    )
+                } else {
+                    std::env::var_os("XDG_DATA_HOME").map_or_else(
+                        || base.join(".local/share/algoclerk/levels"),
+                        |x| std::path::PathBuf::from(x).join("algoclerk/levels"),
+                    )
+                })
+            });
         if let Some(d) = dir {
             campaign.load_dir(&d);
         }
@@ -146,12 +173,19 @@ impl Game {
     ///
     /// # Errors
     /// All art problems, one per line.
-    pub fn new(assets: &Assets, storage: Box<dyn Storage>, config: GameConfig) -> Result<Game, String> {
+    pub fn new(
+        assets: &Assets,
+        storage: Box<dyn Storage>,
+        config: GameConfig,
+    ) -> Result<Game, String> {
         let bank = ArtBank::load(assets).map_err(|e| e.join("\n"))?;
         let mut campaign = Campaign::shipped();
         extra_levels(&mut campaign);
-        let progress = storage.read(PROGRESS_FILE).map_or_else(Progress::default, |t| Progress::from_json(&t));
-        let tr = i18n::load_language(&progress.settings.language).unwrap_or_else(|| i18n::english().clone());
+        let progress = storage
+            .read(PROGRESS_FILE)
+            .map_or_else(Progress::default, |t| Progress::from_json(&t));
+        let tr = i18n::load_language(&progress.settings.language)
+            .unwrap_or_else(|| i18n::english().clone());
         let bank = Arc::new(bank);
         let vp = Viewport::new(false, config.touch);
         let outfit = play::outfit_of(&progress, &bank);
@@ -191,7 +225,10 @@ impl Game {
 
     /// Index of the active palette.
     pub fn palette_index(&self) -> usize {
-        PALETTES.iter().position(|(id, _)| *id == self.progress.settings.palette).unwrap_or(0)
+        PALETTES
+            .iter()
+            .position(|(id, _)| *id == self.progress.settings.palette)
+            .unwrap_or(0)
     }
 
     /// Take the events produced since the last call.
@@ -201,7 +238,11 @@ impl Game {
 
     /// Save progress now.
     pub fn save(&mut self) {
-        if self.storage.write(PROGRESS_FILE, &self.progress.to_json()).is_ok() {
+        if self
+            .storage
+            .write(PROGRESS_FILE, &self.progress.to_json())
+            .is_ok()
+        {
             self.events.push(GameEvent::Saved);
         }
         self.dirty = false;
@@ -233,7 +274,8 @@ impl Game {
         match &self.scene {
             Scene::Title(_) => title::Title::hits(&vp, self.config.can_quit),
             Scene::Select(_) => {
-                let counts: Vec<usize> = self.campaign.packs.iter().map(|p| p.levels.len()).collect();
+                let counts: Vec<usize> =
+                    self.campaign.packs.iter().map(|p| p.levels.len()).collect();
                 select::Select::hits(&vp, &counts)
             }
             Scene::Play(p) => {
@@ -304,7 +346,11 @@ impl Game {
         }
         self.events = keep;
         // language and palette changes take effect immediately
-        if self.tr.get("meta.language") != i18n::load_language(&self.progress.settings.language).and_then(|s| s.get("meta.language").map(String::from)).as_deref() {
+        if self.tr.get("meta.language")
+            != i18n::load_language(&self.progress.settings.language)
+                .and_then(|s| s.get("meta.language").map(String::from))
+                .as_deref()
+        {
             let l = self.progress.settings.language.clone();
             self.set_language(&l);
         }
@@ -387,7 +433,7 @@ impl Game {
             },
             Nav::Sandbox => Scene::Play(Box::new(play::Play::sandbox(&mut cx))),
             Nav::Settings => Scene::Settings(Box::new(settings::Settings::new(&cx))),
-            Nav::About => Scene::About(Box::new(about::About::default())),
+            Nav::About => Scene::About(Box::default()),
             Nav::Victory => match old {
                 Scene::Play(p) => {
                     let improved = p.improved;
@@ -402,7 +448,9 @@ impl Game {
                 other => other,
             },
             Nav::Code => match old {
-                Scene::Play(p) => Scene::Result(Box::new(result::ResultScreen::new(&mut cx, p, false))),
+                Scene::Play(p) => {
+                    Scene::Result(Box::new(result::ResultScreen::new(&mut cx, p, false)))
+                }
                 Scene::Result(mut r) => {
                     r.stage = result::Stage::Code;
                     Scene::Result(r)

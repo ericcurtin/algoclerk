@@ -106,35 +106,180 @@ impl Ex {
     }
     /// Text, parenthesised when binding weaker than `min`.
     pub fn at(&self, min: u8) -> String {
-        if self.p < min { format!("({})", self.s) } else { self.s.clone() }
+        if self.p < min {
+            format!("({})", self.s)
+        } else {
+            self.s.clone()
+        }
     }
 }
 
 /// Words that cannot be identifiers in the target languages.
 const RESERVED: &[&str] = &[
-    "auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum", "extern", "float",
-    "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed", "sizeof", "static",
-    "struct", "switch", "typedef", "union", "unsigned", "void", "volatile", "while", "bool", "class", "namespace",
-    "new", "delete", "this", "template", "typename", "operator", "private", "public", "protected", "virtual", "friend",
-    "try", "catch", "throw", "using", "main", "string", "vector", "map", "set", "list", "stack", "queue", "deque",
-    "tuple", "pair", "optional", "std", "ac", "NULL", "true", "false", "nullptr", "and", "or", "not", "xor", "as",
-    "async", "await", "dyn", "fn", "impl", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "self", "Self",
-    "super", "trait", "type", "unsafe", "use", "where", "yield", "abstract", "become", "box", "final", "macro",
-    "override", "priv", "try", "typeof", "unsized", "str", "Vec", "String", "Option", "Some", "None", "i64", "usize",
-    "len", "min", "max", "abs", "swap", "free", "malloc", "exit", "printf", "puts", "assert", "errno", "stdin",
-    "stdout", "stderr", "index", "remove", "insert", "read", "write", "time", "div", "rand", "y0", "y1", "j0", "j1",
+    "auto",
+    "break",
+    "case",
+    "char",
+    "const",
+    "continue",
+    "default",
+    "do",
+    "double",
+    "else",
+    "enum",
+    "extern",
+    "float",
+    "for",
+    "goto",
+    "if",
+    "inline",
+    "int",
+    "long",
+    "register",
+    "restrict",
+    "return",
+    "short",
+    "signed",
+    "sizeof",
+    "static",
+    "struct",
+    "switch",
+    "typedef",
+    "union",
+    "unsigned",
+    "void",
+    "volatile",
+    "while",
+    "bool",
+    "class",
+    "namespace",
+    "new",
+    "delete",
+    "this",
+    "template",
+    "typename",
+    "operator",
+    "private",
+    "public",
+    "protected",
+    "virtual",
+    "friend",
+    "try",
+    "catch",
+    "throw",
+    "using",
+    "main",
+    "string",
+    "vector",
+    "map",
+    "set",
+    "list",
+    "stack",
+    "queue",
+    "deque",
+    "tuple",
+    "pair",
+    "optional",
+    "std",
+    "ac",
+    "NULL",
+    "true",
+    "false",
+    "nullptr",
+    "and",
+    "or",
+    "not",
+    "xor",
+    "as",
+    "async",
+    "await",
+    "dyn",
+    "fn",
+    "impl",
+    "let",
+    "loop",
+    "match",
+    "mod",
+    "move",
+    "mut",
+    "pub",
+    "ref",
+    "self",
+    "Self",
+    "super",
+    "trait",
+    "type",
+    "unsafe",
+    "use",
+    "where",
+    "yield",
+    "abstract",
+    "become",
+    "box",
+    "final",
+    "macro",
+    "override",
+    "priv",
+    "try",
+    "typeof",
+    "unsized",
+    "str",
+    "Vec",
+    "String",
+    "Option",
+    "Some",
+    "None",
+    "i64",
+    "usize",
+    "len",
+    "min",
+    "max",
+    "abs",
+    "swap",
+    "free",
+    "malloc",
+    "exit",
+    "printf",
+    "puts",
+    "assert",
+    "errno",
+    "stdin",
+    "stdout",
+    "stderr",
+    "index",
+    "remove",
+    "insert",
+    "read",
+    "write",
+    "time",
+    "div",
+    "rand",
+    "y0",
+    "y1",
+    "j0",
+    "j1",
 ];
 
 /// A safe identifier for the target languages (the player's name when possible).
 pub fn ident(name: &str) -> String {
-    if RESERVED.contains(&name) { format!("{name}_") } else { name.to_string() }
+    if RESERVED.contains(&name) {
+        format!("{name}_")
+    } else {
+        name.to_string()
+    }
 }
 
 /// Every distinct type used by a program (expressions, locals, signatures), with all their sub-types, inner first.
 pub fn used_types(prog: &Program, info: &TypeInfo) -> Vec<Ty> {
     fn add(t: &Ty, out: &mut Vec<Ty>) {
         match t {
-            Ty::Vec(a) | Ty::Set(a) | Ty::Option(a) | Ty::Stack(a) | Ty::Queue(a) | Ty::Deque(a) | Ty::Heap(a) => add(a, out),
+            Ty::Vec(a)
+            | Ty::Set(a)
+            | Ty::Option(a)
+            | Ty::Stack(a)
+            | Ty::Queue(a)
+            | Ty::Deque(a)
+            | Ty::Heap(a) => add(a, out),
             Ty::Map(k, v) => {
                 add(k, out);
                 add(v, out);
@@ -166,7 +311,10 @@ pub fn used_types(prog: &Program, info: &TypeInfo) -> Vec<Ty> {
 
 /// Does this expression denote an existing value (so reading it in an owning position copies it)?
 pub fn is_place(e: &Expr) -> bool {
-    matches!(e.kind, ExprKind::Var(_) | ExprKind::Index(..) | ExprKind::TupleIdx(..))
+    matches!(
+        e.kind,
+        ExprKind::Var(_) | ExprKind::Index(..) | ExprKind::TupleIdx(..)
+    )
 }
 
 /// Is a (possibly nested) tuple, option... made only of cheap-to-copy things?

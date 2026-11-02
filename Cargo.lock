@@ -126,6 +126,7 @@ dependencies = [
  "algoclerk-media",
  "arboard",
  "bevy",
+ "blake3",
 ]
 
 [[package]]

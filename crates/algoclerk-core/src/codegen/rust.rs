@@ -41,7 +41,11 @@ const P_CAST: u8 = 14;
 /// Node arena prelude for the test harness (without a second `use` when one exists).
 pub fn nodes_prelude_pub(list: bool, tree: bool, has_use: bool) -> String {
     let s = nodes_prelude(list, tree);
-    if has_use { s.replacen("use std::cell::RefCell;\n", "", 1) } else { s }
+    if has_use {
+        s.replacen("use std::cell::RefCell;\n", "", 1)
+    } else {
+        s
+    }
 }
 
 fn nodes_prelude(list: bool, tree: bool) -> String {
@@ -138,7 +142,10 @@ pub fn ty_name(t: &Ty) -> String {
         Ty::Vec(a) | Ty::Stack(a) => format!("Vec<{}>", ty_name(a)),
         Ty::Set(a) => format!("HashSet<{}>", ty_name(a)),
         Ty::Map(k, v) => format!("HashMap<{}, {}>", ty_name(k), ty_name(v)),
-        Ty::Tuple(ts) => format!("({})", ts.iter().map(ty_name).collect::<Vec<_>>().join(", ")),
+        Ty::Tuple(ts) => format!(
+            "({})",
+            ts.iter().map(ty_name).collect::<Vec<_>>().join(", ")
+        ),
         Ty::Option(a) => format!("Option<{}>", ty_name(a)),
         Ty::Queue(a) | Ty::Deque(a) => format!("VecDeque<{}>", ty_name(a)),
         Ty::Heap(a) => format!("BinaryHeap<{}>", ty_name(a)),
@@ -163,7 +170,12 @@ impl<'a> Gen<'a> {
         self.out.push('\n');
     }
     fn slot_mutated(&self, slot: u32) -> bool {
-        slot != u32::MAX && self.info.fns[self.f].mutated.get(slot as usize).copied().unwrap_or(false)
+        slot != u32::MAX
+            && self.info.fns[self.f]
+                .mutated
+                .get(slot as usize)
+                .copied()
+                .unwrap_or(false)
     }
 
     /// How a parameter is passed: by value, by shared reference or by mutable reference.
@@ -171,7 +183,10 @@ impl<'a> Gen<'a> {
         let p = &self.prog.fns[fidx].params[i];
         if p.by_ref {
             Kind::RefMut
-        } else if is_copy(&p.ty) || self.info.fns[fidx].mutated.get(i).copied().unwrap_or(false) || self.prog.fns[fidx].name == self.entry {
+        } else if is_copy(&p.ty)
+            || self.info.fns[fidx].mutated.get(i).copied().unwrap_or(false)
+            || self.prog.fns[fidx].name == self.entry
+        {
             Kind::Owned
         } else {
             Kind::Ref
@@ -224,7 +239,10 @@ impl<'a> Gen<'a> {
             ExprKind::Int(n) if *n >= 0 => n.to_string(),
             _ => {
                 let x = self.expr(e);
-                format!("{} as usize", if x.p >= 20 { x.s } else { format!("({})", x.s) })
+                format!(
+                    "{} as usize",
+                    if x.p >= 20 { x.s } else { format!("({})", x.s) }
+                )
             }
         }
     }
@@ -250,7 +268,11 @@ impl<'a> Gen<'a> {
     fn expr(&mut self, e: &Expr) -> Ex {
         match &e.kind {
             ExprKind::Int(n) => {
-                if *n < 0 { Ex::new(n.to_string(), P_UNARY) } else { Ex::atom(n.to_string()) }
+                if *n < 0 {
+                    Ex::new(n.to_string(), P_UNARY)
+                } else {
+                    Ex::atom(n.to_string())
+                }
             }
             ExprKind::Bool(b) => Ex::atom(b.to_string()),
             ExprKind::Char(c) => Ex::atom(format!("'{}'", escape_char(*c))),
@@ -264,7 +286,11 @@ impl<'a> Gen<'a> {
                     UnOp::Neg => "-",
                     UnOp::Not | UnOp::BitNot => "!",
                 };
-                let inner = if x.p >= 20 && !x.s.starts_with('-') { x.s } else { format!("({})", x.s) };
+                let inner = if x.p >= 20 && !x.s.starts_with('-') {
+                    x.s
+                } else {
+                    format!("({})", x.s)
+                };
                 Ex::new(format!("{s}{inner}"), P_UNARY)
             }
             ExprKind::Binary(op, a, b) => self.binary(*op, a, b),
@@ -291,7 +317,11 @@ impl<'a> Gen<'a> {
                 let x = self.expr(a);
                 let l = lo.as_ref().map(|l| self.idx(l)).unwrap_or_default();
                 let h = hi.as_ref().map(|h| self.idx(h)).unwrap_or_default();
-                let conv = if matches!(t, Ty::Str) { "to_string()" } else { "to_vec()" };
+                let conv = if matches!(t, Ty::Str) {
+                    "to_string()"
+                } else {
+                    "to_vec()"
+                };
                 Ex::atom(format!("{}[{l}..{h}].{conv}", x.at(20)))
             }
             ExprKind::Field(a, f) => {
@@ -353,10 +383,22 @@ impl<'a> Gen<'a> {
                 _ => {}
             }
         }
-        let (l, r) = if cmp { (self.operand(a), self.operand(b)) } else { (self.expr(a), self.expr(b)) };
+        let (l, r) = if cmp {
+            (self.operand(a), self.operand(b))
+        } else {
+            (self.expr(a), self.expr(b))
+        };
         // comparing a String with a literal: keep the literal borrowed
-        let ls = if (op == BinOp::Lt || op == BinOp::Shl) && l.p == P_CAST { format!("({})", l.s) } else if cmp && l.p <= p { format!("({})", l.s) } else { l.at(p) };
-        let rs = if cmp && r.p <= p { format!("({})", r.s) } else { r.at(p + 1) };
+        let ls = if ((op == BinOp::Lt || op == BinOp::Shl) && l.p == P_CAST) || (cmp && l.p <= p) {
+            format!("({})", l.s)
+        } else {
+            l.at(p)
+        };
+        let rs = if cmp && r.p <= p {
+            format!("({})", r.s)
+        } else {
+            r.at(p + 1)
+        };
         let sym = match op {
             BinOp::And => "&&",
             BinOp::Or => "||",
@@ -373,7 +415,11 @@ impl<'a> Gen<'a> {
             for (i, x) in args.iter().enumerate() {
                 a.push(match self.param_kind(idx, i) {
                     Kind::RefMut => {
-                        if self.var_kind(x) == Kind::RefMut { self.expr(x).s } else { format!("&mut {}", self.expr(x).s) }
+                        if self.var_kind(x) == Kind::RefMut {
+                            self.expr(x).s
+                        } else {
+                            format!("&mut {}", self.expr(x).s)
+                        }
                     }
                     Kind::Ref => self.borrowed(x),
                     Kind::Owned => self.owned(x),
@@ -393,9 +439,19 @@ impl<'a> Gen<'a> {
                     Ex::atom(format!("std::cmp::{name}({a}, {b})"))
                 } else {
                     let x = self.expr(&args[0]);
-                    let deref = if is_copy(match &t0 { Some(Ty::Vec(t)) => t, _ => &Ty::Int }) { "*" } else { "" };
+                    let deref = if is_copy(match &t0 {
+                        Some(Ty::Vec(t)) => t,
+                        _ => &Ty::Int,
+                    }) {
+                        "*"
+                    } else {
+                        ""
+                    };
                     let tail = if deref.is_empty() { ".clone()" } else { "" };
-                    Ex::new(format!("{deref}{}.iter().{name}().unwrap(){tail}", x.at(20)), if deref.is_empty() { 20 } else { P_UNARY })
+                    Ex::new(
+                        format!("{deref}{}.iter().{name}().unwrap(){tail}", x.at(20)),
+                        if deref.is_empty() { 20 } else { P_UNARY },
+                    )
                 }
             }
             "abs" => {
@@ -409,8 +465,12 @@ impl<'a> Gen<'a> {
             "sorted" => {
                 let x = self.owned(&args[0]);
                 match t0 {
-                    Some(Ty::Str) => Ex::atom(format!("{{ let mut t: Vec<char> = {x}.chars().collect(); t.sort(); t.into_iter().collect::<String>() }}")),
-                    Some(Ty::Set(_)) => Ex::atom(format!("{{ let mut t: Vec<_> = {x}.into_iter().collect(); t.sort(); t }}")),
+                    Some(Ty::Str) => Ex::atom(format!(
+                        "{{ let mut t: Vec<char> = {x}.chars().collect(); t.sort(); t.into_iter().collect::<String>() }}"
+                    )),
+                    Some(Ty::Set(_)) => Ex::atom(format!(
+                        "{{ let mut t: Vec<_> = {x}.into_iter().collect(); t.sort(); t }}"
+                    )),
                     _ => Ex::atom(format!("{{ let mut t = {x}; t.sort(); t }}")),
                 }
             }
@@ -419,7 +479,10 @@ impl<'a> Gen<'a> {
                 if matches!(t0, Some(Ty::Str)) {
                     Ex::atom(format!("{}.chars().rev().collect::<String>()", x.at(20)))
                 } else {
-                    Ex::atom(format!("{}.iter().rev().cloned().collect::<Vec<_>>()", x.at(20)))
+                    Ex::atom(format!(
+                        "{}.iter().rev().cloned().collect::<Vec<_>>()",
+                        x.at(20)
+                    ))
                 }
             }
             "to_string" => {
@@ -448,15 +511,28 @@ impl<'a> Gen<'a> {
                 Ex::atom(format!("{}.iter().collect::<String>()", x.at(20)))
             }
             "some" => Ex::atom(format!("Some({})", self.owned(&args[0]))),
-            "lnode" => Ex::atom(format!("ListRef::new({}, {})", self.owned(&args[0]), self.owned(&args[1]))),
-            "tnode" => Ex::atom(format!("TreeRef::new({}, {}, {})", self.owned(&args[0]), self.owned(&args[1]), self.owned(&args[2]))),
+            "lnode" => Ex::atom(format!(
+                "ListRef::new({}, {})",
+                self.owned(&args[0]),
+                self.owned(&args[1])
+            )),
+            "tnode" => Ex::atom(format!(
+                "TreeRef::new({}, {}, {})",
+                self.owned(&args[0]),
+                self.owned(&args[1]),
+                self.owned(&args[2])
+            )),
             _ => Ex::atom(format!("{}()", ident(name))),
         }
     }
 
     fn method(&mut self, _e: &Expr, recv: &Expr, name: &str, args: &[Expr]) -> Ex {
         let rt = self.ety(recv);
-        let r = if crate::lang::check::is_mutating(&rt, name) { Ex::atom(self.place(recv, false)) } else { self.expr(recv) };
+        let r = if crate::lang::check::is_mutating(&rt, name) {
+            Ex::atom(self.place(recv, false))
+        } else {
+            self.expr(recv)
+        };
         let rs = r.at(20);
         let atom = Ex::atom;
         let copy_elem = |t: &Ty| match t {
@@ -466,26 +542,46 @@ impl<'a> Gen<'a> {
         let one = |g: &mut Self| g.owned(&args[0]);
         match (&rt, name) {
             (Ty::Vec(_) | Ty::Stack(_) | Ty::Heap(_), "push") | (Ty::Set(_), "add") => {
-                let m = if matches!(rt, Ty::Set(_)) { "insert" } else { "push" };
+                let m = if matches!(rt, Ty::Set(_)) {
+                    "insert"
+                } else {
+                    "push"
+                };
                 let a = one(self);
                 atom(format!("{rs}.{m}({a})"))
             }
-            (Ty::Vec(_) | Ty::Stack(_) | Ty::Heap(_), "pop") => atom(format!("{rs}.pop().unwrap()")),
-            (Ty::Queue(_), "push") | (Ty::Deque(_), "push_back") => atom(format!("{rs}.push_back({})", one(self))),
+            (Ty::Vec(_) | Ty::Stack(_) | Ty::Heap(_), "pop") => {
+                atom(format!("{rs}.pop().unwrap()"))
+            }
+            (Ty::Queue(_), "push") | (Ty::Deque(_), "push_back") => {
+                atom(format!("{rs}.push_back({})", one(self)))
+            }
             (Ty::Deque(_), "push_front") => atom(format!("{rs}.push_front({})", one(self))),
-            (Ty::Queue(_), "pop") | (Ty::Deque(_), "pop_front") => atom(format!("{rs}.pop_front().unwrap()")),
+            (Ty::Queue(_), "pop") | (Ty::Deque(_), "pop_front") => {
+                atom(format!("{rs}.pop_front().unwrap()"))
+            }
             (Ty::Deque(_), "pop_back") => atom(format!("{rs}.pop_back().unwrap()")),
             (Ty::Stack(_), "peek") => {
-                let c = if copy_elem(&rt) { ".copied()" } else { ".cloned()" };
+                let c = if copy_elem(&rt) {
+                    ".copied()"
+                } else {
+                    ".cloned()"
+                };
                 atom(format!("{rs}.last(){c}.unwrap()"))
             }
-            (Ty::Queue(_) | Ty::Deque(_), "front") | (Ty::Heap(_), "peek") | (Ty::Deque(_), "back") => {
+            (Ty::Queue(_) | Ty::Deque(_), "front")
+            | (Ty::Heap(_), "peek")
+            | (Ty::Deque(_), "back") => {
                 let m = match name {
                     "peek" => "peek",
                     "front" => "front",
                     _ => "back",
                 };
-                let c = if copy_elem(&rt) { ".copied()" } else { ".cloned()" };
+                let c = if copy_elem(&rt) {
+                    ".copied()"
+                } else {
+                    ".cloned()"
+                };
                 atom(format!("{rs}.{m}(){c}.unwrap()"))
             }
             (Ty::Vec(_), "insert") => {
@@ -503,15 +599,23 @@ impl<'a> Gen<'a> {
             }
             (Ty::Vec(_), "index_of") => {
                 let x = self.expr(&args[0]).s;
-                Ex::new(format!("{rs}.iter().position(|y| *y == {x}).map_or(-1, |p| p as i64)"), 20)
+                Ex::new(
+                    format!("{rs}.iter().position(|y| *y == {x}).map_or(-1, |p| p as i64)"),
+                    20,
+                )
             }
             (Ty::Vec(_), "count") => {
                 let x = self.expr(&args[0]).s;
-                Ex::new(format!("{rs}.iter().filter(|&y| *y == {x}).count() as i64"), P_CAST)
+                Ex::new(
+                    format!("{rs}.iter().filter(|&y| *y == {x}).count() as i64"),
+                    P_CAST,
+                )
             }
-            (Ty::Vec(_), "reverse" | "sort" | "clear") | (Ty::Set(_) | Ty::Map(..) | Ty::Stack(_) | Ty::Queue(_) | Ty::Deque(_) | Ty::Heap(_), "clear") => {
-                atom(format!("{rs}.{name}()"))
-            }
+            (Ty::Vec(_), "reverse" | "sort" | "clear")
+            | (
+                Ty::Set(_) | Ty::Map(..) | Ty::Stack(_) | Ty::Queue(_) | Ty::Deque(_) | Ty::Heap(_),
+                "clear",
+            ) => atom(format!("{rs}.{name}()")),
             (Ty::Vec(_), "swap") => {
                 let (i, j) = (self.idx(&args[0]), self.idx(&args[1]));
                 atom(format!("{rs}.swap({i}, {j})"))
@@ -534,16 +638,24 @@ impl<'a> Gen<'a> {
             }
             (Ty::Str, "split") => {
                 let p = self.pattern(&args[0]);
-                atom(format!("{rs}.split({p}).map(|p| p.to_string()).collect::<Vec<String>>()"))
+                atom(format!(
+                    "{rs}.split({p}).map(|p| p.to_string()).collect::<Vec<String>>()"
+                ))
             }
             (Ty::Str, "chars") => atom(format!("{rs}.chars().collect::<Vec<char>>()")),
             (Ty::Str, "push") => atom(format!("{rs}.push({})", self.expr(&args[0]).s)),
             (Ty::Str, "count") => {
                 let x = self.expr(&args[0]).s;
-                Ex::new(format!("{rs}.chars().filter(|&y| y == {x}).count() as i64"), P_CAST)
+                Ex::new(
+                    format!("{rs}.chars().filter(|&y| y == {x}).count() as i64"),
+                    P_CAST,
+                )
             }
             (Ty::Str, "replace") => {
-                let (a, b) = (self.raw_or_owned_str(&args[0]), self.raw_or_owned_str(&args[1]));
+                let (a, b) = (
+                    self.raw_or_owned_str(&args[0]),
+                    self.raw_or_owned_str(&args[1]),
+                );
                 atom(format!("{rs}.replace({a}, {b})"))
             }
             (Ty::Str, "repeat") => {
@@ -583,10 +695,18 @@ impl<'a> Gen<'a> {
                     atom(format!("{rs}.get({k}).cloned()"))
                 }
             }
-            (Ty::Map(..), "keys") => atom(format!("{{ let mut t: Vec<_> = {rs}.keys().cloned().collect(); t.sort(); t }}")),
+            (Ty::Map(..), "keys") => atom(format!(
+                "{{ let mut t: Vec<_> = {rs}.keys().cloned().collect(); t.sort(); t }}"
+            )),
             (Ty::Map(..), "values" | "items") => {
-                let mapper = if name == "values" { "v.clone()" } else { "(k.clone(), v.clone())" };
-                atom(format!("{{ let mut t: Vec<_> = {rs}.iter().collect(); t.sort_by(|a, b| a.0.cmp(b.0)); t.into_iter().map(|(k, v)| {mapper}).collect::<Vec<_>>() }}"))
+                let mapper = if name == "values" {
+                    "v.clone()"
+                } else {
+                    "(k.clone(), v.clone())"
+                };
+                atom(format!(
+                    "{{ let mut t: Vec<_> = {rs}.iter().collect(); t.sort_by(|a, b| a.0.cmp(b.0)); t.into_iter().map(|(k, v)| {mapper}).collect::<Vec<_>>() }}"
+                ))
             }
             (Ty::Option(_), "is_some" | "is_none" | "unwrap") => atom(format!("{rs}.{name}()")),
             (Ty::Option(_), "unwrap_or") => {
@@ -651,7 +771,10 @@ impl<'a> Gen<'a> {
         self.ind += 1;
         let n = b.stmts.len();
         for (i, s) in b.stmts.iter().enumerate() {
-            if tail && i + 1 == n && let StmtKind::Return(Some(e)) = &s.kind {
+            if tail
+                && i + 1 == n
+                && let StmtKind::Return(Some(e)) = &s.kind
+            {
                 let v = if let ExprKind::Var(_) = e.kind
                     && self.var_kind(e) == Kind::Owned
                 {
@@ -671,7 +794,13 @@ impl<'a> Gen<'a> {
         match p {
             Pat::Var(v) => format!("{}{}", if mutable { "mut " } else { "" }, ident(v)),
             Pat::Wild => "_".into(),
-            Pat::Tuple(ps) => format!("({})", ps.iter().map(|x| Self::pat_text(x, mutable)).collect::<Vec<_>>().join(", ")),
+            Pat::Tuple(ps) => format!(
+                "({})",
+                ps.iter()
+                    .map(|x| Self::pat_text(x, mutable))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 
@@ -680,12 +809,23 @@ impl<'a> Gen<'a> {
             StmtKind::Let { pat, ty, init } => {
                 let v = self.owned(init);
                 let t = self.info.ty(s.id).clone();
-                let any_mut = self.info.pat_slots.get(&s.id).is_some_and(|v| v.iter().any(|&x| self.slot_mutated(x)));
+                let any_mut = self
+                    .info
+                    .pat_slots
+                    .get(&s.id)
+                    .is_some_and(|v| v.iter().any(|&x| self.slot_mutated(x)));
                 let needs_ty = ty.is_some()
-                    || matches!(&init.kind, ExprKind::Ctor(_) | ExprKind::NoneLit | ExprKind::Null)
+                    || matches!(
+                        &init.kind,
+                        ExprKind::Ctor(_) | ExprKind::NoneLit | ExprKind::Null
+                    )
                     || matches!(&init.kind, ExprKind::VecLit(items) if items.is_empty())
                     || matches!(&init.kind, ExprKind::Int(_));
-                let ann = if needs_ty && !matches!(pat, Pat::Tuple(_)) { format!(": {}", ty_name(&t)) } else { String::new() };
+                let ann = if needs_ty && !matches!(pat, Pat::Tuple(_)) {
+                    format!(": {}", ty_name(&t))
+                } else {
+                    String::new()
+                };
                 let name = match pat {
                     Pat::Tuple(_) => Self::pat_text(pat, any_mut),
                     Pat::Wild => "_".into(),
@@ -701,9 +841,17 @@ impl<'a> Gen<'a> {
                 self.block(body);
                 self.line("}");
             }
-            StmtKind::ForRange { var, start, end, step, body } => {
+            StmtKind::ForRange {
+                var,
+                start,
+                end,
+                step,
+                body,
+            } => {
                 let v = ident(var);
-                let a = start.as_ref().map_or("0".to_string(), |x| self.expr(x).at(12));
+                let a = start
+                    .as_ref()
+                    .map_or("0".to_string(), |x| self.expr(x).at(12));
                 let b = self.expr(end).at(12);
                 let k = match step.as_ref().map(|x| &x.kind) {
                     Some(ExprKind::Int(k)) => *k,
@@ -711,11 +859,19 @@ impl<'a> Gen<'a> {
                 };
                 let range = if k > 0 {
                     let r = format!("{a}..{b}");
-                    if k == 1 { r } else { format!("({r}).step_by({k})") }
+                    if k == 1 {
+                        r
+                    } else {
+                        format!("({r}).step_by({k})")
+                    }
                 } else {
                     let r = format!("({b} + 1)..={a}");
                     let rev = format!("({r}).rev()");
-                    if k == -1 { rev } else { format!("{rev}.step_by({})", -k) }
+                    if k == -1 {
+                        rev
+                    } else {
+                        format!("{rev}.step_by({})", -k)
+                    }
                 };
                 self.line(&format!("for {v} in {range} {{"));
                 self.block(body);
@@ -789,7 +945,10 @@ impl<'a> Gen<'a> {
             }
             Some(BinOp::Add) if matches!(tt, Ty::Vec(_)) => {
                 let w = self.borrowed(value);
-                self.line(&format!("{}.extend_from_slice({w});", t.trim_start_matches('*')));
+                self.line(&format!(
+                    "{}.extend_from_slice({w});",
+                    t.trim_start_matches('*')
+                ));
             }
             Some(o) => {
                 let v = self.expr(value).s;
@@ -799,9 +958,15 @@ impl<'a> Gen<'a> {
     }
 
     fn if_chain(&mut self, s: &Stmt, continued: bool) {
-        let StmtKind::If { cond, then, els } = &s.kind else { return };
+        let StmtKind::If { cond, then, els } = &s.kind else {
+            return;
+        };
         let c = self.expr(cond).s;
-        let head = if continued { format!("}} else if {c} {{") } else { format!("if {c} {{") };
+        let head = if continued {
+            format!("}} else if {c} {{")
+        } else {
+            format!("if {c} {{")
+        };
         self.line(&head);
         self.block(then);
         match els {
@@ -821,11 +986,18 @@ impl<'a> Gen<'a> {
     }
 
     fn for_each(&mut self, s: &Stmt, pat: &Pat, iter: &Expr, body: &Block) {
-        let any_mut = self.info.pat_slots.get(&s.id).is_some_and(|v| v.iter().any(|&x| self.slot_mutated(x)));
+        let any_mut = self
+            .info
+            .pat_slots
+            .get(&s.id)
+            .is_some_and(|v| v.iter().any(|&x| self.slot_mutated(x)));
         if let Some((kind, args)) = iter_special(iter) {
             let Pat::Tuple(ps) = pat else { return };
             let a0 = self.expr(&args[0]).at(20);
-            let (first, second) = (Self::pat_text(&ps[0], any_mut), Self::pat_text(&ps[1], any_mut));
+            let (first, second) = (
+                Self::pat_text(&ps[0], any_mut),
+                Self::pat_text(&ps[1], any_mut),
+            );
             if kind == "enumerate" {
                 let elem = match self.ety(&args[0]) {
                     Ty::Vec(t) => *t,
@@ -835,7 +1007,9 @@ impl<'a> Gen<'a> {
                 self.line(&format!("for ({}, {second}) in {a0}.iter().{conv}().enumerate().map(|(i, x)| (i as i64, x)) {{", first));
             } else {
                 let a1 = self.expr(&args[1]).at(20);
-                self.line(&format!("for ({first}, {second}) in {a0}.iter().cloned().zip({a1}.iter().cloned()) {{"));
+                self.line(&format!(
+                    "for ({first}, {second}) in {a0}.iter().cloned().zip({a1}.iter().cloned()) {{"
+                ));
             }
             self.block(body);
             self.line("}");
@@ -874,14 +1048,27 @@ impl<'a> Gen<'a> {
                 Kind::Owned => format!("{}{n}: {t}", if mutated { "mut " } else { "" }),
             });
         }
-        let ret = if f.ret == Ty::Unit { String::new() } else { format!(" -> {}", ty_name(&f.ret)) };
+        let ret = if f.ret == Ty::Unit {
+            String::new()
+        } else {
+            format!(" -> {}", ty_name(&f.ret))
+        };
         format!("fn {}({}){ret}", ident(&f.name), params.join(", "))
     }
 }
 
 /// Translate to Rust.
 pub fn generate(prog: &Program, info: &TypeInfo, entry: &str) -> Generated {
-    let mut g = Gen { prog, info, entry: entry.to_string(), f: 0, out: String::new(), ind: 0, pending: Vec::new(), tmp: 0 };
+    let mut g = Gen {
+        prog,
+        info,
+        entry: entry.to_string(),
+        f: 0,
+        out: String::new(),
+        ind: 0,
+        pending: Vec::new(),
+        tmp: 0,
+    };
     let used = used_types(prog, info);
     let (list, tree) = (used.contains(&Ty::LNode), used.contains(&Ty::TNode));
     let mut code = String::new();
@@ -902,7 +1089,11 @@ pub fn generate(prog: &Program, info: &TypeInfo, entry: &str) -> Generated {
     for (pred, name) in [
         (used.iter().any(|t| matches!(t, Ty::Map(..))), "HashMap"),
         (used.iter().any(|t| matches!(t, Ty::Set(_))), "HashSet"),
-        (used.iter().any(|t| matches!(t, Ty::Queue(_) | Ty::Deque(_))), "VecDeque"),
+        (
+            used.iter()
+                .any(|t| matches!(t, Ty::Queue(_) | Ty::Deque(_))),
+            "VecDeque",
+        ),
         (used.iter().any(|t| matches!(t, Ty::Heap(_))), "BinaryHeap"),
     ] {
         if pred {
@@ -911,10 +1102,17 @@ pub fn generate(prog: &Program, info: &TypeInfo, entry: &str) -> Generated {
     }
     std_use.sort();
     if !std_use.is_empty() {
-        pre.push_str(&format!("use std::collections::{{{}}};\n", std_use.join(", ")));
+        pre.push_str(&format!(
+            "use std::collections::{{{}}};\n",
+            std_use.join(", ")
+        ));
     }
     if list || tree {
         pre.push_str(&nodes_prelude(list, tree));
     }
-    Generated { lang: Lang::Rust, prelude: pre, code }
+    Generated {
+        lang: Lang::Rust,
+        prelude: pre,
+        code,
+    }
 }

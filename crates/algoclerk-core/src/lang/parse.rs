@@ -28,13 +28,14 @@ struct Token {
 }
 
 const KEYWORDS: &[&str] = &[
-    "fn", "let", "if", "else", "while", "for", "in", "break", "continue", "return", "true", "false", "null", "none",
-    "and", "or", "not", "mut",
+    "fn", "let", "if", "else", "while", "for", "in", "break", "continue", "return", "true",
+    "false", "null", "none", "and", "or", "not", "mut",
 ];
 
 /// Words that start a type and therefore may not be used as variable names.
 pub const TYPE_WORDS: &[&str] = &[
-    "int", "bool", "char", "string", "vec", "set", "map", "option", "stack", "queue", "deque", "heap", "lnode", "tnode",
+    "int", "bool", "char", "string", "vec", "set", "map", "option", "stack", "queue", "deque",
+    "heap", "lnode", "tnode",
 ];
 
 /// Is this word reserved (keyword or type name)?
@@ -51,15 +52,19 @@ pub fn is_ident(w: &str) -> bool {
 }
 
 const PUNCT: &[&str] = &[
-    "<<=", ">>=", "..", "->", "==", "!=", "<=", ">=", "&&", "||", "<<", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=",
-    "(", ")", "[", "]", "{", "}", ",", ";", ":", ".", "=", "<", ">", "+", "-", "*", "/", "%", "&", "|", "^", "~", "!",
+    "<<=", ">>=", "..", "->", "==", "!=", "<=", ">=", "&&", "||", "<<", "+=", "-=", "*=", "/=",
+    "%=", "&=", "|=", "^=", "(", ")", "[", "]", "{", "}", ",", ";", ":", ".", "=", "<", ">", "+",
+    "-", "*", "/", "%", "&", "|", "^", "~", "!",
 ];
 
 fn lex(src: &str) -> Result<Vec<Token>, Diag> {
     let b = src.as_bytes();
     let mut i = 0usize;
     let mut out: Vec<Token> = Vec::new();
-    let sp = |s: usize, e: usize| Span { start: s as u32, end: e as u32 };
+    let sp = |s: usize, e: usize| Span {
+        start: s as u32,
+        end: e as u32,
+    };
     while i < b.len() {
         let c = b[i];
         if c == b' ' || c == b'\t' || c == b'\r' || c == b'\n' {
@@ -85,7 +90,11 @@ fn lex(src: &str) -> Result<Vec<Token>, Diag> {
             while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
                 i += 1;
             }
-            out.push(Token { tok: Tok::Ident(src[start..i].to_string()), span: sp(start, i), glued: false });
+            out.push(Token {
+                tok: Tok::Ident(src[start..i].to_string()),
+                span: sp(start, i),
+                glued: false,
+            });
         } else if c.is_ascii_digit() {
             let (radix, digits_start) = if c == b'0' && matches!(b.get(i + 1), Some(b'x' | b'X')) {
                 (16, i + 2)
@@ -100,13 +109,20 @@ fn lex(src: &str) -> Result<Vec<Token>, Diag> {
             }
             let text: String = src[digits_start..i].chars().filter(|&c| c != '_').collect();
             match u64::from_str_radix(&text, radix) {
-                Ok(v) if !text.is_empty() => out.push(Token { tok: Tok::Int(v), span: sp(start, i), glued: false }),
+                Ok(v) if !text.is_empty() => out.push(Token {
+                    tok: Tok::Int(v),
+                    span: sp(start, i),
+                    glued: false,
+                }),
                 _ => {
                     return Err(Diag::at(
                         sp(start, i),
                         "lex.number",
-                        format!("'{}' is not a number my calculator understands (or it is too big).", &src[start..i]),
-                    ))
+                        format!(
+                            "'{}' is not a number my calculator understands (or it is too big).",
+                            &src[start..i]
+                        ),
+                    ));
                 }
             }
         } else if c == b'\'' || c == b'"' {
@@ -116,7 +132,11 @@ fn lex(src: &str) -> Result<Vec<Token>, Diag> {
             loop {
                 match b.get(i) {
                     None | Some(b'\n') => {
-                        return Err(Diag::at(sp(start, i), "lex.unterminated", "This quote never closes."));
+                        return Err(Diag::at(
+                            sp(start, i),
+                            "lex.unterminated",
+                            "This quote never closes.",
+                        ));
                     }
                     Some(&q) if q == quote => {
                         i += 1;
@@ -136,7 +156,7 @@ fn lex(src: &str) -> Result<Vec<Token>, Diag> {
                                     sp(i, (i + 2).min(b.len())),
                                     "lex.escape",
                                     "I only know the escapes \\n \\t \\r \\0 \\\\ \\' and \\\".",
-                                ))
+                                ));
                             }
                         };
                         text.push(e);
@@ -151,7 +171,7 @@ fn lex(src: &str) -> Result<Vec<Token>, Diag> {
                             sp(i, i + 1),
                             "lex.ascii",
                             "My typewriter only has plain ASCII keys inside quotes too.",
-                        ))
+                        ));
                     }
                 }
             }
@@ -163,7 +183,11 @@ fn lex(src: &str) -> Result<Vec<Token>, Diag> {
                         "A character in single quotes holds exactly one letter. Use double quotes for words.",
                     ));
                 }
-                out.push(Token { tok: Tok::Char(text[0]), span: sp(start, i), glued: false });
+                out.push(Token {
+                    tok: Tok::Char(text[0]),
+                    span: sp(start, i),
+                    glued: false,
+                });
             } else {
                 out.push(Token {
                     tok: Tok::Str(String::from_utf8_lossy(&text).into_owned()),
@@ -176,16 +200,28 @@ fn lex(src: &str) -> Result<Vec<Token>, Diag> {
             let rest = &src[i..];
             let p = PUNCT.iter().find(|p| rest.starts_with(**p));
             let Some(p) = p else {
-                return Err(Diag::at(sp(i, i + 1), "lex.char", format!("I do not know what '{}' means here.", c as char)));
+                return Err(Diag::at(
+                    sp(i, i + 1),
+                    "lex.char",
+                    format!("I do not know what '{}' means here.", c as char),
+                ));
             };
             i += p.len();
-            out.push(Token { tok: Tok::P(p), span: sp(start, i), glued: false });
+            out.push(Token {
+                tok: Tok::P(p),
+                span: sp(start, i),
+                glued: false,
+            });
         }
         if let Some(last) = out.last_mut() {
             last.glued = b.get(i).is_some_and(|n| !n.is_ascii_whitespace());
         }
     }
-    out.push(Token { tok: Tok::Eof, span: sp(b.len(), b.len()), glued: false });
+    out.push(Token {
+        tok: Tok::Eof,
+        span: sp(b.len(), b.len()),
+        glued: false,
+    });
     Ok(out)
 }
 
@@ -215,7 +251,11 @@ impl Parser {
         self.toks[self.pos].span
     }
     fn prev_end(&self) -> u32 {
-        if self.pos == 0 { 0 } else { self.toks[self.pos - 1].span.end }
+        if self.pos == 0 {
+            0
+        } else {
+            self.toks[self.pos - 1].span.end
+        }
     }
     fn bump(&mut self) -> Token {
         let t = self.toks[self.pos].clone();
@@ -267,14 +307,22 @@ impl Parser {
                 "]" => "I expected a ']' to close the bracket".to_string(),
                 _ => format!("I expected '{p}'"),
             };
-            Err(Diag::at(self.span(), "parse.expected", format!("{what}, but found {}.", self.describe())))
+            Err(Diag::at(
+                self.span(),
+                "parse.expected",
+                format!("{what}, but found {}.", self.describe()),
+            ))
         }
     }
     fn expect_kw(&mut self, k: &str) -> R<()> {
         if self.eat_kw(k) {
             Ok(())
         } else {
-            Err(Diag::at(self.span(), "parse.expected", format!("I expected '{k}', but found {}.", self.describe())))
+            Err(Diag::at(
+                self.span(),
+                "parse.expected",
+                format!("I expected '{k}', but found {}.", self.describe()),
+            ))
         }
     }
     fn ident(&mut self, what: &str) -> R<String> {
@@ -288,13 +336,21 @@ impl Parser {
                 "parse.reserved",
                 format!("'{s}' is a reserved word, so it cannot be {what}."),
             )),
-            _ => Err(Diag::at(self.span(), "parse.expected", format!("I expected {what}, but found {}.", self.describe()))),
+            _ => Err(Diag::at(
+                self.span(),
+                "parse.expected",
+                format!("I expected {what}, but found {}.", self.describe()),
+            )),
         }
     }
     fn enter(&mut self) -> R<()> {
         self.depth += 1;
         if self.depth > MAX_NEST {
-            return Err(Diag::at(self.span(), "parse.deep", "That is nested too deep for my desk. Try a helper function."));
+            return Err(Diag::at(
+                self.span(),
+                "parse.deep",
+                "That is nested too deep for my desk. Try a helper function.",
+            ));
         }
         Ok(())
     }
@@ -302,17 +358,31 @@ impl Parser {
         let id = self.next_id;
         self.next_id += 1;
         self.spans.resize(self.next_id as usize, Span::default());
-        self.spans[id as usize] = Span { start, end: self.prev_end().max(start) };
+        self.spans[id as usize] = Span {
+            start,
+            end: self.prev_end().max(start),
+        };
         id
     }
     fn expr(&mut self, kind: ExprKind, start: u32) -> Expr {
         let h = |p: &Parser, e: &Expr| p.heights.get(e.id as usize).copied().unwrap_or(0);
         let below = match &kind {
             ExprKind::Unary(_, a) | ExprKind::Field(a, _) | ExprKind::TupleIdx(a, _) => h(self, a),
-            ExprKind::Binary(_, a, b) | ExprKind::Index(a, b) | ExprKind::VecRepeat(a, b) => h(self, a).max(h(self, b)),
-            ExprKind::Slice(a, b, c) => h(self, a).max(b.as_ref().map_or(0, |x| h(self, x))).max(c.as_ref().map_or(0, |x| h(self, x))),
-            ExprKind::Call(_, a) | ExprKind::VecLit(a) | ExprKind::TupleLit(a) => a.iter().map(|x| h(self, x)).max().unwrap_or(0),
-            ExprKind::Method(r, _, a) => a.iter().map(|x| h(self, x)).max().unwrap_or(0).max(h(self, r)),
+            ExprKind::Binary(_, a, b) | ExprKind::Index(a, b) | ExprKind::VecRepeat(a, b) => {
+                h(self, a).max(h(self, b))
+            }
+            ExprKind::Slice(a, b, c) => h(self, a)
+                .max(b.as_ref().map_or(0, |x| h(self, x)))
+                .max(c.as_ref().map_or(0, |x| h(self, x))),
+            ExprKind::Call(_, a) | ExprKind::VecLit(a) | ExprKind::TupleLit(a) => {
+                a.iter().map(|x| h(self, x)).max().unwrap_or(0)
+            }
+            ExprKind::Method(r, _, a) => a
+                .iter()
+                .map(|x| h(self, x))
+                .max()
+                .unwrap_or(0)
+                .max(h(self, r)),
             _ => 0,
         };
         let id = self.id(start);
@@ -327,7 +397,10 @@ impl Parser {
         Expr { id, kind }
     }
     fn stmt(&mut self, kind: StmtKind, start: u32) -> Stmt {
-        Stmt { id: self.id(start), kind }
+        Stmt {
+            id: self.id(start),
+            kind,
+        }
     }
 
     // ----- types -----
@@ -354,13 +427,21 @@ impl Parser {
             }
             self.expect_p(")")?;
             if ts.len() < 2 {
-                return Err(Diag::at(self.span(), "parse.tuple", "A tuple type needs at least two parts, like (int, int)."));
+                return Err(Diag::at(
+                    self.span(),
+                    "parse.tuple",
+                    "A tuple type needs at least two parts, like (int, int).",
+                ));
             }
             return Ok(Ty::Tuple(ts));
         }
         let sp = self.span();
         let Tok::Ident(w) = self.peek().clone() else {
-            return Err(Diag::at(sp, "parse.type", format!("I expected a type here, but found {}.", self.describe())));
+            return Err(Diag::at(
+                sp,
+                "parse.type",
+                format!("I expected a type here, but found {}.", self.describe()),
+            ));
         };
         let t = match w.as_str() {
             "int" => Ty::Int,
@@ -395,8 +476,10 @@ impl Parser {
                 return Err(Diag::at(
                     sp,
                     "parse.type",
-                    format!("'{w}' is not a type I know. Try int, bool, char, string, vec<..>, map<..>, set<..> ..."),
-                ))
+                    format!(
+                        "'{w}' is not a type I know. Try int, bool, char, string, vec<..>, map<..>, set<..> ..."
+                    ),
+                ));
             }
         };
         self.bump();
@@ -420,7 +503,8 @@ impl Parser {
         while !self.is_p(")") {
             let pname = self.ident("a parameter name")?;
             self.expect_p(":")?;
-            let by_ref = if self.is_p("&") && matches!(self.peek_at(1), Tok::Ident(m) if m == "mut") {
+            let by_ref = if self.is_p("&") && matches!(self.peek_at(1), Tok::Ident(m) if m == "mut")
+            {
                 self.bump();
                 self.bump();
                 true
@@ -428,15 +512,29 @@ impl Parser {
                 false
             };
             let ty = self.ty()?;
-            params.push(Param { name: pname, ty, by_ref });
+            params.push(Param {
+                name: pname,
+                ty,
+                by_ref,
+            });
             if !self.eat_p(",") {
                 break;
             }
         }
         self.expect_p(")")?;
-        let ret = if self.eat_p("->") { self.ty()? } else { Ty::Unit };
+        let ret = if self.eat_p("->") {
+            self.ty()?
+        } else {
+            Ty::Unit
+        };
         let body = self.block()?;
-        Ok(FnDecl { id: self.id(start), name, params, ret, body })
+        Ok(FnDecl {
+            id: self.id(start),
+            name,
+            params,
+            ret,
+            body,
+        })
     }
     fn block(&mut self) -> R<Block> {
         self.enter()?;
@@ -444,7 +542,11 @@ impl Parser {
         let mut stmts = Vec::new();
         while !self.is_p("}") {
             if *self.peek() == Tok::Eof {
-                return Err(Diag::at(self.span(), "parse.expected", "I expected a '}' to close the body, but the page ended."));
+                return Err(Diag::at(
+                    self.span(),
+                    "parse.expected",
+                    "I expected a '}' to close the body, but the page ended.",
+                ));
             }
             stmts.push(self.statement()?);
         }
@@ -460,7 +562,11 @@ impl Parser {
             }
             self.expect_p(")")?;
             if ps.len() < 2 {
-                return Err(Diag::at(self.span(), "parse.tuple", "A tuple pattern needs at least two names, like (a, b)."));
+                return Err(Diag::at(
+                    self.span(),
+                    "parse.tuple",
+                    "A tuple pattern needs at least two names, like (a, b).",
+                ));
             }
             return Ok(Pat::Tuple(ps));
         }
@@ -476,7 +582,11 @@ impl Parser {
             Tok::Ident(k) if k == "let" => {
                 self.bump();
                 let pat = self.pattern()?;
-                let ty = if self.eat_p(":") { Some(self.ty()?) } else { None };
+                let ty = if self.eat_p(":") {
+                    Some(self.ty()?)
+                } else {
+                    None
+                };
                 self.expect_p("=")?;
                 let init = self.expr_top()?;
                 self.expect_p(";")?;
@@ -493,7 +603,8 @@ impl Parser {
                 self.bump();
                 let pat = self.pattern()?;
                 self.expect_kw("in")?;
-                let is_range = matches!(self.peek(), Tok::Ident(r) if r == "range") && *self.peek_at(1) == Tok::P("(");
+                let is_range = matches!(self.peek(), Tok::Ident(r) if r == "range")
+                    && *self.peek_at(1) == Tok::P("(");
                 if is_range && let Pat::Var(var) = &pat {
                     self.bump();
                     self.bump();
@@ -510,13 +621,22 @@ impl Parser {
                         (Some(a), Some(b), Some(c), None) => (Some(a), b, Some(c)),
                         _ => {
                             return Err(Diag::at(
-                                Span { start, end: self.prev_end() },
+                                Span {
+                                    start,
+                                    end: self.prev_end(),
+                                },
                                 "parse.range",
                                 "range takes one, two or three numbers: range(n), range(a, b) or range(a, b, step).",
-                            ))
+                            ));
                         }
                     };
-                    StmtKind::ForRange { var: var.clone(), start: start_e, end, step, body }
+                    StmtKind::ForRange {
+                        var: var.clone(),
+                        start: start_e,
+                        end,
+                        step,
+                        body,
+                    }
                 } else {
                     let iter = self.expr_top()?;
                     let body = self.block()?;
@@ -535,7 +655,11 @@ impl Parser {
             }
             Tok::Ident(k) if k == "return" => {
                 self.bump();
-                let e = if self.is_p(";") { None } else { Some(self.expr_top()?) };
+                let e = if self.is_p(";") {
+                    None
+                } else {
+                    Some(self.expr_top()?)
+                };
                 self.expect_p(";")?;
                 StmtKind::Return(e)
             }
@@ -556,7 +680,10 @@ impl Parser {
                     _ => None,
                 };
                 if let Some(op) = op {
-                    if !matches!(e.kind, ExprKind::Var(_) | ExprKind::Index(..) | ExprKind::Field(..)) {
+                    if !matches!(
+                        e.kind,
+                        ExprKind::Var(_) | ExprKind::Index(..) | ExprKind::Field(..)
+                    ) {
                         return Err(Diag::at(
                             self.span(),
                             "parse.place",
@@ -566,7 +693,11 @@ impl Parser {
                     self.bump();
                     let value = self.expr_top()?;
                     self.expect_p(";")?;
-                    StmtKind::Assign { target: e, op, value }
+                    StmtKind::Assign {
+                        target: e,
+                        op,
+                        value,
+                    }
                 } else {
                     self.expect_p(";")?;
                     StmtKind::Expr(e)
@@ -584,7 +715,9 @@ impl Parser {
         let els = if self.eat_kw("else") {
             if self.is_kw("if") {
                 let nested = self.if_stmt()?;
-                Some(Block { stmts: vec![nested] })
+                Some(Block {
+                    stmts: vec![nested],
+                })
             } else {
                 Some(self.block()?)
             }
@@ -616,7 +749,10 @@ impl Parser {
         let mut l = self.not_expr()?;
         while self.eat_kw("and") || self.eat_p("&&") {
             let r = self.not_expr()?;
-            l = self.expr(ExprKind::Binary(BinOp::And, Box::new(l), Box::new(r)), start);
+            l = self.expr(
+                ExprKind::Binary(BinOp::And, Box::new(l), Box::new(r)),
+                start,
+            );
         }
         Ok(l)
     }
@@ -650,7 +786,12 @@ impl Parser {
             "<=" => (BinOp::Le, 1),
             ">=" => (BinOp::Ge, 1),
             ">" => {
-                if t.glued && self.toks.get(self.pos + 1).is_some_and(|n| n.tok == Tok::P(">")) {
+                if t.glued
+                    && self
+                        .toks
+                        .get(self.pos + 1)
+                        .is_some_and(|n| n.tok == Tok::P(">"))
+                {
                     (BinOp::Shr, 2)
                 } else {
                     (BinOp::Gt, 1)
@@ -685,9 +826,13 @@ impl Parser {
                     let v = if n == 1u64 << 63 {
                         i64::MIN
                     } else {
-                        i64::try_from(n)
-                            .map(|x| -x)
-                            .map_err(|_| Diag::at(self.span(), "lex.number", "That number is too big for my calculator."))?
+                        i64::try_from(n).map(|x| -x).map_err(|_| {
+                            Diag::at(
+                                self.span(),
+                                "lex.number",
+                                "That number is too big for my calculator.",
+                            )
+                        })?
                     };
                     return Ok(self.expr(ExprKind::Int(v), start));
                 }
@@ -728,8 +873,11 @@ impl Parser {
                         return Err(Diag::at(
                             self.span(),
                             "parse.expected",
-                            format!("I expected a method or field name after the dot, but found {}.", self.describe()),
-                        ))
+                            format!(
+                                "I expected a method or field name after the dot, but found {}.",
+                                self.describe()
+                            ),
+                        ));
                     }
                 }
             } else if self.eat_p("[") {
@@ -739,12 +887,18 @@ impl Parser {
                     lo = Some(Box::new(self.expr_top()?));
                 }
                 if self.eat_p("..") {
-                    let hi = if self.is_p("]") { None } else { Some(Box::new(self.expr_top()?)) };
+                    let hi = if self.is_p("]") {
+                        None
+                    } else {
+                        Some(Box::new(self.expr_top()?))
+                    };
                     self.expect_p("]")?;
                     e = self.expr(ExprKind::Slice(Box::new(e), lo, hi), start);
                 } else {
                     self.expect_p("]")?;
-                    let idx = lo.ok_or_else(|| Diag::at(self.span(), "parse.index", "Empty index brackets."))?;
+                    let idx = lo.ok_or_else(|| {
+                        Diag::at(self.span(), "parse.index", "Empty index brackets.")
+                    })?;
                     e = self.expr(ExprKind::Index(Box::new(e), idx), start);
                 }
                 self.depth -= 1;
@@ -770,8 +924,13 @@ impl Parser {
         match self.peek().clone() {
             Tok::Int(n) => {
                 self.bump();
-                let v = i64::try_from(n)
-                    .map_err(|_| Diag::at(sp, "lex.number", "That number is too big for my calculator."))?;
+                let v = i64::try_from(n).map_err(|_| {
+                    Diag::at(
+                        sp,
+                        "lex.number",
+                        "That number is too big for my calculator.",
+                    )
+                })?;
                 Ok(self.expr(ExprKind::Int(v), start))
             }
             Tok::Char(c) => {
@@ -796,7 +955,11 @@ impl Parser {
                     }
                     self.expect_p(")")?;
                     if items.len() < 2 {
-                        return Err(Diag::at(sp, "parse.tuple", "A tuple needs at least two parts."));
+                        return Err(Diag::at(
+                            sp,
+                            "parse.tuple",
+                            "A tuple needs at least two parts.",
+                        ));
                     }
                     self.expr(ExprKind::TupleLit(items), start)
                 } else {
@@ -873,7 +1036,11 @@ impl Parser {
                     }
                 }
             },
-            _ => Err(Diag::at(sp, "parse.expected", format!("I expected a value here, but found {}.", self.describe()))),
+            _ => Err(Diag::at(
+                sp,
+                "parse.expected",
+                format!("I expected a value here, but found {}.", self.describe()),
+            )),
         }
     }
 }
@@ -881,24 +1048,54 @@ impl Parser {
 /// Parse program text into a [`Program`].
 pub fn parse(src: &str) -> Result<Program, Diag> {
     if src.len() > MAX_SOURCE {
-        return Err(Diag::plain("parse.long", "That page is too long for my desk."));
+        return Err(Diag::plain(
+            "parse.long",
+            "That page is too long for my desk.",
+        ));
     }
     let toks = lex(src)?;
-    let mut p = Parser { toks, pos: 0, next_id: 0, spans: Vec::new(), depth: 0, heights: Vec::new(), too_tall: false };
+    let mut p = Parser {
+        toks,
+        pos: 0,
+        next_id: 0,
+        spans: Vec::new(),
+        depth: 0,
+        heights: Vec::new(),
+        too_tall: false,
+    };
     let fns = p.program()?;
     if p.too_tall {
-        return Err(Diag::plain("parse.tall", "That sentence is far too long-winded for me. Break it into smaller steps with `let`."));
+        return Err(Diag::plain(
+            "parse.tall",
+            "That sentence is far too long-winded for me. Break it into smaller steps with `let`.",
+        ));
     }
-    Ok(Program { fns, next_id: p.next_id, spans: p.spans })
+    Ok(Program {
+        fns,
+        next_id: p.next_id,
+        spans: p.spans,
+    })
 }
 
 /// Parse a single type such as `map<string, vec<int>>` (level signatures, tests).
 pub fn parse_type(src: &str) -> Result<Ty, Diag> {
     let toks = lex(src)?;
-    let mut p = Parser { toks, pos: 0, next_id: 0, spans: Vec::new(), depth: 0, heights: Vec::new(), too_tall: false };
+    let mut p = Parser {
+        toks,
+        pos: 0,
+        next_id: 0,
+        spans: Vec::new(),
+        depth: 0,
+        heights: Vec::new(),
+        too_tall: false,
+    };
     let t = p.ty()?;
     if *p.peek() != Tok::Eof {
-        return Err(Diag::at(p.span(), "parse.expected", "Extra text after the type."));
+        return Err(Diag::at(
+            p.span(),
+            "parse.expected",
+            "Extra text after the type.",
+        ));
     }
     Ok(t)
 }
@@ -906,13 +1103,28 @@ pub fn parse_type(src: &str) -> Result<Ty, Diag> {
 /// Parse one expression (used for level examples and the autocomplete preview).
 pub fn parse_expr(src: &str) -> Result<Expr, Diag> {
     let toks = lex(src)?;
-    let mut p = Parser { toks, pos: 0, next_id: 0, spans: Vec::new(), depth: 0, heights: Vec::new(), too_tall: false };
+    let mut p = Parser {
+        toks,
+        pos: 0,
+        next_id: 0,
+        spans: Vec::new(),
+        depth: 0,
+        heights: Vec::new(),
+        too_tall: false,
+    };
     let e = p.expr_top()?;
     if *p.peek() != Tok::Eof {
-        return Err(Diag::at(p.span(), "parse.expected", "Extra text after the expression."));
+        return Err(Diag::at(
+            p.span(),
+            "parse.expected",
+            "Extra text after the expression.",
+        ));
     }
     if p.too_tall {
-        return Err(Diag::plain("parse.tall", "That sentence is far too long-winded for me."));
+        return Err(Diag::plain(
+            "parse.tall",
+            "That sentence is far too long-winded for me.",
+        ));
     }
     Ok(e)
 }

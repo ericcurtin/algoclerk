@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- A cream paper tag with an amber "A" and an ink punch hole (original artwork). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFF6E0" android:pathData="M30,28 L78,28 L78,80 L30,80 Z" />
+    <path android:fillColor="#1D1B33" android:pathData="M30,28 L78,28 L78,32 L30,32 Z" />
+    <path android:fillColor="#F4A62A" android:pathData="M54,38 L64,70 L58,70 L56.5,64 L51.5,64 L50,70 L44,70 Z M54,48 L52.5,58 L55.5,58 Z" />
+    <path android:fillColor="#1D1B33" android:pathData="M36,34 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0 Z" />
+</vector>

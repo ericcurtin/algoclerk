@@ -54,7 +54,11 @@ pub enum MemoOut {
 impl Memo {
     /// The memo panel rectangle.
     pub fn panel(vp: &Viewport) -> Rect {
-        if vp.portrait { Rect::new(6, 18, vp.w - 12, vp.h - 24) } else { Rect::new(40, 12, vp.w - 80, vp.h - 20) }
+        if vp.portrait {
+            Rect::new(6, 18, vp.w - 12, vp.h - 24)
+        } else {
+            Rect::new(40, 12, vp.w - 80, vp.h - 20)
+        }
     }
 
     /// Control rectangles inside a panel.
@@ -67,7 +71,12 @@ impl Memo {
             primary: Rect::new(panel.right() - 6 - 90, bar_y, 90, bh),
             hint: Rect::new(panel.x + 6, panel.bottom() - 2 * bh - 8, 110, bh),
             reveal: Rect::new(panel.x + 6 + 114, panel.bottom() - 2 * bh - 8, 110, bh),
-            body: Rect::new(panel.x + 6, panel.y + 16, panel.w - 12, panel.h - 16 - 2 * bh - 14),
+            body: Rect::new(
+                panel.x + 6,
+                panel.y + 16,
+                panel.w - 12,
+                panel.h - 16 - 2 * bh - 14,
+            ),
         }
     }
 
@@ -75,7 +84,13 @@ impl Memo {
     pub fn hits(vp: &Viewport) -> Vec<Hit> {
         let p = Self::panel(vp);
         let m = Self::rects(p, vp.btn_h(), vp.portrait);
-        vec![Hit::area("memo", p), Hit::tap("memo prev", m.prev), Hit::tap("memo next", m.next), Hit::tap("memo primary", m.primary), Hit::tap("memo hint", m.hint)]
+        vec![
+            Hit::area("memo", p),
+            Hit::tap("memo prev", m.prev),
+            Hit::tap("memo next", m.next),
+            Hit::tap("memo primary", m.primary),
+            Hit::tap("memo hint", m.hint),
+        ]
     }
 
     /// Handle input.
@@ -116,7 +131,15 @@ impl Memo {
     }
 
     /// Draw the memo.
-    pub fn draw(&self, g: &mut Gfx<'_>, v: &View<'_>, level: &Level, rec: &LevelRecord, shown_hints: usize, starting: bool) {
+    pub fn draw(
+        &self,
+        g: &mut Gfx<'_>,
+        v: &View<'_>,
+        level: &Level,
+        rec: &LevelRecord,
+        shown_hints: usize,
+        starting: bool,
+    ) {
         let vp = v.vp;
         g.shade(vp.screen());
         let p = Self::panel(&vp);
@@ -142,17 +165,21 @@ impl Memo {
         };
         match self.page {
             0 => {
-                h(g, &mut y, "The job");
+                h(g, &mut y, &v.tr.t("brief.job"));
                 para(g, &mut y, &level.story, 'k');
-                h(g, &mut y, "The task");
+                h(g, &mut y, &v.tr.t("brief.task"));
                 para(g, &mut y, &level.statement, 'K');
                 g.round_rect(Rect::new(x, y, m.body.w - 4, 24), 'K', 'k');
                 let sig = level.signature.text();
-                for (i, l) in Font::wrap(&sig, cols.saturating_sub(2)).iter().take(2).enumerate() {
+                for (i, l) in Font::wrap(&sig, cols.saturating_sub(2))
+                    .iter()
+                    .take(2)
+                    .enumerate()
+                {
                     g.text(x + 4, y + 4 + i as i32 * 9, l, 'y');
                 }
                 y += 28;
-                h(g, &mut y, "Constraints");
+                h(g, &mut y, &v.tr.t("brief.constraints"));
                 for c in &level.constraints {
                     for (i, l) in Font::wrap(c, cols.saturating_sub(2)).iter().enumerate() {
                         g.text(x, y, if i == 0 { "-" } else { " " }, 'k');
@@ -162,7 +189,7 @@ impl Memo {
                 }
             }
             1 => {
-                h(g, &mut y, "Examples");
+                h(g, &mut y, &v.tr.t("brief.examples"));
                 let mut nodes = vec![NodeData::default()];
                 for (n, ex) in level.examples.iter().take(4).enumerate() {
                     g.text(x, y, &format!("#{}", n + 1), 'k');
@@ -194,9 +221,14 @@ impl Memo {
                 }
             }
             _ => {
-                h(g, &mut y, "Unlocked tools");
+                h(g, &mut y, &v.tr.t("brief.unlocked"));
                 let mut cx = x;
-                let mut chip = |g: &mut Gfx<'_>, cx: &mut i32, y: &mut i32, label: &str, fill: char, lock: bool| {
+                let chip = |g: &mut Gfx<'_>,
+                            cx: &mut i32,
+                            y: &mut i32,
+                            label: &str,
+                            fill: char,
+                            lock: bool| {
                     let w = label.chars().count() as i32 * 6 + 8 + if lock { 9 } else { 0 };
                     if *cx + w > x + m.body.w {
                         *cx = x;
@@ -217,10 +249,28 @@ impl Memo {
                 }
                 y += 16;
                 if level.helpers || level.recursion {
-                    para(g, &mut y, &format!("Helpers: {}, recursion: {}", if level.helpers { "yes" } else { "no" }, if level.recursion { "yes" } else { "no" }), 'k');
+                    let yn = |b: bool| {
+                        if b {
+                            v.tr.t("brief.yes")
+                        } else {
+                            v.tr.t("brief.no")
+                        }
+                    };
+                    para(
+                        g,
+                        &mut y,
+                        &v.tr.format(
+                            "brief.helpers",
+                            &[
+                                ("helpers", yn(level.helpers)),
+                                ("recursion", yn(level.recursion)),
+                            ],
+                        ),
+                        'k',
+                    );
                 }
                 if !level.locked.is_empty() {
-                    h(g, &mut y, "Locked on this floor");
+                    h(g, &mut y, &v.tr.t("brief.locked"));
                     cx = x;
                     for k in &level.locked {
                         chip(g, &mut cx, &mut y, &k.name, 'p', true);
@@ -230,21 +280,64 @@ impl Memo {
                         para(g, &mut y, &format!("{}: {}", k.name, k.why), 'k');
                     }
                 }
-                h(g, &mut y, "Technique");
-                para(g, &mut y, &format!("{}  ({})", level.technique, level.big_o), 'K');
-                h(g, &mut y, "Targets");
-                for (name, sprite, size, speed) in [("Paper Clip", "ui/medal_clip", level.medals.size[0], level.medals.speed[0]), ("Stapler", "ui/medal_staple", level.medals.size[1], level.medals.speed[1]), ("Golden Stamp", "ui/medal_seal", level.medals.size[2], level.medals.speed[2])] {
-                    g.sprite(sprite, 0, x, y - 2);
-                    g.text(x + 20, y, name, 'K');
-                    g.text(x + 98, y, &format!("size <= {size}   cost <= {speed}"), 'k');
-                    y += 14;
+                h(g, &mut y, &v.tr.t("brief.technique"));
+                para(
+                    g,
+                    &mut y,
+                    &format!("{}  ({})", level.technique, level.big_o),
+                    'K',
+                );
+                h(g, &mut y, &v.tr.t("brief.targets"));
+                for (name, sprite, size, speed) in [
+                    (
+                        v.tr.t("result.medal_bronze"),
+                        "ui/medal_clip",
+                        level.medals.size[0],
+                        level.medals.speed[0],
+                    ),
+                    (
+                        v.tr.t("result.medal_silver"),
+                        "ui/medal_staple",
+                        level.medals.size[1],
+                        level.medals.speed[1],
+                    ),
+                    (
+                        v.tr.t("result.medal_gold"),
+                        "ui/medal_seal",
+                        level.medals.size[2],
+                        level.medals.speed[2],
+                    ),
+                ] {
+                    g.sprite(sprite, 0, x, y - 5);
+                    g.text(x + 20, y, &name, 'K');
+                    g.text(
+                        x + 98,
+                        y,
+                        &v.tr.format(
+                            "brief.target_line",
+                            &[("size", size.to_string()), ("cost", speed.to_string())],
+                        ),
+                        'k',
+                    );
+                    y += 18;
                 }
                 if rec.stars > 0 {
-                    para(g, &mut y, &format!("Your best: size {}, cost {:.0}", rec.best_size.unwrap_or(0), rec.best_speed.unwrap_or(0.0)), 'G');
+                    para(
+                        g,
+                        &mut y,
+                        &v.tr.format(
+                            "brief.best",
+                            &[
+                                ("size", rec.best_size.unwrap_or(0).to_string()),
+                                ("cost", format!("{:.0}", rec.best_speed.unwrap_or(0.0))),
+                            ],
+                        ),
+                        'G',
+                    );
                 }
-                h(g, &mut y, "Hints");
+                h(g, &mut y, &v.tr.t("brief.hints"));
                 if shown_hints == 0 {
-                    para(g, &mut y, "No hints yet. Tap Hint if you are stuck.", 'k');
+                    para(g, &mut y, &v.tr.t("brief.no_hints"), 'k');
                 }
                 for (i, hint) in level.hints.iter().take(shown_hints).enumerate() {
                     let lines = Font::wrap(hint, cols.saturating_sub(4));
@@ -264,13 +357,54 @@ impl Memo {
         // page dots
         for i in 0..PAGES {
             let cx = m.next.right() + 10 + i as i32 * 11;
-            g.round_rect(Rect::new(cx, m.next.y + m.next.h / 2 - 3, 7, 7), if i == self.page { 'y' } else { 'A' }, 'K');
+            g.round_rect(
+                Rect::new(cx, m.next.y + m.next.h / 2 - 3, 7, 7),
+                if i == self.page { 'y' } else { 'A' },
+                'K',
+            );
         }
         let st = |r: &Rect| widget_state(v.ptr, r, false, false);
-        g.icon_button(m.prev, "left", Kind::Normal, State { disabled: self.page == 0, ..st(&m.prev) });
-        g.icon_button(m.next, "right", Kind::Normal, State { disabled: self.page + 1 >= PAGES, ..st(&m.next) });
-        g.button(m.hint, if shown_hints < level.hints.len() { "Hint" } else { "No more hints" }, Kind::Normal, State { disabled: shown_hints >= level.hints.len(), ..st(&m.hint) });
-        g.button(m.primary, if starting { "Start" } else { "Close" }, Kind::Primary, st(&m.primary));
+        g.icon_button(
+            m.prev,
+            "left",
+            Kind::Normal,
+            State {
+                disabled: self.page == 0,
+                ..st(&m.prev)
+            },
+        );
+        g.icon_button(
+            m.next,
+            "right",
+            Kind::Normal,
+            State {
+                disabled: self.page + 1 >= PAGES,
+                ..st(&m.next)
+            },
+        );
+        g.button(
+            m.hint,
+            &if shown_hints < level.hints.len() {
+                v.tr.t("brief.hint")
+            } else {
+                v.tr.t("brief.no_more")
+            },
+            Kind::Normal,
+            State {
+                disabled: shown_hints >= level.hints.len(),
+                ..st(&m.hint)
+            },
+        );
+        g.button(
+            m.primary,
+            &if starting {
+                v.tr.t("brief.start")
+            } else {
+                v.tr.t("brief.close")
+            },
+            Kind::Primary,
+            st(&m.primary),
+        );
     }
 }
 

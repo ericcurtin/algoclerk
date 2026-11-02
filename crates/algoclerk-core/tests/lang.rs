@@ -3,12 +3,19 @@
 
 use algoclerk_core::lang::check::{Allowed, CheckOpts};
 use algoclerk_core::lang::interp::{Limits, RtKind};
+use algoclerk_core::lang::parse;
 use algoclerk_core::lang::print::print;
 use algoclerk_core::lang::run::compile;
-use algoclerk_core::lang::parse;
 
 fn run1(src: &str, entry: &str, args: &[&str]) -> Result<String, String> {
-    let c = compile(src, &CheckOpts { allowed: Allowed::all(), entry: None }).map_err(|d| d[0].msg.clone())?;
+    let c = compile(
+        src,
+        &CheckOpts {
+            allowed: Allowed::all(),
+            entry: None,
+        },
+    )
+    .map_err(|d| d[0].msg.clone())?;
     let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
     let r = c.call(entry, &args, &Limits::default())?;
     match r.report.result {
@@ -28,7 +35,10 @@ fn two_sum_with_a_map() {
         }
         return [];
     }";
-    assert_eq!(run1(src, "two_sum", &["[2, 7, 11, 15]", "9"]).unwrap(), "[0, 1]");
+    assert_eq!(
+        run1(src, "two_sum", &["[2, 7, 11, 15]", "9"]).unwrap(),
+        "[0, 1]"
+    );
     assert_eq!(run1(src, "two_sum", &["[1, 2]", "9"]).unwrap(), "[]");
 }
 
@@ -48,7 +58,12 @@ fn typed_errors_are_friendly() {
     assert!(e.contains("Mix-up"), "{e}");
     let e = run1("fn f(a: int) -> int { return b; }", "f", &["1"]).unwrap_err();
     assert!(e.contains("cannot find"), "{e}");
-    let e = run1("fn f(a: vec<int>) -> int { for x in a { a.push(x); } return 0; }", "f", &["[1]"]).unwrap_err();
+    let e = run1(
+        "fn f(a: vec<int>) -> int { for x in a { a.push(x); } return 0; }",
+        "f",
+        &["[1]"],
+    )
+    .unwrap_err();
     assert!(e.contains("walking along"), "{e}");
 }
 
@@ -58,7 +73,12 @@ fn runtime_errors_are_friendly() {
     assert!(e.contains("Index") && e.contains("slots 0 to 0"), "{e}");
     let e = run1("fn f(a: int) -> int { return 10 / a; }", "f", &["0"]).unwrap_err();
     assert!(e.contains("DivZero"), "{e}");
-    let e = run1("fn f(a: int) -> int { while true { a += 1; } return a; }", "f", &["0"]).unwrap_err();
+    let e = run1(
+        "fn f(a: int) -> int { while true { a += 1; } return a; }",
+        "f",
+        &["0"],
+    )
+    .unwrap_err();
     assert!(e.contains("Time"), "{e}");
 }
 
@@ -85,8 +105,18 @@ fn locked_builtins_and_types() {
     use std::collections::BTreeSet;
     let opts = CheckOpts {
         allowed: Allowed {
-            types: Some(["vec"].iter().map(|s| s.to_string()).collect::<BTreeSet<_>>()),
-            builtins: Some(["len"].iter().map(|s| s.to_string()).collect::<BTreeSet<_>>()),
+            types: Some(
+                ["vec"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<BTreeSet<_>>(),
+            ),
+            builtins: Some(
+                ["len"]
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect::<BTreeSet<_>>(),
+            ),
             helpers: false,
             recursion: false,
         },
@@ -94,7 +124,11 @@ fn locked_builtins_and_types() {
     };
     let e = compile("fn f(a: vec<int>) -> vec<int> { return sorted(a); }", &opts).unwrap_err();
     assert!(e[0].msg.contains("locked"), "{:?}", e[0]);
-    let e = compile("fn f(a: vec<int>) -> int { let s = set<int>(); return len(a); }", &opts).unwrap_err();
+    let e = compile(
+        "fn f(a: vec<int>) -> int { let s = set<int>(); return len(a); }",
+        &opts,
+    )
+    .unwrap_err();
     assert!(e[0].msg.contains("locked"), "{:?}", e[0]);
     assert!(compile("fn f(a: vec<int>) -> int { return len(a); }", &opts).is_ok());
 }
@@ -130,16 +164,40 @@ fn by_ref_helpers() {
 fn cost_model_distinguishes_linear_and_quadratic() {
     let lin = "fn f(v: vec<int>) -> int { let s = 0; for x in v { s += x; } return s; }";
     let quad = "fn f(v: vec<int>) -> int { let s = 0; for i in range(len(v)) { for j in range(len(v)) { s += 1; } } return s; }";
-    let big = format!("[{}]", (0..300).map(|i| i.to_string()).collect::<Vec<_>>().join(", "));
-    let cl = compile(lin, &CheckOpts::default()).unwrap().call("f", &[big.clone()], &Limits::default()).unwrap();
-    let cq = compile(quad, &CheckOpts::default()).unwrap().call("f", &[big], &Limits::default()).unwrap();
-    assert!(cq.report.cost > cl.report.cost * 50, "{} vs {}", cq.report.cost, cl.report.cost);
+    let big = format!(
+        "[{}]",
+        (0..300)
+            .map(|i| i.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    let cl = compile(lin, &CheckOpts::default())
+        .unwrap()
+        .call("f", std::slice::from_ref(&big), &Limits::default())
+        .unwrap();
+    let cq = compile(quad, &CheckOpts::default())
+        .unwrap()
+        .call("f", &[big], &Limits::default())
+        .unwrap();
+    assert!(
+        cq.report.cost > cl.report.cost * 50,
+        "{} vs {}",
+        cq.report.cost,
+        cl.report.cost
+    );
 }
 
 #[test]
 fn time_limit_kind() {
-    let c = compile("fn f(n: int) -> int { let s = 0; for i in range(n) { s += i; } return s; }", &CheckOpts::default()).unwrap();
-    let l = Limits { steps: 1000, ..Limits::default() };
+    let c = compile(
+        "fn f(n: int) -> int { let s = 0; for i in range(n) { s += i; } return s; }",
+        &CheckOpts::default(),
+    )
+    .unwrap();
+    let l = Limits {
+        steps: 1000,
+        ..Limits::default()
+    };
     let r = c.call("f", &["100000".to_string()], &l).unwrap();
     assert_eq!(r.report.result.unwrap_err().kind, RtKind::Time);
 }

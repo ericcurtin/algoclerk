@@ -1,6 +1,6 @@
 # ADR 0001: GUI toolkit
 
-- Status: accepted
+- Status: superseded by ADR 0005 (pixel-art front end on Bevy)
 - Date: 2026-11
 
 ## Context

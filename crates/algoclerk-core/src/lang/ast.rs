@@ -64,7 +64,10 @@ impl Ty {
     }
     /// Scalar types that are cheap to copy and need no cloning in generated code.
     pub fn is_scalar(&self) -> bool {
-        matches!(self, Ty::Int | Ty::Bool | Ty::Char | Ty::LNode | Ty::TNode | Ty::Null | Ty::Unit)
+        matches!(
+            self,
+            Ty::Int | Ty::Bool | Ty::Char | Ty::LNode | Ty::TNode | Ty::Null | Ty::Unit
+        )
     }
     /// The unlock name of the type (`"vec"`, `"map"`, ...).
     pub fn family(&self) -> &'static str {
@@ -93,9 +96,13 @@ impl Ty {
     pub fn families(&self, out: &mut Vec<&'static str>) {
         out.push(self.family());
         match self {
-            Ty::Vec(t) | Ty::Set(t) | Ty::Option(t) | Ty::Stack(t) | Ty::Queue(t) | Ty::Deque(t) | Ty::Heap(t) => {
-                t.families(out)
-            }
+            Ty::Vec(t)
+            | Ty::Set(t)
+            | Ty::Option(t)
+            | Ty::Stack(t)
+            | Ty::Queue(t)
+            | Ty::Deque(t)
+            | Ty::Heap(t) => t.families(out),
             Ty::Map(k, v) => {
                 k.families(out);
                 v.families(out);
@@ -223,7 +230,14 @@ impl BinOp {
     pub fn assignable(self) -> bool {
         !matches!(
             self,
-            BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge | BinOp::And | BinOp::Or
+            BinOp::Eq
+                | BinOp::Ne
+                | BinOp::Lt
+                | BinOp::Le
+                | BinOp::Gt
+                | BinOp::Ge
+                | BinOp::And
+                | BinOp::Or
         )
     }
 }
@@ -433,7 +447,10 @@ impl Program {
     }
     /// Source span of a node, if the node came from parsed text.
     pub fn span(&self, id: NodeId) -> Option<Span> {
-        self.spans.get(id as usize).copied().filter(|s| s.end > s.start)
+        self.spans
+            .get(id as usize)
+            .copied()
+            .filter(|s| s.end > s.start)
     }
     /// Find a function by name.
     pub fn find(&self, name: &str) -> Option<&FnDecl> {
@@ -445,11 +462,15 @@ impl Program {
         fn expr(e: &Expr) -> u32 {
             1 + match &e.kind {
                 ExprKind::Unary(_, a) | ExprKind::Field(a, _) | ExprKind::TupleIdx(a, _) => expr(a),
-                ExprKind::Binary(_, a, b) | ExprKind::Index(a, b) | ExprKind::VecRepeat(a, b) => expr(a) + expr(b),
+                ExprKind::Binary(_, a, b) | ExprKind::Index(a, b) | ExprKind::VecRepeat(a, b) => {
+                    expr(a) + expr(b)
+                }
                 ExprKind::Slice(a, b, c) => {
                     expr(a) + b.as_ref().map_or(0, |x| expr(x)) + c.as_ref().map_or(0, |x| expr(x))
                 }
-                ExprKind::Call(_, a) | ExprKind::VecLit(a) | ExprKind::TupleLit(a) => a.iter().map(expr).sum(),
+                ExprKind::Call(_, a) | ExprKind::VecLit(a) | ExprKind::TupleLit(a) => {
+                    a.iter().map(expr).sum()
+                }
                 ExprKind::Method(r, _, a) => expr(r) + a.iter().map(expr).sum::<u32>(),
                 _ => 0,
             }
@@ -461,10 +482,21 @@ impl Program {
             1 + match &s.kind {
                 StmtKind::Let { init, .. } => expr(init),
                 StmtKind::Assign { target, value, .. } => expr(target) + expr(value),
-                StmtKind::If { cond, then, els } => expr(cond) + block(then) + els.as_ref().map_or(0, block),
+                StmtKind::If { cond, then, els } => {
+                    expr(cond) + block(then) + els.as_ref().map_or(0, block)
+                }
                 StmtKind::While { cond, body } => expr(cond) + block(body),
-                StmtKind::ForRange { start, end, step, body, .. } => {
-                    start.as_ref().map_or(0, expr) + expr(end) + step.as_ref().map_or(0, expr) + block(body)
+                StmtKind::ForRange {
+                    start,
+                    end,
+                    step,
+                    body,
+                    ..
+                } => {
+                    start.as_ref().map_or(0, expr)
+                        + expr(end)
+                        + step.as_ref().map_or(0, expr)
+                        + block(body)
                 }
                 StmtKind::ForEach { iter, body, .. } => expr(iter) + block(body),
                 StmtKind::Return(e) => e.as_ref().map_or(0, expr),
@@ -487,9 +519,9 @@ pub fn walk_stmts<'a>(b: &'a Block, f: &mut dyn FnMut(&'a Stmt)) {
                     walk_stmts(e, f);
                 }
             }
-            StmtKind::While { body, .. } | StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. } => {
-                walk_stmts(body, f)
-            }
+            StmtKind::While { body, .. }
+            | StmtKind::ForRange { body, .. }
+            | StmtKind::ForEach { body, .. } => walk_stmts(body, f),
             _ => {}
         }
     }
@@ -513,7 +545,9 @@ pub fn walk_expr<'a>(e: &'a Expr, f: &mut dyn FnMut(&'a Expr)) {
                 walk_expr(c, f);
             }
         }
-        ExprKind::Call(_, a) | ExprKind::VecLit(a) | ExprKind::TupleLit(a) => a.iter().for_each(|x| walk_expr(x, f)),
+        ExprKind::Call(_, a) | ExprKind::VecLit(a) | ExprKind::TupleLit(a) => {
+            a.iter().for_each(|x| walk_expr(x, f))
+        }
         ExprKind::Method(r, _, a) => {
             walk_expr(r, f);
             a.iter().for_each(|x| walk_expr(x, f));
@@ -531,7 +565,9 @@ pub fn stmt_exprs<'a>(s: &'a Stmt, f: &mut dyn FnMut(&'a Expr)) {
             f(value);
         }
         StmtKind::If { cond, .. } | StmtKind::While { cond, .. } => f(cond),
-        StmtKind::ForRange { start, end, step, .. } => {
+        StmtKind::ForRange {
+            start, end, step, ..
+        } => {
             if let Some(x) = start {
                 f(x);
             }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 plugins {
     id("com.android.application")
 }
@@ -8,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "org.algoclerk.game"
-        minSdk = 26
+        minSdk = 28
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
@@ -38,6 +39,19 @@ android {
         }
     }
 
-    // The native library (libalgoclerk_app.so) is built by cargo-ndk into src/main/jniLibs.
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    // libalgoclerk_app.so per ABI, built by cargo-ndk into src/main/jniLibs.
     sourceSets["main"].jniLibs.srcDir("src/main/jniLibs")
+    buildFeatures { prefab = true }
+}
+
+dependencies {
+    // GameActivity is the activity flavour enabled by the `android-game-activity` cargo feature.
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.core:core:1.13.1")
+    implementation("androidx.games:games-activity:2.0.2")
 }

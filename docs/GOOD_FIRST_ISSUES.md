@@ -1,60 +1,47 @@
 # Good first issues
 
-Ideas that are well-scoped and friendly to newcomers. Open an issue (or comment on one) to claim an
-item. "Level" items only touch `levels/`; "Translation" items only touch `lang/`.
+Ideas that are well-scoped and friendly to newcomers. Open an issue (or comment on one) to claim an item.
+"Level" items only touch `levels/` (copy a neighbouring file, run `algoclerk-cli validate`); "Translation"
+items only touch `crates/algoclerk-core/lang/`; "Art" and "Music" items only touch `assets/`.
 
 ## Levels (data only)
 
-1. **Second-largest**: output the second-largest distinct value of a list (counting-house pack).
-2. **Average (integer)**: output the integer average of a list using `DIV`.
-3. **Count negatives**: filter-and-count with `JUMPN`.
-4. **Pairwise maximum**: for pairs (a, b) output `max(a, b)`.
-5. **Triangular numbers**: n -> n(n+1)/2 without `MUL`, then with `MUL`.
-6. **Leap year**: output 1 if a year is a leap year (`MOD`).
-7. **Binary digits**: output the binary digits of n, most significant first (needs a stack on the floor).
-8. **Reverse digits of a number** and **palindromic number**.
-9. **Anagram check** for two short words over a small alphabet (histogram trick).
-10. **First unique element** of a list.
-11. **Move zeroes to the end** (stable, in place on the floor).
-12. **Rotate the floor array right by one** using pointer tiles.
-13. **Running maximum** (prefix maximum) and **running minimum**.
-14. **Two-sum with indices**: output the positions of the pair (two pointers on sorted input).
-15. **Intersection of two sorted lists** (merge-like).
-16. **Stock profit**: best single buy/sell gain over a list of prices.
-17. **House robber** (DP with a rolling window) and **min-cost climbing stairs**.
-18. **Longest common prefix length** of two words.
-19. **Queue with two stacks**: simulate with floor arrays.
-20. **Detect a cycle in a linked list** using index pointers (tortoise and hare).
-21. **Find the middle of a linked list**.
-22. **Pascal's triangle row** n using a floor array.
-23. **Greatest common divisor of a list** (fold with Euclid).
-24. **Perfect numbers** up to n.
-25. A whole new **pack** (for example "Trees and Heaps": array-based heap push/pop).
+1. **Valid sudoku row**: `fn valid_row(row: vec<int>) -> bool` (sets).
+2. **Roman numerals**: `fn from_roman(s: string) -> int` (map and a look-ahead).
+3. **Pascal's triangle row**: `fn pascal(n: int) -> vec<int>` (nested loops, vec of vec).
+4. **Happy numbers**: cycle detection with a set (or Floyd) on digit-square sums.
+5. **Remove duplicates from a sorted vec** with two pointers (push is locked).
+6. **Valid mountain array**: one pass with two states.
+7. **Search a 2D matrix** (binary search on a flattened index).
+8. **Add two numbers as linked lists** (carry handling, `lnode`).
+9. **Same tree / mirror tree** (recursion with helpers).
+10. **Jump game** (greedy reach) and **Gas station** (prefix sums).
 
-## Translations (data only)
+Each needs: signature, story, statement, at least two examples and three hints, a reference solution,
+a `naive` solution that times out on the large tests, seeded generators, and an oracle in
+`crates/algoclerk-levels/tests/oracles.rs`.
 
-26. Add a UI language (`crates/algoclerk-core/lang/<code>.toml`): German, French, Spanish, Portuguese,
-    Japanese, Chinese, Hindi, Arabic, Russian ... (for non-Latin scripts also see the font item below).
-27. Proof-read `en.toml`: shorter wording for phone screens, friendlier error messages.
+## Translation
 
-## Game and UI
+- A new UI language: copy `en.toml`, translate the values (see `docs/TRANSLATING.md`).
+- Accented Latin glyphs for the 5x7 font (`assets/art/font.txt`), then a French or German catalogue.
 
-28. **New theme**: a sepia or solarized palette in `theme.rs`, with screenshots from `scripts/screenshots.sh`.
-29. **Fallback fonts** for CJK or Arabic (OFL only) and the matching `CREDITS.md` entry.
-30. **Clerk expressions**: animate the clerk's eyebrows or a blink on success (`office.rs`).
-31. **Sound design**: new synthesised effects in `sound.rs` (still no audio files).
-32. **Keyboard navigation** of the program list (arrow keys to select, Enter to edit, Delete to remove).
-33. **Undo/redo** for program edits in the list.
-34. **Share as QR code** (pure-Rust generation, permissive licence) for phone-to-phone solution sharing.
-35. **Level search** in the level list.
-36. **Per-level notes**: let the player jot a note that is saved with the draft.
+## Art
 
-## Tooling and quality
+- **Clerk outfits**: new hair / shirt / pants colour presets in `assets/art/outfits.txt`, or a third body
+  template `_body_c.px` (see `docs/ART_PIPELINE.md`).
+- **Props**: a coat rack, a printer, a fish tank, a second desk plant (16x16 `.px` with 2 to 4 frames).
+- **Value widgets**: nicer pixel art for the stack plates, the heap pyramid or the tag chain
+  (`crates/algoclerk-game/src/value_view.rs` draws them with primitives today; a sprite version is welcome).
+- **Palette**: tune `palette_cb.txt` against a colour-blindness simulator; keep the letters.
 
-37. `algoclerk-cli compare <dir>`: verify a directory of shared solutions and print a table.
-38. A `cargo xtask`-style script (in Rust) that regenerates the platform icons from the icon renderer.
-39. More property tests for `Structurer` (for example comparing against a tree interpreter).
-40. Fuzz targets (`cargo-fuzz`) for the parser and level loader.
-41. Improve the CI caching and add a job that builds with `--features audio` on Windows and macOS.
-42. Documentation: an illustrated tutorial for the text syntax, or a "solve level 1-10" walkthrough
-    (please keep walkthroughs separate from the in-game reference solutions).
+## Music
+
+- A calmer second office loop, a "boss floor" track for the Executive Floor wing, a short jingle per wing.
+  Songs are plain text (`assets/music/*.song`); keep them original.
+
+## Engineering
+
+- Explain a runtime error with the exact card it happened on (highlight the card and the tray).
+- Put the "step into helper function" view on a second tray row.
+- A `cargo xtask screenshots` wrapper around `scripts/screenshots.sh`.

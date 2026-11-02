@@ -47,7 +47,8 @@ pub fn logo(g: &mut Gfx<'_>, cx: i32, y: i32, scale: i32) {
     }
     g.text_s(x, y + o + 1, text, 'k', scale);
     let h = 7 * scale;
-    let clip_full = g.c.set_clip(Rect::new(x + g.off.0, y + g.off.1, w + 2, h * 6 / 10));
+    let clip_full =
+        g.c.set_clip(Rect::new(x + g.off.0, y + g.off.1, w + 2, h * 6 / 10));
     g.text_s(x, y, text, 'y', scale);
     g.c.set_clip(Rect::new(x + g.off.0, y + g.off.1 + h * 6 / 10, w + 2, h));
     g.text_s(x, y, text, 'Y', scale);
@@ -66,7 +67,13 @@ impl Title {
 
     /// The menu entries for the current progress.
     pub fn items(cx_can_quit: bool) -> Vec<Item> {
-        let mut v = vec![Item::Start, Item::Sandbox, Item::Levels, Item::Settings, Item::About];
+        let mut v = vec![
+            Item::Start,
+            Item::Sandbox,
+            Item::Levels,
+            Item::Settings,
+            Item::About,
+        ];
         if cx_can_quit {
             v.push(Item::Quit);
         }
@@ -75,11 +82,15 @@ impl Title {
 
     /// Menu panel and row rectangles.
     pub fn menu_rects(vp: &Viewport, n: usize) -> (Rect, Vec<Rect>) {
-        let row_h = if vp.touch { 28 } else { 17 };
+        let row_h = if vp.touch { 33 } else { 17 };
         let w = if vp.portrait { 214 } else { 168 };
         let h = n as i32 * row_h + 16;
         let x = vp.safe.x + (vp.safe.w - w) / 2;
-        let y = if vp.portrait { vp.safe.y + 214 } else { vp.safe.bottom() - h - 18 };
+        let y = if vp.portrait {
+            vp.safe.y + 214
+        } else {
+            vp.safe.bottom() - h - 18
+        };
         let panel = Rect::new(x, y, w, h);
         let rows = (0..n as i32)
             .map(|i| Rect::new(x + 6, y + 8 + i * row_h, w - 12, row_h))
@@ -130,19 +141,38 @@ impl Title {
         // floor and wall
         for ty in 0..=(h / 16) {
             for tx in 0..=(w / 16) {
-                let k = if (tx + ty) % 2 == 0 { "tiles/carpet_a" } else { "tiles/carpet_b" };
+                let k = if (tx + ty) % 2 == 0 {
+                    "tiles/carpet_a"
+                } else {
+                    "tiles/carpet_b"
+                };
                 g.sprite(k, 0, tx * 16, ty * 16);
             }
         }
         for tx in 0..=(w / 16) {
             g.sprite("tiles/wall_top", 0, tx * 16, 0);
             for ty in 1..(wall_h / 16 - 1) {
-                g.sprite(if (tx + ty) % 4 == 1 { "tiles/wall_b" } else { "tiles/wall_a" }, 0, tx * 16, ty * 16);
+                g.sprite(
+                    if (tx + ty) % 4 == 1 {
+                        "tiles/wall_b"
+                    } else {
+                        "tiles/wall_a"
+                    },
+                    0,
+                    tx * 16,
+                    ty * 16,
+                );
             }
             g.sprite("tiles/dado", 0, tx * 16, wall_h - 16);
         }
         let (tick, rm) = (g.tick, v.progress.settings.reduce_motion);
-        let anim = move |p: u64, n: usize| if rm { 0 } else { ((tick / p) % n as u64) as usize };
+        let anim = move |p: u64, n: usize| {
+            if rm {
+                0
+            } else {
+                ((tick / p) % n as u64) as usize
+            }
+        };
         // wall decor (the sign hangs in the middle, windows and posters flank it)
         let win = anim(90, 2);
         if portrait {
@@ -168,8 +198,17 @@ impl Title {
         let tag_cols = ((sign_w - 20) / 6) as usize;
         let tag_lines = algoclerk_media::Font::wrap(&tag, tag_cols);
         let sign_h = 7 * scale + 22 + tag_lines.len() as i32 * 10 + 6;
-        let sign = Rect::new((w - sign_w) / 2, if portrait { 18 } else { 8 }, sign_w, sign_h);
-        let bob = if v.progress.settings.reduce_motion { 0 } else { [0, 0, 1, 1][((g.tick / 40) % 4) as usize] };
+        let sign = Rect::new(
+            (w - sign_w) / 2,
+            if portrait { 18 } else { 8 },
+            sign_w,
+            sign_h,
+        );
+        let bob = if v.progress.settings.reduce_motion {
+            0
+        } else {
+            [0, 0, 1, 1][((g.tick / 40) % 4) as usize]
+        };
         for cxp in [sign.x + 16, sign.right() - 17] {
             g.vline(cxp, 0, sign.y + bob, 'a');
             g.vline(cxp + 1, 0, sign.y + bob, 'A');
@@ -184,7 +223,11 @@ impl Title {
         }
         // the belt with crates
         let belt_y = if portrait { 172 } else { 126 };
-        let phase = if v.progress.settings.reduce_motion { 0 } else { (g.tick / 2) as i32 };
+        let phase = if v.progress.settings.reduce_motion {
+            0
+        } else {
+            (g.tick / 2) as i32
+        };
         let frame = ((g.tick / 3) % 4) as usize * usize::from(!v.progress.settings.reduce_motion);
         for tx in 0..=(w / 16) {
             g.sprite("tiles/belt_h", frame, tx * 16, belt_y);
@@ -198,7 +241,17 @@ impl Title {
         for i in 0..n_crates {
             let x = ((phase * 3 / 4 + i * 56) % (n_crates * 56)) - 16;
             let val = (i * 7 + 3) % 40;
-            g.sprite(["tiles/crate_a", "tiles/crate_b", "tiles/crate_c", "tiles/crate_d"][(val % 4) as usize], 0, x, belt_y - 12);
+            g.sprite(
+                [
+                    "tiles/crate_a",
+                    "tiles/crate_b",
+                    "tiles/crate_c",
+                    "tiles/crate_d",
+                ][(val % 4) as usize],
+                0,
+                x,
+                belt_y - 12,
+            );
             g.tiny_c(x + 8, belt_y - 12 + 6, &val.to_string(), 'K');
         }
         // desk and clerk
@@ -210,7 +263,14 @@ impl Title {
         c.clock = g.tick as u32;
         let (frame, flip) = c.frame(!v.progress.settings.reduce_motion);
         g.rect(Rect::new(dx + 36, dy + 12, 16, 3), 't');
-        g.c.blit(self.art.sprite(), frame, dx + 36 + g.off.0, dy - 6 + g.off.1, flip, g.pal);
+        g.c.blit(
+            self.art.sprite(),
+            frame,
+            dx + 36 + g.off.0,
+            dy - 6 + g.off.1,
+            flip,
+            g.pal,
+        );
         g.sprite("props/desk", anim(30, 2), dx, dy - 10);
         g.sprite("props/mug", anim(14, 3), dx + 17, dy - 7);
         if !portrait {
@@ -232,7 +292,11 @@ impl Title {
         for (i, (it, r)) in items.iter().zip(&rows).enumerate() {
             let label = match it {
                 Item::Start => {
-                    if v.progress.solved_count() > 0 { v.tr.t("title.continue") } else { v.tr.t("title.play") }
+                    if v.progress.solved_count() > 0 {
+                        v.tr.t("title.continue")
+                    } else {
+                        v.tr.t("title.play")
+                    }
                 }
                 Item::Sandbox => v.tr.t("title.sandbox"),
                 Item::Levels => v.tr.t("title.levels"),
@@ -250,7 +314,14 @@ impl Title {
         }
         // footer
         let fy = vp.safe.bottom() - 11;
-        g.text_shadow(vp.safe.x + 6, fy, &format!("v{}", env!("CARGO_PKG_VERSION")), 'W', 'K', 1);
+        g.text_shadow(
+            vp.safe.x + 6,
+            fy,
+            &format!("v{}", env!("CARGO_PKG_VERSION")),
+            'W',
+            'K',
+            1,
+        );
         let stars = format!("{} {}", v.tr.t("title.stars"), v.progress.total_stars());
         g.text_r(vp.safe.right() - 6, fy, &stars, 'W', 1);
         g.c.reset_clip();

@@ -46,7 +46,10 @@ impl About {
 
     /// Hit rectangles for layout tests.
     pub fn hits(vp: &crate::layout::Viewport) -> Vec<Hit> {
-        vec![Hit::area("body", About::body(vp)), Hit::tap("back", About::back_rect(vp))]
+        vec![
+            Hit::area("body", About::body(vp)),
+            Hit::tap("back", About::back_rect(vp)),
+        ]
     }
 
     /// Handle input.
@@ -68,7 +71,10 @@ impl About {
             }
         }
         self.scroll = self.scroll.max(0);
-        if cx.ptr.tapped_in(&About::back_rect(&cx.vp)) || cx.input.key(Key::Escape) || cx.input.key(Key::Enter) {
+        if cx.ptr.tapped_in(&About::back_rect(&cx.vp))
+            || cx.input.key(Key::Escape)
+            || cx.input.key(Key::Enter)
+        {
             cx.sfx("button");
             return Some(Nav::Title);
         }
@@ -93,12 +99,33 @@ impl About {
         g.rect(vp.screen(), 'T');
         for ty in 0..=(vp.h / 16) {
             for tx in 0..=(vp.w / 16) {
-                g.sprite(if (tx + ty) % 2 == 0 { "tiles/carpet_a" } else { "tiles/carpet_b" }, 0, tx * 16, ty * 16);
+                g.sprite(
+                    if (tx + ty) % 2 == 0 {
+                        "tiles/carpet_a"
+                    } else {
+                        "tiles/carpet_b"
+                    },
+                    0,
+                    tx * 16,
+                    ty * 16,
+                );
             }
         }
         logo(g, s.x + s.w / 2, s.y + 10, if vp.portrait { 3 } else { 4 });
-        g.text_c(s.x + s.w / 2 + 1, s.y + 52, &format!("v{}", env!("CARGO_PKG_VERSION")), 'K', 1);
-        g.text_c(s.x + s.w / 2, s.y + 51, &format!("v{}", env!("CARGO_PKG_VERSION")), 'W', 1);
+        g.text_c(
+            s.x + s.w / 2 + 1,
+            s.y + 52,
+            &format!("v{}", env!("CARGO_PKG_VERSION")),
+            'K',
+            1,
+        );
+        g.text_c(
+            s.x + s.w / 2,
+            s.y + 51,
+            &format!("v{}", env!("CARGO_PKG_VERSION")),
+            'W',
+            1,
+        );
         let body = About::body(&vp);
         g.panel(body.grow(4), 'W');
         let cols = ((body.w - 12) / 6) as usize;
@@ -111,8 +138,18 @@ impl About {
             g.text(body.x + 2, body.y + i as i32 * 10 - scroll, l, *c);
         }
         g.c.set_clip(saved);
-        g.scrollbar(Rect::new(body.right() - 2, body.y, 3, body.h), scroll, content, body.h);
+        g.scrollbar(
+            Rect::new(body.right() - 2, body.y, 3, body.h),
+            scroll,
+            content,
+            body.h,
+        );
         let back = About::back_rect(&vp);
-        g.button(back, &v.tr.t("common.back"), crate::gfx::Kind::Primary, crate::ui::widget_state(v.ptr, &back, true, false));
+        g.button(
+            back,
+            &v.tr.t("common.back"),
+            crate::gfx::Kind::Primary,
+            crate::ui::widget_state(v.ptr, &back, true, false),
+        );
     }
 }

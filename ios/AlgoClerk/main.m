@@ -3,11 +3,11 @@
 // winit (inside the library) runs UIApplicationMain.
 #import <UIKit/UIKit.h>
 
-extern void algoclerk_ios_main(void);
+extern void main_rs(void);
 
 int main(int argc, char *argv[]) {
     @autoreleasepool {
-        algoclerk_ios_main();
+        main_rs();
     }
     return 0;
 }

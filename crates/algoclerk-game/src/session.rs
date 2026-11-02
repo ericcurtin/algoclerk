@@ -75,7 +75,9 @@ pub struct Session {
 
 impl std::fmt::Debug for Session {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Session").field("level", &self.level.as_ref().map(|l| &l.id)).finish_non_exhaustive()
+        f.debug_struct("Session")
+            .field("level", &self.level.as_ref().map(|l| &l.id))
+            .finish_non_exhaustive()
     }
 }
 
@@ -85,7 +87,11 @@ impl Session {
     /// A session for a level, starting from a saved draft or the starter program.
     pub fn for_level(level: &Level, draft: &str) -> Result<Session, String> {
         let judge = Judge::new(level)?;
-        let text = if draft.trim().is_empty() { level.starter() } else { draft.to_string() };
+        let text = if draft.trim().is_empty() {
+            level.starter()
+        } else {
+            draft.to_string()
+        };
         let mut s = Session::raw(Some(level.clone()), Some(Arc::new(judge)), &text);
         s.recompile();
         Ok(s)
@@ -93,7 +99,15 @@ impl Session {
 
     /// The sandbox.
     pub fn sandbox(saved: &str) -> Session {
-        let mut s = Session::raw(None, None, if saved.trim().is_empty() { SANDBOX } else { saved });
+        let mut s = Session::raw(
+            None,
+            None,
+            if saved.trim().is_empty() {
+                SANDBOX
+            } else {
+                saved
+            },
+        );
         s.recompile();
         s
     }
@@ -122,7 +136,10 @@ impl Session {
     fn opts(&self) -> CheckOpts {
         match &self.level {
             Some(l) => l.check_opts(),
-            None => CheckOpts { allowed: Allowed::all(), entry: None },
+            None => CheckOpts {
+                allowed: Allowed::all(),
+                entry: None,
+            },
         }
     }
 
@@ -142,7 +159,7 @@ impl Session {
     pub fn sync(&mut self) -> bool {
         let now = self.edit.text();
         if now != self.last_text {
-            self.undo.push(std::mem::replace(&mut self.last_text, String::new()));
+            self.undo.push(std::mem::take(&mut self.last_text));
             if self.undo.len() > 200 {
                 self.undo.remove(0);
             }
@@ -163,7 +180,9 @@ impl Session {
 
     /// Undo the last change.
     pub fn undo(&mut self) -> bool {
-        let Some(prev) = self.undo.pop() else { return false };
+        let Some(prev) = self.undo.pop() else {
+            return false;
+        };
         self.redo.push(self.edit.text());
         self.edit.set_text(&prev);
         self.last_text = prev;
@@ -174,7 +193,9 @@ impl Session {
 
     /// Redo.
     pub fn redo(&mut self) -> bool {
-        let Some(next) = self.redo.pop() else { return false };
+        let Some(next) = self.redo.pop() else {
+            return false;
+        };
         self.undo.push(self.edit.text());
         self.edit.set_text(&next);
         self.last_text = next;
@@ -206,21 +227,33 @@ impl Session {
 
     /// Number of cases that can be visualised (examples).
     pub fn case_count(&self) -> usize {
-        self.judge.as_ref().map_or(1, |j| j.suite.iter().filter(|c| c.example).count().max(1))
+        self.judge
+            .as_ref()
+            .map_or(1, |j| j.suite.iter().filter(|c| c.example).count().max(1))
     }
 
     /// The entry function name.
     pub fn entry_name(&self) -> String {
         match &self.level {
             Some(l) => l.signature.name.clone(),
-            None => self.good.as_ref().and_then(|p| p.fns.last().map(|f| f.name.clone())).unwrap_or_default(),
+            None => self
+                .good
+                .as_ref()
+                .and_then(|p| p.fns.last().map(|f| f.name.clone()))
+                .unwrap_or_default(),
         }
     }
 
     /// Argument literals for the chosen case.
     pub fn case_args(&self) -> Vec<String> {
         match &self.judge {
-            Some(j) => j.suite.iter().filter(|c| c.example).nth(self.case).map(|c| c.args.clone()).unwrap_or_default(),
+            Some(j) => j
+                .suite
+                .iter()
+                .filter(|c| c.example)
+                .nth(self.case)
+                .map(|c| c.args.clone())
+                .unwrap_or_default(),
             None => vec!["[3, 1, 4, 1, 5]".to_string()],
         }
     }
@@ -229,21 +262,40 @@ impl Session {
     pub fn start_run(&mut self) -> Result<(), String> {
         let c = match &self.compiled {
             Ok(c) => c,
-            Err(d) => return Err(d.first().map(|d| d.msg.clone()).unwrap_or_else(|| "The page is empty.".into())),
+            Err(d) => {
+                return Err(d
+                    .first()
+                    .map(|d| d.msg.clone())
+                    .unwrap_or_else(|| "The page is empty.".into()));
+            }
         };
         let entry = self.entry_name();
         let args = self.case_args();
-        let limits = Limits { steps: 200_000, trace_events: 4000, ..Limits::default() };
+        let limits = Limits {
+            steps: 200_000,
+            trace_events: 4000,
+            ..Limits::default()
+        };
         let called = c.call(&entry, &args, &limits)?;
         let (vals, nodes0) = c.parse_args(&entry, &args)?;
         let f = c.program.find(&entry).ok_or("missing function")?;
-        let fidx = c.program.fns.iter().position(|x| x.name == entry).unwrap_or(0);
+        let fidx = c
+            .program
+            .fns
+            .iter()
+            .position(|x| x.name == entry)
+            .unwrap_or(0);
         let mut frames = Vec::new();
         // first frame: the arguments sitting on the inbox
         frames.push(Frame {
             node: 0,
             cost: 0,
-            vars: f.params.iter().zip(vals.iter()).map(|(p, v)| (p.name.clone(), p.ty.clone(), v.clone())).collect(),
+            vars: f
+                .params
+                .iter()
+                .zip(vals.iter())
+                .map(|(p, v)| (p.name.clone(), p.ty.clone(), v.clone()))
+                .collect(),
             returned: None,
         });
         let mut truncated = false;
@@ -257,20 +309,34 @@ impl Session {
                     .filter(|(_, v)| **v != Value::Unit)
                     .map(|((n, t), v)| (n.clone(), t.clone(), v.clone()))
                     .collect();
-                frames.push(Frame { node: e.node, cost: e.cost, vars, returned: e.returned.clone() });
+                frames.push(Frame {
+                    node: e.node,
+                    cost: e.cost,
+                    vars,
+                    returned: e.returned.clone(),
+                });
             }
         }
         let _ = (fidx, nodes0);
         let expected = self
             .judge
             .as_ref()
-            .and_then(|j| j.suite.iter().filter(|c| c.example).nth(self.case).map(|c| c.expect.clone()))
+            .and_then(|j| {
+                j.suite
+                    .iter()
+                    .filter(|c| c.example)
+                    .nth(self.case)
+                    .map(|c| c.expect.clone())
+            })
             .unwrap_or_default();
         self.run = Some(RunView {
             case: self.case,
             frames,
             pos: 0,
-            result: called.report.result.map(|_| called.output.unwrap_or_default()).map_err(|e| e),
+            result: called
+                .report
+                .result
+                .map(|_| called.output.unwrap_or_default()),
             cost: called.report.cost,
             nodes: called.report.nodes,
             expected,
@@ -290,7 +356,11 @@ impl Session {
 
     /// Statement being executed in the current frame.
     pub fn current_node(&self) -> Option<u32> {
-        self.run.as_ref().and_then(|r| r.frames.get(r.pos)).map(|f| f.node).filter(|n| *n != 0)
+        self.run
+            .as_ref()
+            .and_then(|r| r.frames.get(r.pos))
+            .map(|f| f.node)
+            .filter(|n| *n != 0)
     }
 
     /// Block rows of the best known program.
@@ -300,7 +370,10 @@ impl Session {
 
     /// One-based line and column range of a diagnostic in the text.
     pub fn diag_span(&self, d: &Diag) -> Option<(usize, usize, usize)> {
-        let sp = d.span.or_else(|| d.node.and_then(|n| self.compiled_program().and_then(|p| p.span(n))))?;
+        let sp = d.span.or_else(|| {
+            d.node
+                .and_then(|n| self.compiled_program().and_then(|p| p.span(n)))
+        })?;
         let text = self.edit.text();
         let (l, c) = algoclerk_core::lang::diag::line_col(&text, sp.start);
         let (l2, c2) = algoclerk_core::lang::diag::line_col(&text, sp.end);

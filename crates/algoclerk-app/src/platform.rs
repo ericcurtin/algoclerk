@@ -15,7 +15,10 @@ pub fn data_dir(args: &Args) -> PathBuf {
     }
     #[cfg(target_os = "android")]
     {
-        if let Some(p) = bevy::android::ANDROID_APP.get().and_then(|a| a.internal_data_path()) {
+        if let Some(p) = bevy::android::ANDROID_APP
+            .get()
+            .and_then(|a| a.internal_data_path())
+        {
             return p;
         }
     }

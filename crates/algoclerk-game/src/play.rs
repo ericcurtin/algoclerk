@@ -63,20 +63,37 @@ impl PlayRects {
             let ch = bh * 2 + 8 + if vp.touch { 4 } else { 14 };
             let scene = Rect::new((vp.w - SCENE_W) / 2, 20, SCENE_W, SCENE_H);
             let controls = Rect::new(2, scene.bottom() + 2, vp.w - 4, ch);
-            let editor = Rect::new(2, controls.bottom() + 2, vp.w - 4, vp.h - controls.bottom() - 4);
-            PlayRects { top, scene, controls, editor }
+            let editor = Rect::new(
+                2,
+                controls.bottom() + 2,
+                vp.w - 4,
+                vp.h - controls.bottom() - 4,
+            );
+            PlayRects {
+                top,
+                scene,
+                controls,
+                editor,
+            }
         } else {
             let scene = Rect::new(2, 20, SCENE_W, SCENE_H);
             let controls = Rect::new(2, scene.bottom() + 3, SCENE_W, vp.h - scene.bottom() - 5);
             let editor = Rect::new(SCENE_W + 6, 20, vp.w - SCENE_W - 8, vp.h - 22);
-            PlayRects { top, scene, controls, editor }
+            PlayRects {
+                top,
+                scene,
+                controls,
+                editor,
+            }
         }
     }
 }
 
 /// The outfit chosen in settings.
 pub fn outfit_of(p: &algoclerk_core::progress::Progress, bank: &ArtBank) -> Outfit {
-    Outfit::from_code(&p.settings.outfit).filter(|o| bank.has_template(&format!("clerk/body_{}", o.body))).unwrap_or_default()
+    Outfit::from_code(&p.settings.outfit)
+        .filter(|o| bank.has_template(&format!("clerk/body_{}", o.body)))
+        .unwrap_or_default()
 }
 
 /// A tap rectangle at least `min` big, kept inside `bounds`.
@@ -111,9 +128,25 @@ fn controls(vp: &Viewport, c: Rect, ncases: usize) -> Controls {
     let cases_y = c.y + bh + 3;
     let chip_h = if vp.touch { 24 } else { 14 };
     let cw = if vp.touch { 40 } else { 34 };
-    let cases = (0..ncases.min(5)).map(|i| Rect::new(c.x + i as i32 * (cw + 2), cases_y, cw, chip_h)).collect();
-    let status = Rect::new(c.x, cases_y + chip_h + 3, c.w, (c.bottom() - cases_y - chip_h - 3).max(8));
-    Controls { reset: cols[0], back: cols[1], play: cols[2], step: cols[3], speed: cols[4], check: cols[5], cases, status }
+    let cases = (0..ncases.min(5))
+        .map(|i| Rect::new(c.x + i as i32 * (cw + 2), cases_y, cw, chip_h))
+        .collect();
+    let status = Rect::new(
+        c.x,
+        cases_y + chip_h + 3,
+        c.w,
+        (c.bottom() - cases_y - chip_h - 3).max(8),
+    );
+    Controls {
+        reset: cols[0],
+        back: cols[1],
+        play: cols[2],
+        step: cols[3],
+        speed: cols[4],
+        check: cols[5],
+        cases,
+        status,
+    }
 }
 
 impl Play {
@@ -122,7 +155,11 @@ impl Play {
     /// # Errors
     /// The level could not be prepared (broken level file).
     pub fn level(cx: &mut Ctx<'_>, id: &str, brief: bool) -> Result<Play, String> {
-        let level = cx.campaign.find(id).ok_or_else(|| format!("no level {id}"))?.clone();
+        let level = cx
+            .campaign
+            .find(id)
+            .ok_or_else(|| format!("no level {id}"))?
+            .clone();
         let rec = cx.progress.record(id);
         let session = Session::for_level(&level, &rec.draft)?;
         let outfit = outfit_of(cx.progress, cx.bank);
@@ -167,9 +204,26 @@ impl Play {
     pub fn hits(&self, vp: &Viewport) -> Vec<Hit> {
         let r = PlayRects::new(vp);
         let c = controls(vp, r.controls, self.session.case_count());
-        let mut v = vec![Hit::area("scene", r.scene), Hit::area("controls", r.controls), Hit::tap("reset", c.reset), Hit::tap("back", c.back), Hit::tap("play", c.play), Hit::tap("step", c.step), Hit::tap("speed", c.speed), Hit::tap("check", c.check)];
+        let mut v = vec![
+            Hit::area("scene", r.scene),
+            Hit::area("controls", r.controls),
+            Hit::tap("reset", c.reset),
+            Hit::tap("back", c.back),
+            Hit::tap("play", c.play),
+            Hit::tap("step", c.step),
+            Hit::tap("speed", c.speed),
+            Hit::tap("check", c.check),
+        ];
         v.extend(self.panel.hits(vp, r.editor));
-        v.push(Hit::tap("brief", Rect::new(vp.w - 50, 0, 50, 18)));
+        v.push(Hit::tap(
+            "brief",
+            Rect::new(
+                vp.w - 50.max(vp.hit_min()),
+                0,
+                50.max(vp.hit_min()),
+                vp.hit_min().max(18),
+            ),
+        ));
         v
     }
 
@@ -232,7 +286,13 @@ impl Play {
                     });
                 }
                 if let Some(t) = found {
-                    self.panel.card = Some(crate::editor::CardEdit { node: row.node, line: crate::textedit::TextEdit::new(&t, false), pad: crate::editor::Pad::Names, last_var: None, msg: None });
+                    self.panel.card = Some(crate::editor::CardEdit {
+                        node: row.node,
+                        line: crate::textedit::TextEdit::new(&t, false),
+                        pad: crate::editor::Pad::Names,
+                        last_var: None,
+                        msg: None,
+                    });
                 }
             }
         }
@@ -259,7 +319,16 @@ impl Play {
     fn show(&mut self) {
         let Some(r) = &self.session.run else { return };
         let Some(f) = r.frames.get(r.pos) else { return };
-        let nparams = self.session.level.as_ref().map_or_else(|| self.session.good.as_ref().and_then(|p| p.fns.last().map(|f| f.params.len())).unwrap_or(0), |l| l.signature.params.len());
+        let nparams = self.session.level.as_ref().map_or_else(
+            || {
+                self.session
+                    .good
+                    .as_ref()
+                    .and_then(|p| p.fns.last().map(|f| f.params.len()))
+                    .unwrap_or(0)
+            },
+            |l| l.signature.params.len(),
+        );
         let exp = (!r.expected.is_empty()).then_some((r.expected.as_str(), &r.ret));
         let got = match &r.result {
             Ok(t) => t.clone(),
@@ -268,13 +337,21 @@ impl Play {
         let nodes = r.nodes.clone();
         let f = f.clone();
         match exp {
-            Some((text, ty)) => self.office.show(&f, &nodes, nparams, Some((text, ty, &nodes, &got))),
+            Some((text, ty)) => {
+                self.office
+                    .show(&f, &nodes, nparams, Some((text, ty, &nodes, &got)))
+            }
             None => self.office.show(&f, &nodes, nparams, None),
         }
     }
 
     fn ensure_run(&mut self) -> bool {
-        if self.session.run.as_ref().is_some_and(|r| r.case == self.session.case) {
+        if self
+            .session
+            .run
+            .as_ref()
+            .is_some_and(|r| r.case == self.session.case)
+        {
             return true;
         }
         match self.session.start_run() {
@@ -295,7 +372,9 @@ impl Play {
         if !self.ensure_run() {
             return;
         }
-        let Some(r) = &mut self.session.run else { return };
+        let Some(r) = &mut self.session.run else {
+            return;
+        };
         if r.pos + 1 < r.frames.len() {
             r.pos += 1;
             self.show();
@@ -317,7 +396,17 @@ impl Play {
             }
             Ok(out) => {
                 let ok = r.expected.is_empty() || *out == r.expected;
-                self.status = Some((if ok { format!("Returned {out}. It matches the expected answer.") } else { format!("Returned {out}, but {} was expected.", r.expected) }, !ok));
+                self.status = Some((
+                    if ok {
+                        cx.tr.format("play.matches", &[("out", out.clone())])
+                    } else {
+                        cx.tr.format(
+                            "play.mismatch",
+                            &[("out", out.clone()), ("want", r.expected.clone())],
+                        )
+                    },
+                    !ok,
+                ));
                 if ok {
                     cx.sfx("correct");
                 } else {
@@ -386,11 +475,24 @@ impl Play {
             return None;
         }
         // top bar
-        let back = Rect::new(0, 0, 40.max(vp.hit_min()), 18);
-        let brief = Rect::new(vp.w - 50, 0, 50, 18);
-        if cx.ptr.tapped_in(&back) || (cx.input.key(Key::Escape) && self.panel.card.is_none() && self.panel.palette.is_none()) {
+        let back = Rect::new(0, 0, 40.max(vp.hit_min()), vp.hit_min().max(18));
+        let brief = Rect::new(
+            vp.w - 50.max(vp.hit_min()),
+            0,
+            50.max(vp.hit_min()),
+            vp.hit_min().max(18),
+        );
+        if cx.ptr.tapped_in(&back)
+            || (cx.input.key(Key::Escape)
+                && self.panel.card.is_none()
+                && self.panel.palette.is_none())
+        {
             self.save_draft(cx);
-            return Some(if self.session.level.is_some() { Nav::Select } else { Nav::Title });
+            return Some(if self.session.level.is_some() {
+                Nav::Select
+            } else {
+                Nav::Title
+            });
         }
         if cx.ptr.tapped_in(&brief) && self.session.level.is_some() {
             self.memo = Some(Memo::default());
@@ -509,7 +611,12 @@ impl Play {
         self.report(cx, &level, &verdict)
     }
 
-    fn report(&mut self, cx: &mut Ctx<'_>, level: &algoclerk_core::level::Level, v: &Verdict) -> Option<Nav> {
+    fn report(
+        &mut self,
+        cx: &mut Ctx<'_>,
+        level: &algoclerk_core::level::Level,
+        v: &Verdict,
+    ) -> Option<Nav> {
         if v.passed {
             let text = self.session.text();
             self.improved = cx.progress.record_verdict(level, v, &text);
@@ -525,12 +632,26 @@ impl Play {
             let args = f.case.args.join(", ");
             let args = clip(&args, 60);
             match f.kind {
-                FailKind::Wrong => (format!("For ({args}) I expected {} but got {}.", f.case.expect, f.got.clone().unwrap_or_default()), "My answer does not match the memo!".to_string()),
+                FailKind::Wrong => (
+                    format!(
+                        "For ({args}) I expected {} but got {}.",
+                        f.case.expect,
+                        f.got.clone().unwrap_or_default()
+                    ),
+                    "My answer does not match the memo!".to_string(),
+                ),
                 FailKind::TimeLimit => (
-                    format!("The clock ran out on {} test. {}", if f.case.large { "a big" } else { "a" }, level.technique_hint()),
+                    format!(
+                        "The clock ran out on {} test. {}",
+                        if f.case.large { "a big" } else { "a" },
+                        level.technique_hint()
+                    ),
                     "Too slow! The big job is still unfinished.".to_string(),
                 ),
-                FailKind::MemoryLimit => ("Too much shelf space used.".to_string(), "The shelves are full!".to_string()),
+                FailKind::MemoryLimit => (
+                    "Too much shelf space used.".to_string(),
+                    "The shelves are full!".to_string(),
+                ),
                 FailKind::Error => {
                     let m = f.error.as_ref().map(|e| e.msg.clone()).unwrap_or_default();
                     (format!("For ({args}): {m}"), m)
@@ -551,50 +672,117 @@ impl Play {
         g.rect(vp.screen(), 'k');
         // top bar
         g.rect(r.top, 'K');
-        let title = self.session.level.as_ref().map_or("Sandbox".to_string(), |l| l.title.clone());
+        let title = self
+            .session
+            .level
+            .as_ref()
+            .map_or_else(|| v.tr.t("play.sandbox"), |l| l.title.clone());
         let back = Rect::new(0, 0, 40.max(vp.hit_min()), 18);
         g.icon("back", 4, 4, 'W');
-        g.text(16, 5, "Back", 'W');
+        g.text(16, 5, &v.tr.t("common.back"), 'W');
         let _ = back;
-        g.text_c(vp.w / 2, 5, &clip(&title, ((vp.w - 110) / 6) as usize), 'y', 1);
+        g.text_c(
+            vp.w / 2,
+            5,
+            &clip(&title, ((vp.w - 110) / 6) as usize),
+            'y',
+            1,
+        );
         if self.session.level.is_some() {
             g.icon("memo", vp.w - 46, 4, 'y');
-            g.text(vp.w - 34, 5, "Memo", 'W');
+            g.text(vp.w - 34, 5, &v.tr.t("play.memo"), 'W');
         }
-        self.office.draw(g, (r.scene.x, r.scene.y));
+        self.office.draw(g, (r.scene.x, r.scene.y), v.tr);
         g.frame(r.scene.grow(1), 'K');
         // controls
         let c = controls(&vp, r.controls, self.session.case_count());
         let st = |rect: &Rect| widget_state(v.ptr, rect, false, false);
         let has_run = self.session.run.is_some();
         g.icon_button(c.reset, "reset", Kind::Normal, st(&c.reset));
-        g.icon_button(c.back, "left", Kind::Normal, State { disabled: !has_run, ..st(&c.back) });
-        g.icon_button(c.play, if self.playing { "pause" } else { "play" }, Kind::Primary, st(&c.play));
+        g.icon_button(
+            c.back,
+            "left",
+            Kind::Normal,
+            State {
+                disabled: !has_run,
+                ..st(&c.back)
+            },
+        );
+        g.icon_button(
+            c.play,
+            if self.playing { "pause" } else { "play" },
+            Kind::Primary,
+            st(&c.play),
+        );
         g.icon_button(c.step, "step", Kind::Normal, st(&c.step));
         let sp = usize::from(v.progress.settings.speed_level.min(4));
-        g.button(c.speed, ["x1", "x2", "x4", "x8", "max"][sp], Kind::Normal, st(&c.speed));
+        g.button(
+            c.speed,
+            ["x1", "x2", "x4", "x8", "max"][sp],
+            Kind::Normal,
+            st(&c.speed),
+        );
         let can_check = self.session.compiled.is_ok() || self.session.level.is_none();
-        g.button(c.check, if self.session.level.is_some() { "Check" } else { "Run" }, Kind::Good, State { disabled: !can_check, ..st(&c.check) });
+        g.button(
+            c.check,
+            &if self.session.level.is_some() {
+                v.tr.t("play.check")
+            } else {
+                v.tr.t("play.run")
+            },
+            Kind::Good,
+            State {
+                disabled: !can_check,
+                ..st(&c.check)
+            },
+        );
         for (i, cr) in c.cases.iter().enumerate() {
-            g.button(*cr, &format!("Ex{}", i + 1), if self.session.case == i { Kind::On } else { Kind::Normal }, st(cr));
+            g.button(
+                *cr,
+                &v.tr.format("play.example", &[("n", (i + 1).to_string())]),
+                if self.session.case == i {
+                    Kind::On
+                } else {
+                    Kind::Normal
+                },
+                st(cr),
+            );
         }
         // status
         let sr = c.status;
         let (text, bad) = match (&self.status, self.session.problem()) {
             (Some((t, b)), _) => (t.clone(), *b),
             (None, Some(d)) => (d.msg, true),
-            (None, None) => (self.hint_line(), false),
+            (None, None) => (self.hint_line(v), false),
         };
         let lines = Font::wrap(&text, (sr.w / 6).max(8) as usize);
         let max_lines = (sr.h / 9).max(1) as usize;
         for (i, l) in lines.iter().take(max_lines).enumerate() {
-            g.text(sr.x + 1, sr.y + i as i32 * 9, l, if bad { 'p' } else { 'A' });
+            g.text(
+                sr.x + 1,
+                sr.y + i as i32 * 9,
+                l,
+                if bad { 'p' } else { 'A' },
+            );
         }
         // cost line next to the cases
         if let Some(run) = &self.session.run {
             let f = run.frames.get(run.pos);
-            let label = format!("step {}/{}  cost {}", run.pos, run.frames.len().saturating_sub(1), f.map_or(0, |f| f.cost));
-            g.text_r(r.controls.right() - 2, c.cases.first().map_or(sr.y - 12, |c| c.y + 4), &label, 'A', 1);
+            let label = v.tr.format(
+                "play.step_of",
+                &[
+                    ("pos", run.pos.to_string()),
+                    ("total", run.frames.len().saturating_sub(1).to_string()),
+                    ("cost", f.map_or(0, |f| f.cost).to_string()),
+                ],
+            );
+            g.text_r(
+                r.controls.right() - 2,
+                c.cases.first().map_or(sr.y - 12, |c| c.y + 4),
+                &label,
+                'A',
+                1,
+            );
         }
         let exec = self.session.current_node();
         self.panel.draw(g, v, &self.session, r.editor, exec);
@@ -609,12 +797,12 @@ impl Play {
         }
     }
 
-    fn hint_line(&self) -> String {
+    fn hint_line(&self, v: &View<'_>) -> String {
         match &self.session.run {
-            None => "Press play to watch the clerk run your program, or Check to judge it.".to_string(),
+            None => v.tr.t("play.hint_idle"),
             Some(r) => match r.frames.get(r.pos) {
-                Some(f) if f.node != 0 => "The highlighted card is the step the clerk just finished.".to_string(),
-                _ => "The arguments are on the desk. Step through to follow the clerk.".to_string(),
+                Some(f) if f.node != 0 => v.tr.t("play.hint_node"),
+                _ => v.tr.t("play.hint_start"),
             },
         }
     }

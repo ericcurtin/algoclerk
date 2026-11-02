@@ -35,20 +35,19 @@ compiler time limits, but a runaway process of your own is your responsibility.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). In short: all logic is in `crates/algoclerk-core`
 (no GUI dependency, `#![forbid(unsafe_code)]`), levels are data in `levels/`, the game is a thin
-egui layer in `crates/algoclerk-app`.
+Bevy shell in `crates/algoclerk-app` around the engine-free game in `crates/algoclerk-game`.
 
 ## Writing levels (the easiest way to contribute)
 
-1. Read [docs/LEVEL_FORMAT.md](docs/LEVEL_FORMAT.md) and [docs/ISA.md](docs/ISA.md).
+1. Read [docs/LEVEL_FORMAT.md](docs/LEVEL_FORMAT.md) and [docs/LANGUAGE.md](docs/LANGUAGE.md).
 2. Pick a classic algorithm topic and write the story, statement, hints and names **yourself**.
    Do not copy text, puzzles, level designs or art from other games or from problem websites.
    Topics and ideas are fine; sentences are not.
-3. Make it a good puzzle: at least 3 hand-written edge cases with explicit outputs, generated cases
-   that make hard-coding impossible, a 3-step hint ladder, a reference solution, par/ace targets
-   (`algoclerk-cli tune`), `[code]` metadata so the generated code reads like an answer, and an
-   `[explain]` note naming the algorithm.
-4. Check: `algoclerk-cli validate levels/<pack>` and `cargo test -p algoclerk-levels`.
-   Optionally add an independent Rust oracle for your level in `crates/algoclerk-levels/tests/oracles.rs`.
+3. Make it a good puzzle: hand-written edge cases with explicit outputs, seeded generated cases (including
+   a large one), a 3-step hint ladder, a reference solution, a `naive` solution that times out on the large
+   test, medal targets (`algoclerk-cli tune <id> --write`), and a `technique` / `big_o` note naming the algorithm.
+4. Check: `algoclerk-cli validate <id>` and `cargo test -p algoclerk-levels`. Add an independent Rust oracle
+   for your level in `crates/algoclerk-levels/tests/oracles.rs` (the oracle test fails for a level without one).
 5. Open a pull request using the template.
 
 ## Translating

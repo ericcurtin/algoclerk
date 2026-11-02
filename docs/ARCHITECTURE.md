@@ -1,93 +1,53 @@
 # Architecture
 
-AlgoClerk is a Cargo workspace. **All logic lives in toolkit-free crates** with no GPU or display
-dependency, so tests, headless simulation, CI and screenshots work anywhere. The game is a thin
-layer on top.
-
 ```text
-                  +---------------------------+
-                  |  algoclerk-app (egui)     |  desktop bin, Android cdylib, iOS staticlib
-                  |  thin UI over the core    |  + headless software renderer (screenshots)
-                  +------------+--------------+
-                               |
- +------------------+   +------v-------------+   +--------------------+
- | algoclerk-cli    +-->| algoclerk-levels   |   | levels/*.toml      |
- | run/judge/...    |   | embedded packs     |<--+ (data, no Rust)    |
- +--------+---------+   +------+-------------+   +--------------------+
-          |                    |
-          +--------------------v---------------------------------------+
-          |  algoclerk-core   #![forbid(unsafe_code)]                  |
-          |  isa  asm  vm  level  testgen  judge  validate  share      |
-          |  progress  i18n  codegen{structure,render,meta,harness,    |
-          |  highlight,compile}                                        |
-          +------------------------------------------------------------+
+levels/<wing>/<level>.toml ──► algoclerk-levels (embedded Campaign, extra packs from a directory)
+                                      │
+assets/art, assets/music ──► algoclerk-media ──► algoclerk-game ──► algoclerk-app (Bevy shell)
+                                      ▲                 ▲                │
+              algoclerk-core ─────────┴─────────────────┘        algoclerk-cli, algoclerk-tools
 ```
 
-## Crates
+| Crate | Responsibility | Depends on |
+| --- | --- | --- |
+| `algoclerk-core` | **ClerkScript** (lexer, parser, printer, type checker with inference, interpreter with the cost model), level data model and seeded test generators, the judge (tests, budgets, medals), the empirical complexity estimator, the level validator, the C/C++/Rust code generators and their compile-and-compare harnesses, progress, i18n. No graphics, no I/O beyond reading files in tests and the compiler driver. `#![forbid(unsafe_code)]`. | serde, toml |
+| `algoclerk-levels` | The 80 shipped levels embedded at build time, loading extra packs, unlock rules. | core |
+| `algoclerk-media` | Pixel-art engine: palettes, `.px` sprites, 5x7 and 3x5 fonts, software `Canvas`, text-defined chiptune synthesiser, asset embedding. | png |
+| `algoclerk-game` | The whole game as a state machine over engine-free types: `Game::tick(&Input)`, `Game::draw(&mut Canvas)`, events for audio, clipboard, fullscreen. Screens: title, level select, play (office scene, card editor, text editor, run controls), memo, victory, code reveal, settings, about, sandbox. | core, levels, media |
+| `algoclerk-app` | Thin Bevy 0.19.1 shell: window, integer-scaled nearest-neighbour texture, mouse / touch / keyboard to `Input`, audio (feature `audio`), clipboard, lifecycle, Android (GameActivity) and iOS entry points. | game, media, bevy |
+| `algoclerk-cli` | `list`, `show`, `check`, `run`, `judge`, `validate`, `table`, `tune`, `uses`, `codegen --verify`. | core, levels |
+| `algoclerk-tools` | `algoclerk-shots`: renders every scenario headlessly to PNG. | game |
 
-### `algoclerk-core`
+## ClerkScript pipeline (core)
 
-| Module | Responsibility |
-| --- | --- |
-| `isa` | `Instr<L>` (generic over the jump target type), `Opcode`, `Addr`, `Allowed`, value limits |
-| `asm` | text parser to `Listing` (the editor model: labels, instructions, comments), `compile` to `Program` (resolved jumps), printer, rule checks against a level (`Program::check`) |
-| `vm` | `Machine`: deterministic interpreter, per-step `Effect`s for animation, undo records for step-back, hard step limit, no I/O, `RuntimeError` with message keys |
-| `level` | serde data model of level files, `build_tests` (examples + hand-written + generated cases) |
-| `testgen` | SplitMix64 PRNG and the generator DSL (`list`, `perm`, `balanced`, `linked`, ...) |
-| `judge` | `Judge`: runs all tests, `Verdict` with size/speed and medals |
-| `validate` | level validator used by the CLI, CI and tests |
-| `codegen` | program to C / C++ / Rust (see [CODEGEN.md](CODEGEN.md)) |
-| `share`, `progress`, `i18n` | solution text format, local saves, translation catalogues |
+`parse` (source text to `Program`, node ids and spans) → `check` (unification-based inference, unlock lists,
+friendly diagnostics, per-function slot tables and mutation facts) → `interp::run` (tree walk over slot-resolved
+locals; a `Limits` budget for cost, call depth and live elements; optional recorded **trace** of statement
+events with the locals at that moment) → `judge::Judge` (suite = examples + hand tests + seeded generated tests;
+verdict with size, average cost, medals, complexity estimate) → `codegen::generate` (typed AST to C, C++ or Rust).
 
-Design rules: no panics on user input (parsers and VM are fuzz-tested with proptest), deterministic
-results, everything player-visible goes through message keys, `#![forbid(unsafe_code)]`.
+The interpreter never panics: parser depth, expression height and source length are bounded, arithmetic is
+checked, recursion is limited, and everything is fuzzed (`crates/algoclerk-core/tests/robustness.rs`).
 
-### `algoclerk-levels`
+## The front end
 
-`build.rs` embeds every `levels/**/*.toml` with `include_str!` (no runtime file access, which matters on
-mobile). `Campaign` groups levels into packs ("wings"), implements unlock rules and can load extra
-packs from a user directory on desktop. Integration tests live here: validation of every level,
-reference solutions meet targets, independent oracles, and the compile-and-compare tests of generated
-code for every level in both calling conventions.
+All drawing uses palette letters into a 480x270 (landscape) or 270x480 (portrait) software `Canvas`; the
+shell scales it by an integer and letterboxes. Because `algoclerk-game` has no engine types, every screen is
+rendered, laid out and tested without a window (`algoclerk-tools`, `crates/algoclerk-game/tests/ui.rs`).
 
-### `algoclerk-cli`
+**Play screen.** The scene (`office.rs`) replays a recorded run: each trace event carries the locals, the scene
+lays them out as labelled trays drawn by `value_view.rs` (crate, letter tile, ribbon, shelf, rack, drawers,
+bin, spring plates, belt, pyramid, tag chain, org chart), sends the clerk to the tray that changed, shows the
+returned value in the outbox with the expected value and a tick or cross stamp, and ticks the wall clock with
+the abstract cost. The editor (`editor.rs`, `blocks.rs`) shows the same program as nested cards or as text.
+The program **text is the source of truth** (`session.rs`): card edits transform the tree and print it back,
+text edits re-parse, undo and redo are text history, so the two views are always in sync.
 
-A small hand-written argument parser and the commands `list`, `show`, `run`, `judge`, `validate`,
-`tune`, `codegen`, `export`, `import`, all with `--json` where it makes sense.
+**Input.** The shell converts pointer positions to virtual pixels and latches presses between 60 Hz ticks;
+`input.rs` derives taps, drags and long presses. Gamepad support is not wired in the shell.
 
-### `algoclerk-app`
+**Audio.** `GameEvent::Sfx(name)` and `GameEvent::Music(name)`; the shell renders `assets/music/<name>.song`
+once, caches the WAV and plays it. Failure to open an audio device or a missing song is ignored.
 
-egui/eframe (see [ADR 0001](adr/0001-gui-toolkit.md)). Modules: `app` (screens, navigation,
-persistence), `play` (session state: program, machine, animation clock), `play_ui` (layouts: three
-columns on wide screens, tabs on phones), `editor` (program list with drag and drop and tap buttons),
-`brief`, `result` (victory screen and code view), `office` (the animated scene, all procedural),
-`widgets` (vector icons), `theme`, `fonts`, `sound` (optional `audio` feature, synthesised tones),
-`raster` + `shot` (CPU renderer of egui meshes for screenshots and smoke tests).
-
-Entry points: `main.rs` (desktop), `android_main` (NativeActivity, `cdylib`), `algoclerk_ios_main`
-(called from the Objective-C wrapper, `staticlib`).
-
-## Data flow of a play session
-
-1. `Campaign` provides a `Level`; `Judge::new` builds the concrete tests once.
-2. The player edits a `Listing` (list or text; both views stay in sync through `PlayState::after_edit`
-   and `PlayState::set_text`).
-3. `Listing::compile` gives a `Program`; `Program::check` enforces the level's rules.
-4. Run/step creates a `Machine` per test; each `step()` returns `Effect`s that the office scene animates.
-5. **Check** runs `Judge::judge` on all tests. A pass records progress (`Progress::record_verdict`) and
-   opens the result screen, which calls `codegen::generate` for C, C++ and Rust.
-
-## Testing strategy
-
-- Unit tests next to the code; property tests (proptest) for the parser, VM, rewind and text round trips.
-- `crates/algoclerk-core/tests/codegen_random.rs`: random structured and irreducible programs are
-  translated, compiled with every available C/C++/Rust compiler and compared to the interpreter.
-- `crates/algoclerk-levels/tests/`: validation, targets, oracles, hard-coding resistance, compile tests.
-- `crates/algoclerk-app/tests/render_smoke.rs`: every screen, theme, level and phone/desktop size is
-  rendered headlessly.
-- CI: fmt, clippy `-D warnings`, tests on Linux/macOS/Windows, `cargo deny`, level validation, Android
-  and iOS type-checks.
-
-## Decisions
-
-Architecture decision records live in [adr/](adr/).
+**Save data.** `progress.json` (versioned, corrupt files fall back to defaults) in the platform data
+directory, plus the sandbox program and the draft of every level.

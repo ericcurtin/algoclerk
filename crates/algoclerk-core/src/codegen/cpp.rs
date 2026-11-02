@@ -34,26 +34,64 @@ const P_UNARY: u8 = 15;
 
 fn helper(name: &str) -> &'static str {
     match name {
-        "pop" => "template <class T> T pop(std::vector<T>& v) { T x = std::move(v.back()); v.pop_back(); return x; }\ntemplate <class T> T pop(std::stack<T>& s) { T x = std::move(s.top()); s.pop(); return x; }\ntemplate <class T> T pop(std::queue<T>& q) { T x = std::move(q.front()); q.pop(); return x; }\ntemplate <class T> T pop(std::priority_queue<T>& h) { T x = h.top(); h.pop(); return x; }",
-        "pop_dq" => "template <class T> T pop_front(std::deque<T>& d) { T x = std::move(d.front()); d.pop_front(); return x; }\ntemplate <class T> T pop_back(std::deque<T>& d) { T x = std::move(d.back()); d.pop_back(); return x; }",
+        "pop" => {
+            "template <class T> T pop(std::vector<T>& v) { T x = std::move(v.back()); v.pop_back(); return x; }\ntemplate <class T> T pop(std::stack<T>& s) { T x = std::move(s.top()); s.pop(); return x; }\ntemplate <class T> T pop(std::queue<T>& q) { T x = std::move(q.front()); q.pop(); return x; }\ntemplate <class T> T pop(std::priority_queue<T>& h) { T x = h.top(); h.pop(); return x; }"
+        }
+        "pop_dq" => {
+            "template <class T> T pop_front(std::deque<T>& d) { T x = std::move(d.front()); d.pop_front(); return x; }\ntemplate <class T> T pop_back(std::deque<T>& d) { T x = std::move(d.back()); d.pop_back(); return x; }"
+        }
         "clear" => "template <class C> void clear_all(C& c) { c = C(); }",
-        "erase_at" => "template <class T> T erase_at(std::vector<T>& v, long long i) { T x = std::move(v[i]); v.erase(v.begin() + i); return x; }",
-        "index_of" => "template <class T> long long index_of(const std::vector<T>& v, const T& x) {\n    auto it = std::find(v.begin(), v.end(), x);\n    return it == v.end() ? -1 : it - v.begin();\n}",
-        "slice" => "template <class C> C slice(const C& c, long long lo, long long hi) { return C(c.begin() + lo, c.begin() + hi); }",
-        "concat" => "template <class T> std::vector<T> concat(std::vector<T> a, const std::vector<T>& b) { a.insert(a.end(), b.begin(), b.end()); return a; }",
-        "sorted" => "template <class T> std::vector<T> sorted(std::vector<T> v) { std::sort(v.begin(), v.end()); return v; }\ninline std::string sorted(std::string s) { std::sort(s.begin(), s.end()); return s; }\ntemplate <class T, class H> std::vector<T> sorted(const std::unordered_set<T, H>& s) { std::vector<T> v(s.begin(), s.end()); std::sort(v.begin(), v.end()); return v; }",
-        "reversed" => "template <class T> std::vector<T> reversed(std::vector<T> v) { std::reverse(v.begin(), v.end()); return v; }\ninline std::string reversed(std::string s) { std::reverse(s.begin(), s.end()); return s; }",
-        "join" => "inline std::string join(const std::vector<std::string>& v, const std::string& sep) {\n    std::string out;\n    for (size_t i = 0; i < v.size(); ++i) { if (i) out += sep; out += v[i]; }\n    return out;\n}",
-        "upper" => "inline std::string upper(std::string s) { for (char& c : s) c = (char)std::toupper((unsigned char)c); return s; }\ninline std::string lower(std::string s) { for (char& c : s) c = (char)std::tolower((unsigned char)c); return s; }",
-        "trim" => "inline std::string trim(const std::string& s) {\n    size_t a = 0, b = s.size();\n    while (a < b && std::isspace((unsigned char)s[a])) ++a;\n    while (b > a && std::isspace((unsigned char)s[b - 1])) --b;\n    return s.substr(a, b - a);\n}",
-        "find" => "inline long long find(const std::string& s, const std::string& x) { auto p = s.find(x); return p == std::string::npos ? -1 : (long long)p; }\ninline long long find(const std::string& s, char x) { auto p = s.find(x); return p == std::string::npos ? -1 : (long long)p; }",
-        "ends_with" => "inline bool ends_with(const std::string& s, const std::string& p) { return s.size() >= p.size() && s.compare(s.size() - p.size(), p.size(), p) == 0; }",
-        "split" => "inline std::vector<std::string> split(const std::string& s, const std::string& sep) {\n    std::vector<std::string> out;\n    size_t start = 0, pos;\n    while (!sep.empty() && (pos = s.find(sep, start)) != std::string::npos) {\n        out.push_back(s.substr(start, pos - start));\n        start = pos + sep.size();\n    }\n    out.push_back(s.substr(start));\n    return out;\n}\ninline std::vector<std::string> split(const std::string& s, char sep) { return split(s, std::string(1, sep)); }",
-        "replace" => "inline std::string replace(std::string s, const std::string& a, const std::string& b) {\n    if (a.empty()) return s;\n    std::string out;\n    size_t i = 0;\n    while (i < s.size()) {\n        if (s.compare(i, a.size(), a) == 0) { out += b; i += a.size(); } else { out += s[i++]; }\n    }\n    return out;\n}",
-        "repeat" => "inline std::string repeat(const std::string& s, long long k) { std::string out; for (long long i = 0; i < k; ++i) out += s; return out; }",
-        "hash" => "inline void hash_mix(size_t& h, size_t v) { h ^= v + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2); }\ntemplate <class T> size_t hash_of(const T& x) { return std::hash<T>()(x); }\ntemplate <class A, class B> size_t hash_of(const std::pair<A, B>& p) { size_t h = hash_of(p.first); hash_mix(h, hash_of(p.second)); return h; }\ntemplate <class... Ts> size_t hash_of(const std::tuple<Ts...>& t) { size_t h = 0; std::apply([&](const Ts&... xs) { (hash_mix(h, hash_of(xs)), ...); }, t); return h; }\ntemplate <class T> size_t hash_of(const std::vector<T>& v) { size_t h = v.size(); for (const T& x : v) hash_mix(h, hash_of(x)); return h; }\nstruct Hash { template <class T> size_t operator()(const T& x) const { return hash_of(x); } };",
-        "sets" => "template <class T, class H> std::unordered_set<T, H> set_union(std::unordered_set<T, H> a, const std::unordered_set<T, H>& b) { a.insert(b.begin(), b.end()); return a; }\ntemplate <class T, class H> std::unordered_set<T, H> set_intersection(const std::unordered_set<T, H>& a, const std::unordered_set<T, H>& b) { std::unordered_set<T, H> r; for (const T& x : a) if (b.count(x)) r.insert(x); return r; }\ntemplate <class T, class H> std::unordered_set<T, H> set_difference(const std::unordered_set<T, H>& a, const std::unordered_set<T, H>& b) { std::unordered_set<T, H> r; for (const T& x : a) if (!b.count(x)) r.insert(x); return r; }",
-        "maps" => "// Maps and sets have no defined order, so keys(), values() and items() hand back the entries sorted by key.\ntemplate <class M> auto items(const M& m) {\n    std::vector<std::pair<typename M::key_type, typename M::mapped_type>> v(m.begin(), m.end());\n    std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) { return a.first < b.first; });\n    return v;\n}\ntemplate <class M> auto keys(const M& m) { std::vector<typename M::key_type> v; for (const auto& kv : items(m)) v.push_back(kv.first); return v; }\ntemplate <class M> auto values(const M& m) { std::vector<typename M::mapped_type> v; for (const auto& kv : items(m)) v.push_back(kv.second); return v; }\ntemplate <class M> typename M::mapped_type get_or(const M& m, const typename M::key_type& k, const typename M::mapped_type& d) { auto it = m.find(k); return it == m.end() ? d : it->second; }\ntemplate <class M, class K> auto get(const M& m, const K& k) { auto it = m.find(k); using V = typename M::mapped_type; return it == m.end() ? std::optional<V>() : std::optional<V>(it->second); }",
+        "erase_at" => {
+            "template <class T> T erase_at(std::vector<T>& v, long long i) { T x = std::move(v[i]); v.erase(v.begin() + i); return x; }"
+        }
+        "index_of" => {
+            "template <class T> long long index_of(const std::vector<T>& v, const T& x) {\n    auto it = std::find(v.begin(), v.end(), x);\n    return it == v.end() ? -1 : it - v.begin();\n}"
+        }
+        "slice" => {
+            "template <class C> C slice(const C& c, long long lo, long long hi) { return C(c.begin() + lo, c.begin() + hi); }"
+        }
+        "concat" => {
+            "template <class T> std::vector<T> concat(std::vector<T> a, const std::vector<T>& b) { a.insert(a.end(), b.begin(), b.end()); return a; }"
+        }
+        "sorted" => {
+            "template <class T> std::vector<T> sorted(std::vector<T> v) { std::sort(v.begin(), v.end()); return v; }\ninline std::string sorted(std::string s) { std::sort(s.begin(), s.end()); return s; }\ntemplate <class T, class H> std::vector<T> sorted(const std::unordered_set<T, H>& s) { std::vector<T> v(s.begin(), s.end()); std::sort(v.begin(), v.end()); return v; }"
+        }
+        "reversed" => {
+            "template <class T> std::vector<T> reversed(std::vector<T> v) { std::reverse(v.begin(), v.end()); return v; }\ninline std::string reversed(std::string s) { std::reverse(s.begin(), s.end()); return s; }"
+        }
+        "join" => {
+            "inline std::string join(const std::vector<std::string>& v, const std::string& sep) {\n    std::string out;\n    for (size_t i = 0; i < v.size(); ++i) { if (i) out += sep; out += v[i]; }\n    return out;\n}"
+        }
+        "upper" => {
+            "inline std::string upper(std::string s) { for (char& c : s) c = (char)std::toupper((unsigned char)c); return s; }\ninline std::string lower(std::string s) { for (char& c : s) c = (char)std::tolower((unsigned char)c); return s; }"
+        }
+        "trim" => {
+            "inline std::string trim(const std::string& s) {\n    size_t a = 0, b = s.size();\n    while (a < b && std::isspace((unsigned char)s[a])) ++a;\n    while (b > a && std::isspace((unsigned char)s[b - 1])) --b;\n    return s.substr(a, b - a);\n}"
+        }
+        "find" => {
+            "inline long long find(const std::string& s, const std::string& x) { auto p = s.find(x); return p == std::string::npos ? -1 : (long long)p; }\ninline long long find(const std::string& s, char x) { auto p = s.find(x); return p == std::string::npos ? -1 : (long long)p; }"
+        }
+        "ends_with" => {
+            "inline bool ends_with(const std::string& s, const std::string& p) { return s.size() >= p.size() && s.compare(s.size() - p.size(), p.size(), p) == 0; }"
+        }
+        "split" => {
+            "inline std::vector<std::string> split(const std::string& s, const std::string& sep) {\n    std::vector<std::string> out;\n    size_t start = 0, pos;\n    while (!sep.empty() && (pos = s.find(sep, start)) != std::string::npos) {\n        out.push_back(s.substr(start, pos - start));\n        start = pos + sep.size();\n    }\n    out.push_back(s.substr(start));\n    return out;\n}\ninline std::vector<std::string> split(const std::string& s, char sep) { return split(s, std::string(1, sep)); }"
+        }
+        "replace" => {
+            "inline std::string replace(std::string s, const std::string& a, const std::string& b) {\n    if (a.empty()) return s;\n    std::string out;\n    size_t i = 0;\n    while (i < s.size()) {\n        if (s.compare(i, a.size(), a) == 0) { out += b; i += a.size(); } else { out += s[i++]; }\n    }\n    return out;\n}"
+        }
+        "repeat" => {
+            "inline std::string repeat(const std::string& s, long long k) { std::string out; for (long long i = 0; i < k; ++i) out += s; return out; }"
+        }
+        "hash" => {
+            "inline void hash_mix(size_t& h, size_t v) { h ^= v + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2); }\ntemplate <class T> size_t hash_of(const T& x) { return std::hash<T>()(x); }\ntemplate <class A, class B> size_t hash_of(const std::pair<A, B>& p) { size_t h = hash_of(p.first); hash_mix(h, hash_of(p.second)); return h; }\ntemplate <class... Ts> size_t hash_of(const std::tuple<Ts...>& t) { size_t h = 0; std::apply([&](const Ts&... xs) { (hash_mix(h, hash_of(xs)), ...); }, t); return h; }\ntemplate <class T> size_t hash_of(const std::vector<T>& v) { size_t h = v.size(); for (const T& x : v) hash_mix(h, hash_of(x)); return h; }\nstruct Hash { template <class T> size_t operator()(const T& x) const { return hash_of(x); } };"
+        }
+        "sets" => {
+            "template <class T, class H> std::unordered_set<T, H> set_union(std::unordered_set<T, H> a, const std::unordered_set<T, H>& b) { a.insert(b.begin(), b.end()); return a; }\ntemplate <class T, class H> std::unordered_set<T, H> set_intersection(const std::unordered_set<T, H>& a, const std::unordered_set<T, H>& b) { std::unordered_set<T, H> r; for (const T& x : a) if (b.count(x)) r.insert(x); return r; }\ntemplate <class T, class H> std::unordered_set<T, H> set_difference(const std::unordered_set<T, H>& a, const std::unordered_set<T, H>& b) { std::unordered_set<T, H> r; for (const T& x : a) if (!b.count(x)) r.insert(x); return r; }"
+        }
+        "maps" => {
+            "// Maps and sets have no defined order, so keys(), values() and items() hand back the entries sorted by key.\ntemplate <class M> auto items(const M& m) {\n    std::vector<std::pair<typename M::key_type, typename M::mapped_type>> v(m.begin(), m.end());\n    std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) { return a.first < b.first; });\n    return v;\n}\ntemplate <class M> auto keys(const M& m) { std::vector<typename M::key_type> v; for (const auto& kv : items(m)) v.push_back(kv.first); return v; }\ntemplate <class M> auto values(const M& m) { std::vector<typename M::mapped_type> v; for (const auto& kv : items(m)) v.push_back(kv.second); return v; }\ntemplate <class M> typename M::mapped_type get_or(const M& m, const typename M::key_type& k, const typename M::mapped_type& d) { auto it = m.find(k); return it == m.end() ? d : it->second; }\ntemplate <class M, class K> auto get(const M& m, const K& k) { auto it = m.find(k); using V = typename M::mapped_type; return it == m.end() ? std::optional<V>() : std::optional<V>(it->second); }"
+        }
         _ => "",
     }
 }
@@ -97,7 +135,11 @@ impl<'a> Gen<'a> {
                 self.inc.insert("unordered_map");
                 if needs_custom_hash(k) {
                     self.uses.insert("hash");
-                    format!("std::unordered_map<{}, {}, ac::Hash>", self.ty(k), self.ty(v))
+                    format!(
+                        "std::unordered_map<{}, {}, ac::Hash>",
+                        self.ty(k),
+                        self.ty(v)
+                    )
                 } else {
                     format!("std::unordered_map<{}, {}>", self.ty(k), self.ty(v))
                 }
@@ -149,7 +191,12 @@ impl<'a> Gen<'a> {
     }
 
     fn slot_mutated(&self, slot: u32) -> bool {
-        slot != u32::MAX && self.info.fns[self.f].mutated.get(slot as usize).copied().unwrap_or(false)
+        slot != u32::MAX
+            && self.info.fns[self.f]
+                .mutated
+                .get(slot as usize)
+                .copied()
+                .unwrap_or(false)
     }
 
     // ----- expressions -----
@@ -185,7 +232,11 @@ impl<'a> Gen<'a> {
                     UnOp::Not => "!",
                     UnOp::BitNot => "~",
                 };
-                let inner = if x.p >= 20 && !x.s.starts_with('-') { x.s } else { format!("({})", x.s) };
+                let inner = if x.p >= 20 && !x.s.starts_with('-') {
+                    x.s
+                } else {
+                    format!("({})", x.s)
+                };
                 Ex::new(format!("{s}{inner}"), P_UNARY)
             }
             ExprKind::Binary(op, a, b) => {
@@ -196,7 +247,21 @@ impl<'a> Gen<'a> {
                     self.uses.insert("concat");
                     return Ex::atom(format!("ac::concat({}, {})", l.s, r.s));
                 }
-                Ex::new(format!("{} {} {}", l.at(p), if *op == BinOp::And { "&&" } else if *op == BinOp::Or { "||" } else { op.text() }, r.at(p + 1)), p)
+                Ex::new(
+                    format!(
+                        "{} {} {}",
+                        l.at(p),
+                        if *op == BinOp::And {
+                            "&&"
+                        } else if *op == BinOp::Or {
+                            "||"
+                        } else {
+                            op.text()
+                        },
+                        r.at(p + 1)
+                    ),
+                    p,
+                )
             }
             ExprKind::Index(a, i) => {
                 let x = self.expr(a);
@@ -211,7 +276,11 @@ impl<'a> Gen<'a> {
                 self.uses.insert("slice");
                 let x = self.expr(a);
                 let l = lo.as_ref().map_or("0".to_string(), |l| self.expr(l).s);
-                let h = hi.as_ref().map_or(format!("(long long){}.size()", x.at(20)), |h| self.expr(h).s);
+                let h = hi
+                    .as_ref()
+                    .map_or(format!("(long long){}.size()", x.at(20)), |h| {
+                        self.expr(h).s
+                    });
                 Ex::atom(format!("ac::slice({}, {}, {})", x.s, l, h))
             }
             ExprKind::Field(a, f) => {
@@ -221,7 +290,11 @@ impl<'a> Gen<'a> {
             ExprKind::TupleIdx(a, n) => {
                 let x = self.expr(a);
                 if matches!(self.ety(a), Ty::Tuple(ref ts) if ts.len() == 2) {
-                    Ex::atom(format!("{}.{}", x.at(20), if *n == 0 { "first" } else { "second" }))
+                    Ex::atom(format!(
+                        "{}.{}",
+                        x.at(20),
+                        if *n == 0 { "first" } else { "second" }
+                    ))
                 } else {
                     Ex::atom(format!("std::get<{n}>({})", x.s))
                 }
@@ -287,7 +360,10 @@ impl<'a> Gen<'a> {
                     let ty = self.ty(&t0.unwrap_or(Ty::Int));
                     Ex::atom(format!("std::{name}<{ty}>({}, {})", at(0), at(1)))
                 } else {
-                    Ex::new(format!("*std::{name}_element({0}.begin(), {0}.end())", a[0].at(20)), P_UNARY)
+                    Ex::new(
+                        format!("*std::{name}_element({0}.begin(), {0}.end())", a[0].at(20)),
+                        P_UNARY,
+                    )
                 }
             }
             "abs" => {
@@ -296,7 +372,10 @@ impl<'a> Gen<'a> {
             }
             "sum" => {
                 self.inc.insert("numeric");
-                Ex::atom(format!("std::accumulate({0}.begin(), {0}.end(), 0LL)", a[0].at(20)))
+                Ex::atom(format!(
+                    "std::accumulate({0}.begin(), {0}.end(), 0LL)",
+                    a[0].at(20)
+                ))
             }
             "sorted" => {
                 self.uses.insert("sorted");
@@ -308,7 +387,11 @@ impl<'a> Gen<'a> {
             }
             "to_string" => {
                 self.inc.insert("string");
-                if matches!(t0, Some(Ty::Char)) { Ex::atom(format!("std::string(1, {})", at(0))) } else { Ex::atom(format!("std::to_string({})", at(0))) }
+                if matches!(t0, Some(Ty::Char)) {
+                    Ex::atom(format!("std::string(1, {})", at(0)))
+                } else {
+                    Ex::atom(format!("std::to_string({})", at(0)))
+                }
             }
             "to_int" => Ex::atom(format!("std::stoll({})", at(0))),
             "ord" => Ex::new(format!("(long long){}", a[0].at(P_UNARY)), P_UNARY),
@@ -325,7 +408,11 @@ impl<'a> Gen<'a> {
             }
             "lnode" => Ex::atom(format!("new ListNode{{{}, {}}}", at(0), at(1))),
             "tnode" => Ex::atom(format!("new TreeNode{{{}, {}, {}}}", at(0), at(1), at(2))),
-            _ => Ex::atom(format!("{}({})", ident(name), a.iter().map(|x| x.s.clone()).collect::<Vec<_>>().join(", "))),
+            _ => Ex::atom(format!(
+                "{}({})",
+                ident(name),
+                a.iter().map(|x| x.s.clone()).collect::<Vec<_>>().join(", ")
+            )),
         }
     }
 
@@ -337,22 +424,38 @@ impl<'a> Gen<'a> {
         let atom = Ex::atom;
         match (&rt, name) {
             (Ty::Vec(_), "push") => atom(format!("{rs}.push_back({})", a[0])),
-            (Ty::Vec(_), "pop") | (Ty::Stack(_), "pop") | (Ty::Queue(_), "pop") | (Ty::Heap(_), "pop") => {
+            (Ty::Vec(_), "pop")
+            | (Ty::Stack(_), "pop")
+            | (Ty::Queue(_), "pop")
+            | (Ty::Heap(_), "pop") => {
                 self.uses.insert("pop");
                 atom(format!("ac::pop({})", r.s))
             }
             (Ty::Deque(_), "pop" | "pop_front") | (Ty::Deque(_), "pop_back") => {
                 self.uses.insert("pop_dq");
-                atom(format!("ac::{}({})", if name == "pop_back" { "pop_back" } else { "pop_front" }, r.s))
+                atom(format!(
+                    "ac::{}({})",
+                    if name == "pop_back" {
+                        "pop_back"
+                    } else {
+                        "pop_front"
+                    },
+                    r.s
+                ))
             }
-            (Ty::Vec(_), "insert") => atom(format!("{rs}.insert({rs}.begin() + {}, {})", a[0], a[1])),
+            (Ty::Vec(_), "insert") => {
+                atom(format!("{rs}.insert({rs}.begin() + {}, {})", a[0], a[1]))
+            }
             (Ty::Vec(_), "remove") => {
                 self.uses.insert("erase_at");
                 atom(format!("ac::erase_at({}, {})", r.s, a[0]))
             }
             (Ty::Vec(_), "contains") => {
                 self.inc.insert("algorithm");
-                atom(format!("(std::find({rs}.begin(), {rs}.end(), {}) != {rs}.end())", a[0]))
+                atom(format!(
+                    "(std::find({rs}.begin(), {rs}.end(), {}) != {rs}.end())",
+                    a[0]
+                ))
             }
             (Ty::Vec(_), "index_of") => {
                 self.uses.insert("index_of");
@@ -360,7 +463,10 @@ impl<'a> Gen<'a> {
             }
             (Ty::Vec(_), "count") | (Ty::Str, "count") => {
                 self.inc.insert("algorithm");
-                atom(format!("(long long)std::count({rs}.begin(), {rs}.end(), {})", a[0]))
+                atom(format!(
+                    "(long long)std::count({rs}.begin(), {rs}.end(), {})",
+                    a[0]
+                ))
             }
             (Ty::Vec(_), "reverse") => {
                 self.inc.insert("algorithm");
@@ -374,9 +480,24 @@ impl<'a> Gen<'a> {
                 self.inc.insert("algorithm");
                 atom(format!("std::swap({rs}[{}], {rs}[{}])", a[0], a[1]))
             }
-            (Ty::Vec(_), "extend") => atom(format!("{rs}.insert({rs}.end(), {0}.begin(), {0}.end())", Ex::atom(a[0].clone()).at(20))),
-            (Ty::Vec(_) | Ty::Str | Ty::Set(_) | Ty::Map(..) | Ty::Stack(_) | Ty::Queue(_) | Ty::Deque(_) | Ty::Heap(_), "is_empty") => atom(format!("{rs}.empty()")),
-            (Ty::Vec(_) | Ty::Set(_) | Ty::Map(..) | Ty::Deque(_), "clear") => atom(format!("{rs}.clear()")),
+            (Ty::Vec(_), "extend") => atom(format!(
+                "{rs}.insert({rs}.end(), {0}.begin(), {0}.end())",
+                Ex::atom(a[0].clone()).at(20)
+            )),
+            (
+                Ty::Vec(_)
+                | Ty::Str
+                | Ty::Set(_)
+                | Ty::Map(..)
+                | Ty::Stack(_)
+                | Ty::Queue(_)
+                | Ty::Deque(_)
+                | Ty::Heap(_),
+                "is_empty",
+            ) => atom(format!("{rs}.empty()")),
+            (Ty::Vec(_) | Ty::Set(_) | Ty::Map(..) | Ty::Deque(_), "clear") => {
+                atom(format!("{rs}.clear()"))
+            }
             (Ty::Stack(_) | Ty::Queue(_) | Ty::Heap(_), "clear") => {
                 self.uses.insert("clear");
                 atom(format!("ac::clear_all({})", r.s))
@@ -413,7 +534,10 @@ impl<'a> Gen<'a> {
                 self.uses.insert("repeat");
                 atom(format!("ac::repeat({}, {})", r.s, a[0]))
             }
-            (Ty::Char, "is_digit" | "is_alpha" | "is_alnum" | "is_upper" | "is_lower" | "is_space") => {
+            (
+                Ty::Char,
+                "is_digit" | "is_alpha" | "is_alnum" | "is_upper" | "is_lower" | "is_space",
+            ) => {
                 self.inc.insert("cctype");
                 let f = match name {
                     "is_digit" => "isdigit",
@@ -427,7 +551,10 @@ impl<'a> Gen<'a> {
             }
             (Ty::Char, "upper" | "lower") => {
                 self.inc.insert("cctype");
-                atom(format!("(char)std::to{name}((unsigned char){})", r.at(P_UNARY)))
+                atom(format!(
+                    "(char)std::to{name}((unsigned char){})",
+                    r.at(P_UNARY)
+                ))
             }
             (Ty::Set(_), "add") => atom(format!("{rs}.insert({})", a[0])),
             (Ty::Set(_) | Ty::Map(..), "remove") => atom(format!("{rs}.erase({})", a[0])),
@@ -439,7 +566,11 @@ impl<'a> Gen<'a> {
             (Ty::Map(..), "get") => {
                 self.uses.insert("maps");
                 self.inc.insert("optional");
-                if a.len() == 2 { atom(format!("ac::get_or({}, {}, {})", r.s, a[0], a[1])) } else { atom(format!("ac::get({}, {})", r.s, a[0])) }
+                if a.len() == 2 {
+                    atom(format!("ac::get_or({}, {}, {})", r.s, a[0], a[1]))
+                } else {
+                    atom(format!("ac::get({}, {})", r.s, a[0]))
+                }
             }
             (Ty::Map(..), "keys" | "values" | "items") => {
                 self.uses.insert("maps");
@@ -450,7 +581,9 @@ impl<'a> Gen<'a> {
             (Ty::Option(_), "is_none") => Ex::new(format!("!{rs}.has_value()"), P_UNARY),
             (Ty::Option(_), "unwrap") => atom(format!("{rs}.value()")),
             (Ty::Option(_), "unwrap_or") => atom(format!("{rs}.value_or({})", a[0])),
-            (Ty::Stack(_) | Ty::Queue(_), "push") | (Ty::Heap(_), "push") => atom(format!("{rs}.push({})", a[0])),
+            (Ty::Stack(_) | Ty::Queue(_), "push") | (Ty::Heap(_), "push") => {
+                atom(format!("{rs}.push({})", a[0]))
+            }
             (Ty::Stack(_) | Ty::Heap(_), "peek") => atom(format!("{rs}.top()")),
             (Ty::Queue(_) | Ty::Deque(_), "front") => atom(format!("{rs}.front()")),
             (Ty::Deque(_), "back") => atom(format!("{rs}.back()")),
@@ -476,7 +609,11 @@ impl<'a> Gen<'a> {
         match p {
             Pat::Var(v) => ident(v),
             Pat::Wild => "_".into(),
-            Pat::Tuple(ps) => ps.iter().map(Self::pat_names).collect::<Vec<_>>().join(", "),
+            Pat::Tuple(ps) => ps
+                .iter()
+                .map(Self::pat_names)
+                .collect::<Vec<_>>()
+                .join(", "),
         }
     }
 
@@ -504,9 +641,9 @@ impl<'a> Gen<'a> {
                 let v = self.expr(value);
                 match op {
                     None => self.line(&format!("{t} = {};", v.s)),
-                    Some(BinOp::Add) if matches!(self.ety(target), Ty::Vec(_)) => {
-                        self.line(&format!("{t}.insert({t}.end(), {0}.begin(), {0}.end());", v.at(20)))
-                    }
+                    Some(BinOp::Add) if matches!(self.ety(target), Ty::Vec(_)) => self.line(
+                        &format!("{t}.insert({t}.end(), {0}.begin(), {0}.end());", v.at(20)),
+                    ),
                     Some(o) => self.line(&format!("{t} {}= {};", o.text(), v.s)),
                 }
             }
@@ -517,7 +654,13 @@ impl<'a> Gen<'a> {
                 self.block(body);
                 self.line("}");
             }
-            StmtKind::ForRange { var, start, end, step, body } => {
+            StmtKind::ForRange {
+                var,
+                start,
+                end,
+                step,
+                body,
+            } => {
                 let v = ident(var);
                 let a = start.as_ref().map_or("0".to_string(), |x| self.expr(x).s);
                 let b = self.expr(end).s;
@@ -554,9 +697,15 @@ impl<'a> Gen<'a> {
     }
 
     fn if_chain(&mut self, s: &Stmt, continued: bool) {
-        let StmtKind::If { cond, then, els } = &s.kind else { return };
+        let StmtKind::If { cond, then, els } = &s.kind else {
+            return;
+        };
         let c = self.expr(cond).s;
-        let head = if continued { format!("}} else if ({c}) {{") } else { format!("if ({c}) {{") };
+        let head = if continued {
+            format!("}} else if ({c}) {{")
+        } else {
+            format!("if ({c}) {{")
+        };
         self.line(&head);
         self.block(then);
         match els {
@@ -577,7 +726,10 @@ impl<'a> Gen<'a> {
 
     fn pat_mutated(&self, s: &Stmt, pat: &Pat) -> bool {
         let _ = pat;
-        self.info.pat_slots.get(&s.id).is_some_and(|v| v.iter().any(|&x| self.slot_mutated(x)))
+        self.info
+            .pat_slots
+            .get(&s.id)
+            .is_some_and(|v| v.iter().any(|&x| self.slot_mutated(x)))
     }
 
     /// A name for a collection that is indexed repeatedly: places are used directly, temporaries are bound first.
@@ -599,23 +751,36 @@ impl<'a> Gen<'a> {
         if let Some((kind, args)) = iter_special(iter) {
             let Pat::Tuple(ps) = pat else { return };
             self.tmp += 1;
-            let i = if kind == "enumerate" { Self::pat_names(&ps[0]) } else { format!("i{}", self.tmp) };
+            let i = if kind == "enumerate" {
+                Self::pat_names(&ps[0])
+            } else {
+                format!("i{}", self.tmp)
+            };
             let a0 = self.hoist(&args[0]);
             let (bound, names): (String, Vec<(String, String)>) = if kind == "enumerate" {
-                (format!("(long long){a0}.size()"), vec![(Self::pat_names(&ps[1]), format!("{a0}[{i}]"))])
+                (
+                    format!("(long long){a0}.size()"),
+                    vec![(Self::pat_names(&ps[1]), format!("{a0}[{i}]"))],
+                )
             } else {
                 let a1 = self.hoist(&args[1]);
                 self.inc.insert("algorithm");
                 (
                     format!("(long long)std::min({a0}.size(), {a1}.size())"),
-                    vec![(Self::pat_names(&ps[0]), format!("{a0}[{i}]")), (Self::pat_names(&ps[1]), format!("{a1}[{i}]"))],
+                    vec![
+                        (Self::pat_names(&ps[0]), format!("{a0}[{i}]")),
+                        (Self::pat_names(&ps[1]), format!("{a1}[{i}]")),
+                    ],
                 )
             };
             self.line(&format!("for (long long {i} = 0; {i} < {bound}; ++{i}) {{"));
             self.ind += 1;
             for (n, src) in names {
                 if n != "_" {
-                    self.line(&format!("{} {n} = {src};", if mutated { "auto" } else { "const auto&" }));
+                    self.line(&format!(
+                        "{} {n} = {src};",
+                        if mutated { "auto" } else { "const auto&" }
+                    ));
                 }
             }
             self.ind -= 1;
@@ -628,10 +793,18 @@ impl<'a> Gen<'a> {
             Ty::Vec(t) => *t,
             _ => Ty::Char,
         };
-        let q = if mutated || is_copy(&elem) { "auto" } else { "const auto&" };
+        let q = if mutated || is_copy(&elem) {
+            "auto"
+        } else {
+            "const auto&"
+        };
         match pat {
             Pat::Var(v) => {
-                let tn = if is_copy(&elem) { self.ty(&elem) } else { q.to_string() };
+                let tn = if is_copy(&elem) {
+                    self.ty(&elem)
+                } else {
+                    q.to_string()
+                };
                 self.line(&format!("for ({tn} {} : {it}) {{", ident(v)));
                 self.block(body);
                 self.line("}");
@@ -652,10 +825,20 @@ impl<'a> Gen<'a> {
                 self.line(&format!("for (const auto& {item} : {it}) {{"));
                 self.ind += 1;
                 for (k, p) in ps.iter().enumerate() {
-                    let acc = if ps.len() == 2 { if k == 0 { format!("{item}.first") } else { format!("{item}.second") } } else { format!("std::get<{k}>({item})") };
+                    let acc = if ps.len() == 2 {
+                        if k == 0 {
+                            format!("{item}.first")
+                        } else {
+                            format!("{item}.second")
+                        }
+                    } else {
+                        format!("std::get<{k}>({item})")
+                    };
                     match p {
                         Pat::Var(v) => self.line(&format!("auto {} = {acc};", ident(v))),
-                        Pat::Tuple(_) => self.line(&format!("auto [{}] = {acc};", Self::pat_names(p))),
+                        Pat::Tuple(_) => {
+                            self.line(&format!("auto [{}] = {acc};", Self::pat_names(p)))
+                        }
                         Pat::Wild => {}
                     }
                 }
@@ -707,8 +890,33 @@ fn prelude(g: &Gen<'_>, nodes: (bool, bool)) -> String {
     if nodes.1 {
         s.push_str("\nstruct TreeNode {\n    long long val;\n    TreeNode* left;\n    TreeNode* right;\n};\n");
     }
-    let order = ["hash", "pop", "pop_dq", "clear", "erase_at", "index_of", "slice", "concat", "sorted", "reversed", "join", "upper", "trim", "find", "ends_with", "split", "replace", "repeat", "sets", "maps"];
-    let helpers: Vec<&str> = order.iter().copied().filter(|n| g.uses.contains(n)).collect();
+    let order = [
+        "hash",
+        "pop",
+        "pop_dq",
+        "clear",
+        "erase_at",
+        "index_of",
+        "slice",
+        "concat",
+        "sorted",
+        "reversed",
+        "join",
+        "upper",
+        "trim",
+        "find",
+        "ends_with",
+        "split",
+        "replace",
+        "repeat",
+        "sets",
+        "maps",
+    ];
+    let helpers: Vec<&str> = order
+        .iter()
+        .copied()
+        .filter(|n| g.uses.contains(n))
+        .collect();
     if !helpers.is_empty() {
         s.push_str("\n// Small helpers so the solution below reads like the original program.\nnamespace ac {\n");
         for h in helpers {
@@ -722,7 +930,16 @@ fn prelude(g: &Gen<'_>, nodes: (bool, bool)) -> String {
 
 /// Translate to C++17.
 pub fn generate(prog: &Program, info: &TypeInfo) -> Generated {
-    let mut g = Gen { prog, info, f: 0, out: String::new(), ind: 0, uses: BTreeSet::new(), inc: BTreeSet::new(), tmp: 0 };
+    let mut g = Gen {
+        prog,
+        info,
+        f: 0,
+        out: String::new(),
+        ind: 0,
+        uses: BTreeSet::new(),
+        inc: BTreeSet::new(),
+        tmp: 0,
+    };
     let used = used_types(prog, info);
     let nodes = (used.contains(&Ty::LNode), used.contains(&Ty::TNode));
     let mut protos = Vec::new();
@@ -751,13 +968,26 @@ pub fn generate(prog: &Program, info: &TypeInfo) -> Generated {
     code.push_str(&bodies);
     // generate types for prototypes too (already inserted into inc/uses by g.function)
     let pre = prelude(&g, nodes);
-    Generated { lang: Lang::Cpp, prelude: pre, code }
+    Generated {
+        lang: Lang::Cpp,
+        prelude: pre,
+        code,
+    }
 }
 
 /// The C++ spelling of a type (used by the test harness).
 pub fn ty_name(t: &Ty) -> String {
     let p = Program::default();
     let i = TypeInfo::default();
-    let mut g = Gen { prog: &p, info: &i, f: 0, out: String::new(), ind: 0, uses: BTreeSet::new(), inc: BTreeSet::new(), tmp: 0 };
+    let mut g = Gen {
+        prog: &p,
+        info: &i,
+        f: 0,
+        out: String::new(),
+        ind: 0,
+        uses: BTreeSet::new(),
+        inc: BTreeSet::new(),
+        tmp: 0,
+    };
     g.ty(t)
 }

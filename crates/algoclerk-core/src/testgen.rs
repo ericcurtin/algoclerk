@@ -11,7 +11,9 @@ pub struct Rng(std::cell::Cell<u64>);
 impl Rng {
     /// Seeded generator.
     pub fn new(seed: u64) -> Rng {
-        Rng(std::cell::Cell::new(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03))
+        Rng(std::cell::Cell::new(
+            seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0xD1B5_4A32_D192_ED03,
+        ))
     }
     /// Next 64 random bits.
     pub fn next(&self) -> u64 {
@@ -75,7 +77,8 @@ fn eval_expr(s: &str, n: i64) -> Result<i64, String> {
     if s == "n" {
         return Ok(n);
     }
-    s.parse::<i64>().map_err(|_| format!("bad size expression '{s}'"))
+    s.parse::<i64>()
+        .map_err(|_| format!("bad size expression '{s}'"))
 }
 
 fn num(t: &toml::Table, key: &str, default: (i64, i64), n: i64, rng: &Rng) -> Result<i64, String> {
@@ -110,7 +113,10 @@ fn flag(t: &toml::Table, key: &str) -> bool {
 }
 
 fn text_of(t: &toml::Table, key: &str, default: &str) -> String {
-    t.get(key).and_then(toml::Value::as_str).unwrap_or(default).to_string()
+    t.get(key)
+        .and_then(toml::Value::as_str)
+        .unwrap_or(default)
+        .to_string()
 }
 
 fn quote(s: &str) -> String {
@@ -127,7 +133,9 @@ fn quote(s: &str) -> String {
 }
 
 fn rand_string(rng: &Rng, len: i64, alphabet: &[u8]) -> String {
-    (0..len.max(0)).map(|_| alphabet[rng.range(0, alphabet.len() as i64 - 1) as usize] as char).collect()
+    (0..len.max(0))
+        .map(|_| alphabet[rng.range(0, alphabet.len() as i64 - 1) as usize] as char)
+        .collect()
 }
 
 fn words_string(rng: &Rng, count: i64, alphabet: &[u8], wlen: (i64, i64)) -> String {
@@ -148,10 +156,18 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
         return Err("empty alphabet".into());
     }
     let range = bounds(t, "range", (-20, 20), n)?;
-    let ints_text = |v: &[i64]| format!("[{}]", v.iter().map(i64::to_string).collect::<Vec<_>>().join(", "));
+    let ints_text = |v: &[i64]| {
+        format!(
+            "[{}]",
+            v.iter().map(i64::to_string).collect::<Vec<_>>().join(", ")
+        )
+    };
     let dep = |key: &str| -> Result<Option<&Arg>, String> {
         match t.get(key).and_then(toml::Value::as_integer) {
-            Some(i) => earlier.get(i as usize).map(Some).ok_or_else(|| format!("{key}: no such earlier argument")),
+            Some(i) => earlier
+                .get(i as usize)
+                .map(Some)
+                .ok_or_else(|| format!("{key}: no such earlier argument")),
             None => Ok(None),
         }
     };
@@ -179,22 +195,32 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             } else if let Some(a) = dep("up_to_len_of")? {
                 rng.range(0, a.ints.len() as i64)
             } else if let Some(a) = dep("in_len_of")? {
-                let hi = num(t, "max", (i64::MAX, i64::MAX), n, rng)?.min(a.ints.len().max(1) as i64);
+                let hi =
+                    num(t, "max", (i64::MAX, i64::MAX), n, rng)?.min(a.ints.len().max(1) as i64);
                 rng.range(1, hi)
             } else if let Some(a) = dep("below")? {
                 rng.range(0, a.ints.first().copied().unwrap_or(1).max(1) - 1)
             } else {
                 rng.range(range.0, range.1)
             };
-            Ok(Arg { text: v.to_string(), ints: vec![v] })
+            Ok(Arg {
+                text: v.to_string(),
+                ints: vec![v],
+            })
         }
         "bool" => {
             let v = rng.chance(50);
-            Ok(Arg { text: v.to_string(), ints: vec![i64::from(v)] })
+            Ok(Arg {
+                text: v.to_string(),
+                ints: vec![i64::from(v)],
+            })
         }
         "char" => {
             let c = alphabet[rng.range(0, alphabet.len() as i64 - 1) as usize] as char;
-            Ok(Arg { text: format!("'{c}'"), ints: vec![c as i64] })
+            Ok(Arg {
+                text: format!("'{c}'"),
+                ints: vec![c as i64],
+            })
         }
         "string" => {
             let s = if let Some(a) = dep("anagram_of")? {
@@ -209,9 +235,16 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 let mut perm: Vec<u8> = alphabet.to_vec();
                 rng.shuffle(&mut perm);
                 let len = num(t, "len", (0, 8), n, rng)?;
-                (0..len.max(0) as usize).map(|i| perm[i % perm.len()] as char).collect()
+                (0..len.max(0) as usize)
+                    .map(|i| perm[i % perm.len()] as char)
+                    .collect()
             } else if let Some(br) = t.get("brackets").and_then(toml::Value::as_str) {
-                let pairs: Vec<(char, char)> = br.chars().collect::<Vec<_>>().chunks(2).map(|c| (c[0], c[1])).collect();
+                let pairs: Vec<(char, char)> = br
+                    .chars()
+                    .collect::<Vec<_>>()
+                    .chunks(2)
+                    .map(|c| (c[0], c[1]))
+                    .collect();
                 let len = num(t, "len", (0, 8), n, rng)?;
                 let mut out = String::new();
                 let mut stack: Vec<char> = Vec::new();
@@ -240,14 +273,20 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 if !out.is_empty() && !rng.chance(num(t, "balanced_pct", (100, 100), n, rng)?) {
                     let mut cs: Vec<char> = out.chars().collect();
                     let k = rng.range(0, cs.len() as i64 - 1) as usize;
-                    cs[k] = br.chars().nth(rng.range(0, br.len() as i64 - 1) as usize).unwrap_or('(');
+                    cs[k] = br
+                        .chars()
+                        .nth(rng.range(0, br.len() as i64 - 1) as usize)
+                        .unwrap_or('(');
                     out = cs.into_iter().collect();
                 }
                 out
             } else if flag(t, "words") {
                 let wl = bounds(t, "word_len", (1, 6), n)?;
                 words_string(rng, num(t, "len", (0, 8), n, rng)?, alphabet, wl)
-            } else if flag(t, "palindrome") || (t.contains_key("palindrome_pct") && rng.chance(num(t, "palindrome_pct", (0, 0), n, rng)?)) {
+            } else if flag(t, "palindrome")
+                || (t.contains_key("palindrome_pct")
+                    && rng.chance(num(t, "palindrome_pct", (0, 0), n, rng)?))
+            {
                 let len = num(t, "len", (0, 8), n, rng)?;
                 let half = rand_string(rng, (len + 1) / 2, alphabet);
                 let mut full = half.clone();
@@ -256,9 +295,16 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             } else {
                 rand_string(rng, num(t, "len", (0, 8), n, rng)?, alphabet)
             };
-            let s = format!("{}{s}{}", text_of(t, "prefix", ""), text_of(t, "suffix", ""));
+            let s = format!(
+                "{}{s}{}",
+                text_of(t, "prefix", ""),
+                text_of(t, "suffix", "")
+            );
             let ints = s.bytes().map(i64::from).collect();
-            Ok(Arg { text: quote(&s), ints })
+            Ok(Arg {
+                text: quote(&s),
+                ints,
+            })
         }
         "vec_int" => {
             let len = num(t, "len", (0, 8), n, rng)?;
@@ -277,7 +323,9 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 pool.truncate(len.max(0) as usize);
                 pool
             } else {
-                (0..len.max(0)).map(|_| rng.range(range.0, range.1)).collect()
+                (0..len.max(0))
+                    .map(|_| rng.range(range.0, range.1))
+                    .collect()
             };
             if flag(t, "perm_missing") {
                 let top = num(t, "len", (1, 8), n, rng)?;
@@ -309,17 +357,35 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 let k = rng.range(0, v.len() as i64 - 1) as usize;
                 v.rotate_left(k);
             }
-            Ok(Arg { text: ints_text(&v), ints: v })
+            Ok(Arg {
+                text: ints_text(&v),
+                ints: v,
+            })
         }
         "vec_bool" => {
             let len = num(t, "len", (0, 8), n, rng)?;
             let v: Vec<bool> = (0..len.max(0)).map(|_| rng.chance(50)).collect();
-            Ok(Arg { text: format!("[{}]", v.iter().map(bool::to_string).collect::<Vec<_>>().join(", ")), ints: vec![] })
+            Ok(Arg {
+                text: format!(
+                    "[{}]",
+                    v.iter().map(bool::to_string).collect::<Vec<_>>().join(", ")
+                ),
+                ints: vec![],
+            })
         }
         "vec_char" => {
             let len = num(t, "len", (0, 8), n, rng)?;
             let s = rand_string(rng, len, alphabet);
-            Ok(Arg { text: format!("[{}]", s.chars().map(|c| format!("'{c}'")).collect::<Vec<_>>().join(", ")), ints: vec![] })
+            Ok(Arg {
+                text: format!(
+                    "[{}]",
+                    s.chars()
+                        .map(|c| format!("'{c}'"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+                ints: vec![],
+            })
         }
         "vec_string" => {
             let len = num(t, "len", (0, 6), n, rng)?;
@@ -346,7 +412,17 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                     it.insert_str(0, &p);
                 }
             }
-            Ok(Arg { text: format!("[{}]", items.iter().map(|s| quote(s)).collect::<Vec<_>>().join(", ")), ints: vec![] })
+            Ok(Arg {
+                text: format!(
+                    "[{}]",
+                    items
+                        .iter()
+                        .map(|s| quote(s))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
+                ints: vec![],
+            })
         }
         "sorted_lists" => {
             let count = num(t, "count", (1, 4), n, rng)?;
@@ -359,7 +435,10 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 flat.extend(v.iter().copied());
                 lists.push(ints_text(&v));
             }
-            Ok(Arg { text: format!("[{}]", lists.join(", ")), ints: flat })
+            Ok(Arg {
+                text: format!("[{}]", lists.join(", ")),
+                ints: flat,
+            })
         }
         "rpn" => {
             let numbers = num(t, "numbers", (1, 5), n, rng)?;
@@ -389,22 +468,57 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                     pushed += 1;
                 }
             }
-            Ok(Arg { text: format!("[{}]", tokens.join(", ")), ints: vec![] })
+            Ok(Arg {
+                text: format!("[{}]", tokens.join(", ")),
+                ints: vec![],
+            })
         }
         "grid_int" => {
             let rows = num(t, "rows", (1, 4), n, rng)?;
-            let cols = if flag(t, "square") { rows } else { num(t, "cols", (1, 4), n, rng)? };
-            let rows_v: Vec<String> =
-                (0..rows).map(|_| ints_text(&(0..cols).map(|_| rng.range(range.0, range.1)).collect::<Vec<_>>())).collect();
-            Ok(Arg { text: format!("[{}]", rows_v.join(", ")), ints: vec![rows, cols] })
+            let cols = if flag(t, "square") {
+                rows
+            } else {
+                num(t, "cols", (1, 4), n, rng)?
+            };
+            let rows_v: Vec<String> = (0..rows)
+                .map(|_| {
+                    ints_text(
+                        &(0..cols)
+                            .map(|_| rng.range(range.0, range.1))
+                            .collect::<Vec<_>>(),
+                    )
+                })
+                .collect();
+            Ok(Arg {
+                text: format!("[{}]", rows_v.join(", ")),
+                ints: vec![rows, cols],
+            })
         }
         "grid_char" => {
             let rows = num(t, "rows", (1, 4), n, rng)?;
-            let cols = if flag(t, "square") { rows } else { num(t, "cols", (1, 4), n, rng)? };
+            let cols = if flag(t, "square") {
+                rows
+            } else {
+                num(t, "cols", (1, 4), n, rng)?
+            };
             let rows_v: Vec<String> = (0..rows)
-                .map(|_| format!("[{}]", (0..cols).map(|_| format!("'{}'", alphabet[rng.range(0, alphabet.len() as i64 - 1) as usize] as char)).collect::<Vec<_>>().join(", ")))
+                .map(|_| {
+                    format!(
+                        "[{}]",
+                        (0..cols)
+                            .map(|_| format!(
+                                "'{}'",
+                                alphabet[rng.range(0, alphabet.len() as i64 - 1) as usize] as char
+                            ))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                })
                 .collect();
-            Ok(Arg { text: format!("[{}]", rows_v.join(", ")), ints: vec![rows, cols] })
+            Ok(Arg {
+                text: format!("[{}]", rows_v.join(", ")),
+                ints: vec![rows, cols],
+            })
         }
         "pairs" => {
             // vec<vec<int>> of [a, b] pairs; `intervals` makes a <= b
@@ -413,12 +527,19 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             let mut flat = Vec::new();
             for _ in 0..count.max(0) {
                 let a = rng.range(range.0, range.1);
-                let b = if flag(t, "intervals") { a + rng.range(0, num(t, "max_len", (3, 3), n, rng)?) } else { rng.range(range.0, range.1) };
+                let b = if flag(t, "intervals") {
+                    a + rng.range(0, num(t, "max_len", (3, 3), n, rng)?)
+                } else {
+                    rng.range(range.0, range.1)
+                };
                 ps.push(format!("[{a}, {b}]"));
                 flat.push(a);
                 flat.push(b);
             }
-            Ok(Arg { text: format!("[{}]", ps.join(", ")), ints: flat })
+            Ok(Arg {
+                text: format!("[{}]", ps.join(", ")),
+                ints: flat,
+            })
         }
         "edges" => {
             // random edges over `nodes` vertices (given as an earlier int argument or a number)
@@ -462,12 +583,19 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 } else {
                     (a, b)
                 };
-                let key = if directed || dag { (a, b) } else { (a.min(b), a.max(b)) };
+                let key = if directed || dag {
+                    (a, b)
+                } else {
+                    (a.min(b), a.max(b))
+                };
                 if seen.insert(key) {
                     es.push(format!("[{a}, {b}]"));
                 }
             }
-            Ok(Arg { text: format!("[{}]", es.join(", ")), ints: vec![nodes] })
+            Ok(Arg {
+                text: format!("[{}]", es.join(", ")),
+                ints: vec![nodes],
+            })
         }
         "list" => {
             let len = num(t, "len", (0, 6), n, rng)?;
@@ -476,7 +604,10 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 v.sort();
             }
             let mut text = ints_text(&v);
-            if len > 0 && t.contains_key("cycle_pct") && rng.chance(num(t, "cycle_pct", (0, 0), n, rng)?) {
+            if len > 0
+                && t.contains_key("cycle_pct")
+                && rng.chance(num(t, "cycle_pct", (0, 0), n, rng)?)
+            {
                 text.push_str(&format!(" @{}", rng.range(0, len - 1)));
             }
             Ok(Arg { text, ints: v })
@@ -493,7 +624,10 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             };
             let mut vals = vals;
             if vals.len() > 1 && rng.chance(num(t, "swap_pct", (0, 0), n, rng)?) {
-                let (a, b) = (rng.range(0, vals.len() as i64 - 1) as usize, rng.range(0, vals.len() as i64 - 1) as usize);
+                let (a, b) = (
+                    rng.range(0, vals.len() as i64 - 1) as usize,
+                    rng.range(0, vals.len() as i64 - 1) as usize,
+                );
                 vals.swap(a, b);
             }
             // structure: arrays of left/right child indices
@@ -504,7 +638,11 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 for i in 1..cn {
                     let mut cur = 0;
                     loop {
-                        let slot = if vals[i] < vals[cur] { &mut left[cur] } else { &mut right[cur] };
+                        let slot = if vals[i] < vals[cur] {
+                            &mut left[cur]
+                        } else {
+                            &mut right[cur]
+                        };
                         if *slot == usize::MAX {
                             *slot = i;
                             break;
@@ -517,7 +655,11 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 let mut open: Vec<(usize, bool)> = Vec::new();
                 for i in 0..cn {
                     if i > 0 {
-                        let k = if deep { open.len() - 1 - rng.range(0, (open.len() as i64 - 1).min(1)) as usize } else { rng.range(0, open.len() as i64 - 1) as usize };
+                        let k = if deep {
+                            open.len() - 1 - rng.range(0, (open.len() as i64 - 1).min(1)) as usize
+                        } else {
+                            rng.range(0, open.len() as i64 - 1) as usize
+                        };
                         let (p, is_left) = open.remove(k);
                         if is_left { left[p] = i } else { right[p] = i }
                     }
@@ -542,7 +684,10 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                     items.pop();
                 }
             }
-            Ok(Arg { text: format!("[{}]", items.join(", ")), ints: vals })
+            Ok(Arg {
+                text: format!("[{}]", items.join(", ")),
+                ints: vals,
+            })
         }
         other => Err(format!("unknown generator kind '{other}'")),
     }

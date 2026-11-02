@@ -3,19 +3,37 @@
 //! Everything runs through the real [`Game`] (no GPU, no window): the scenarios build a game state, tick it
 //! a number of frames and draw.
 
+use crate::Game;
 use crate::editor::Tab;
 use crate::input::{Input, Key};
 use crate::layout::Display;
 use crate::result::Stage;
 use crate::storage::MemoryStorage;
 use crate::ui::{GameConfig, Nav};
-use crate::Game;
 use algoclerk_media::{Assets, Canvas};
 
 /// All scenario names, in documentation order.
 pub const NAMES: [&str; 20] = [
-    "title", "select", "select-locked", "brief", "brief-examples", "brief-tools", "play", "play-grid", "play-error", "play-text", "play-card", "play-palette",
-    "play-keyboard", "victory", "code-c", "code-cpp", "code-rust", "sandbox", "settings", "about",
+    "title",
+    "select",
+    "select-locked",
+    "brief",
+    "brief-examples",
+    "brief-tools",
+    "play",
+    "play-grid",
+    "play-error",
+    "play-text",
+    "play-card",
+    "play-palette",
+    "play-keyboard",
+    "victory",
+    "code-c",
+    "code-cpp",
+    "code-rust",
+    "sandbox",
+    "settings",
+    "about",
 ];
 
 /// What to render.
@@ -38,7 +56,14 @@ pub struct Spec {
 impl Spec {
     /// A landscape scenario with default settings.
     pub fn new(name: &str) -> Spec {
-        Spec { name: name.to_string(), portrait: false, palette: "warm".into(), text_size: 1, reduce_motion: false, touch: false }
+        Spec {
+            name: name.to_string(),
+            portrait: false,
+            palette: "warm".into(),
+            text_size: 1,
+            reduce_motion: false,
+            touch: false,
+        }
     }
 }
 
@@ -50,14 +75,26 @@ fn tick_n(g: &mut Game, n: u32) {
 }
 
 fn click(g: &mut Game, x: i32, y: i32) {
-    let down = Input { pointer: Some((x, y)), down: true, pressed: true, ..Input::default() };
+    let down = Input {
+        pointer: Some((x, y)),
+        down: true,
+        pressed: true,
+        ..Input::default()
+    };
     g.tick(&down);
-    let up = Input { pointer: Some((x, y)), released: true, ..Input::default() };
+    let up = Input {
+        pointer: Some((x, y)),
+        released: true,
+        ..Input::default()
+    };
     g.tick(&up);
 }
 
 fn press(g: &mut Game, k: Key) {
-    let i = Input { keys: vec![k], ..Input::default() };
+    let i = Input {
+        keys: vec![k],
+        ..Input::default()
+    };
     g.tick(&i);
 }
 
@@ -66,12 +103,20 @@ fn press(g: &mut Game, k: Key) {
 /// # Errors
 /// A message when the scenario cannot be set up.
 pub fn build(spec: &Spec) -> Result<Game, String> {
-    let cfg = GameConfig { can_quit: !spec.portrait, touch: spec.portrait || spec.touch, system_clipboard: false };
+    let cfg = GameConfig {
+        can_quit: !spec.portrait,
+        touch: spec.portrait || spec.touch,
+        system_clipboard: false,
+    };
     let mut g = Game::new(&Assets::embedded(), Box::new(MemoryStorage::default()), cfg)?;
     g.progress.settings.palette.clone_from(&spec.palette);
     g.progress.settings.text_size = spec.text_size;
     g.progress.settings.reduce_motion = spec.reduce_motion;
-    let (w, h) = if spec.portrait { (1080.0, 1920.0) } else { (1920.0, 1080.0) };
+    let (w, h) = if spec.portrait {
+        (1080.0, 1920.0)
+    } else {
+        (1920.0, 1080.0)
+    };
     let d: Display = crate::layout::choose(w, h, (0.0, 0.0, 0.0, 0.0), g.config.touch);
     g.set_display(&d);
     // a believable mid-game save for the map screens
@@ -189,7 +234,7 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
                         "code-cpp" => 1,
                         _ => 2,
                     };
-                    r.show_prelude = spec.name == "code-c" && false;
+                    r.show_prelude = false;
                 }
                 tick_n(&mut g, 2);
             }
@@ -210,7 +255,10 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
         }
         other => return Err(format!("unknown scenario {other}")),
     }
-    let _ = (click as fn(&mut Game, i32, i32), press as fn(&mut Game, Key));
+    let _ = (
+        click as fn(&mut Game, i32, i32),
+        press as fn(&mut Game, Key),
+    );
     Ok(g)
 }
 

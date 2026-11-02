@@ -16,7 +16,11 @@ fn campaign_has_the_promised_shape() {
         assert!(ids.insert(l.id.clone()), "duplicate id {}", l.id);
         assert!(l.hints.len() >= 3, "{} needs a hint ladder", l.id);
         assert!(l.examples.len() >= 2, "{} needs examples", l.id);
-        assert!(!l.story.is_empty() && !l.technique.is_empty() && !l.big_o.is_empty(), "{}", l.id);
+        assert!(
+            !l.story.is_empty() && !l.technique.is_empty() && !l.big_o.is_empty(),
+            "{}",
+            l.id
+        );
     }
     // at least a dozen levels declare a deliberately naive solution that must time out
     assert!(c.all_levels().filter(|l| l.naive.is_some()).count() >= 40);
@@ -68,7 +72,12 @@ fn a_brute_force_answer_is_a_time_limit_not_a_wrong_answer() {
 #[test]
 fn complexity_estimates_match_the_declared_classes() {
     let c = Campaign::shipped();
-    for (id, time) in [("two-sum", "O(n)"), ("binary-search", "O(log n)"), ("merge-sort", "O(n log n)"), ("edit-distance", "O(n^2)")] {
+    for (id, time) in [
+        ("two-sum", "O(n)"),
+        ("binary-search", "O(log n)"),
+        ("merge-sort", "O(n log n)"),
+        ("edit-distance", "O(n^2)"),
+    ] {
         let l = c.find(id).unwrap();
         let v = Judge::new(l).unwrap().reference_verdict();
         let cx = v.complexity.unwrap_or_else(|| panic!("{id}: no estimate"));

@@ -71,13 +71,19 @@ pub fn classify(samples: &[f64]) -> Class {
         return Class::Constant;
     }
     // A steady, small increase per doubling is logarithmic growth.
-    let (lo, hi) = steps.iter().fold((f64::MAX, f64::MIN), |(l, h), d| (l.min(*d), h.max(*d)));
+    let (lo, hi) = steps
+        .iter()
+        .fold((f64::MAX, f64::MIN), |(l, h), d| (l.min(*d), h.max(*d)));
     if last / first < 1.7 && lo > 0.0 && hi <= 1.8 * lo {
         return Class::Log;
     }
     // Geometric mean of the later ratios (the first one is dominated by constant offsets).
     let skip = if samples.len() > 3 { 1 } else { 0 };
-    let ratios: Vec<f64> = samples.windows(2).skip(skip).map(|w| w[1].max(1.0) / w[0].max(1.0)).collect();
+    let ratios: Vec<f64> = samples
+        .windows(2)
+        .skip(skip)
+        .map(|w| w[1].max(1.0) / w[0].max(1.0))
+        .collect();
     let g = (ratios.iter().map(|r| r.ln()).sum::<f64>() / ratios.len() as f64).exp();
     class_of_ratio(g)
 }
@@ -106,8 +112,14 @@ mod tests {
         assert_eq!(classify(&series(|_| 10.0)), Class::Constant);
         assert_eq!(classify(&series(|n| 6.0 * n.log2() + 3.0)), Class::Log);
         assert_eq!(classify(&series(|n| 7.0 * n + 40.0)), Class::Linear);
-        assert_eq!(classify(&series(|n| 3.0 * n * n.log2() + 20.0)), Class::NLogN);
-        assert_eq!(classify(&series(|n| 2.0 * n * n + 5.0 * n)), Class::Quadratic);
+        assert_eq!(
+            classify(&series(|n| 3.0 * n * n.log2() + 20.0)),
+            Class::NLogN
+        );
+        assert_eq!(
+            classify(&series(|n| 2.0 * n * n + 5.0 * n)),
+            Class::Quadratic
+        );
         assert_eq!(classify(&series(|n| n * n * n / 100.0)), Class::Cubic);
         assert_eq!(classify(&series(|n| 4.0 * n.sqrt() + 5.0)), Class::Sqrt);
     }

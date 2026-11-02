@@ -162,7 +162,7 @@ impl Progress {
         let rec = self.record_mut(&level.id);
         let mut improved = !rec.solved;
         rec.solved = true;
-        let size = verdict.size as u32;
+        let size = verdict.size;
         if rec.best_size.is_none_or(|b| size < b) {
             rec.best_size = Some(size);
             rec.best_size_solution = solution_text.to_string();

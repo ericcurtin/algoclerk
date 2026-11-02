@@ -75,7 +75,9 @@ impl Outfit {
     pub fn parse(rest: &str) -> Result<Outfit, String> {
         let mut o = Outfit::default();
         for kv in rest.split_whitespace() {
-            let (k, v) = kv.split_once('=').ok_or(format!("bad `{kv}` (want role=letter)"))?;
+            let (k, v) = kv
+                .split_once('=')
+                .ok_or(format!("bad `{kv}` (want role=letter)"))?;
             let ch = v.chars().next().ok_or("empty value")?;
             match k {
                 "body" => o.body = v.to_string(),
@@ -171,7 +173,10 @@ impl ArtBank {
             Some(Err(e)) => return Err(vec![format!("art/font.txt: {e}")]),
             None => return Err(vec!["art/font.txt missing".into()]),
         };
-        let tiny = match assets.text("art/tinyfont.txt").map(|t| Font::parse(t, 3, 5)) {
+        let tiny = match assets
+            .text("art/tinyfont.txt")
+            .map(|t| Font::parse(t, 3, 5))
+        {
             Some(Ok(f)) => f,
             Some(Err(e)) => return Err(vec![format!("art/tinyfont.txt: {e}")]),
             None => return Err(vec!["art/tinyfont.txt missing".into()]),
@@ -213,7 +218,10 @@ impl ArtBank {
                     continue;
                 }
                 let Some((name, rest)) = line.split_once(':') else {
-                    errs.push(format!("art/outfits.txt line {}: expected `name: role=letter ...`", n + 1));
+                    errs.push(format!(
+                        "art/outfits.txt line {}: expected `name: role=letter ...`",
+                        n + 1
+                    ));
                     continue;
                 };
                 match Outfit::parse(rest) {
@@ -278,8 +286,15 @@ impl ArtBank {
     ///
     /// # Errors
     /// Unknown template or a letter missing from the master palette.
-    pub fn render_template(&self, key: &str, roles: &HashMap<char, char>) -> Result<Sprite, String> {
-        let g = self.templates.get(key).ok_or(format!("no template `{key}`"))?;
+    pub fn render_template(
+        &self,
+        key: &str,
+        roles: &HashMap<char, char>,
+    ) -> Result<Sprite, String> {
+        let g = self
+            .templates
+            .get(key)
+            .ok_or(format!("no template `{key}`"))?;
         g.render(&self.palettes[0], roles)
     }
 

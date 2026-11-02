@@ -36,7 +36,12 @@ fn main() {
     }
     let mut src = String::from("pub static EMBEDDED: &[(&str, &[u8])] = &[\n");
     for (rel, abs) in files {
-        let _ = writeln!(src, "    ({:?}, include_bytes!({:?})),", rel, abs.to_string_lossy());
+        let _ = writeln!(
+            src,
+            "    ({:?}, include_bytes!({:?})),",
+            rel,
+            abs.to_string_lossy()
+        );
     }
     src.push_str("];\n");
     let out = PathBuf::from(std::env::var("OUT_DIR").expect("out dir")).join("embedded.rs");

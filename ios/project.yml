@@ -26,4 +26,4 @@ targets:
         ENABLE_BITCODE: NO
         LIBRARY_SEARCH_PATHS[sdk=iphoneos*]: "$(SRCROOT)/../target-ios/aarch64-apple-ios/release"
         LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]: "$(SRCROOT)/../target-ios/aarch64-apple-ios-sim/release"
-        OTHER_LDFLAGS: ["-lalgoclerk_app", "-framework", "Metal", "-framework", "QuartzCore", "-framework", "UIKit", "-framework", "CoreGraphics", "-framework", "Foundation", "-framework", "AudioToolbox", "-framework", "CoreAudio"]
+        OTHER_LDFLAGS: ["-lalgoclerk_app", "-framework", "Metal", "-framework", "QuartzCore", "-framework", "UIKit", "-framework", "CoreGraphics", "-framework", "Foundation", "-framework", "AudioToolbox", "-framework", "CoreAudio", "-framework", "MetalKit", "-framework", "AVFoundation", "-framework", "GameController", "-framework", "CoreHaptics", "-framework", "Security"]

@@ -206,7 +206,9 @@ pub fn parse_grid(text: &str) -> Result<Grid, String> {
     let mut frames: Vec<Vec<Vec<char>>> = vec![];
     let mut cur: Vec<Vec<char>> = vec![];
     let parse_dim = |v: &str| -> Result<(usize, usize), String> {
-        let (a, b) = v.split_once('x').ok_or(format!("bad size `{v}` (want WxH)"))?;
+        let (a, b) = v
+            .split_once('x')
+            .ok_or(format!("bad size `{v}` (want WxH)"))?;
         Ok((
             a.trim().parse().map_err(|_| format!("bad size `{v}`"))?,
             b.trim().parse().map_err(|_| format!("bad size `{v}`"))?,
@@ -303,15 +305,18 @@ impl Grid {
                         if src[y * self.w + x] != b'.' {
                             continue;
                         }
-                        let near = [(0i32, 1i32), (0, -1), (1, 0), (-1, 0)].iter().any(|(dx, dy)| {
-                            let (nx, ny) = (x as i32 + dx, y as i32 + dy);
-                            nx >= 0
-                                && ny >= 0
-                                && (nx as usize) < self.w
-                                && (ny as usize) < self.h
-                                && src[ny as usize * self.w + nx as usize] != b'.'
-                                && src[ny as usize * self.w + nx as usize] != o as u8
-                        });
+                        let near =
+                            [(0i32, 1i32), (0, -1), (1, 0), (-1, 0)]
+                                .iter()
+                                .any(|(dx, dy)| {
+                                    let (nx, ny) = (x as i32 + dx, y as i32 + dy);
+                                    nx >= 0
+                                        && ny >= 0
+                                        && (nx as usize) < self.w
+                                        && (ny as usize) < self.h
+                                        && src[ny as usize * self.w + nx as usize] != b'.'
+                                        && src[ny as usize * self.w + nx as usize] != o as u8
+                                });
                         if near {
                             px[y * self.w + x] = o as u8;
                         }
@@ -395,10 +400,16 @@ mod tests {
 
     #[test]
     fn errors_are_clear() {
-        assert!(parse_px("size: 2x2\nWW\n", &pal()).unwrap_err().contains("expected"));
-        assert!(parse_px("size: 2x2\nQW\nWW\n", &pal())
-            .unwrap_err()
-            .contains("unknown palette letter"));
+        assert!(
+            parse_px("size: 2x2\nWW\n", &pal())
+                .unwrap_err()
+                .contains("expected")
+        );
+        assert!(
+            parse_px("size: 2x2\nQW\nWW\n", &pal())
+                .unwrap_err()
+                .contains("unknown palette letter")
+        );
         assert!(parse_px("WW\n", &pal()).unwrap_err().contains("size"));
         assert!(Palette::parse("KK = #000000").is_err());
         assert!(Palette::parse("K = #000000\nK = #111111").is_err());

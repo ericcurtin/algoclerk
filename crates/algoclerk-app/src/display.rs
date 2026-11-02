@@ -26,7 +26,11 @@ pub struct SafeInsets(pub (f32, f32, f32, f32));
 
 pub fn make_image(c: &Canvas) -> Image {
     let mut img = Image::new(
-        Extent3d { width: c.w as u32, height: c.h as u32, depth_or_array_layers: 1 },
+        Extent3d {
+            width: c.w as u32,
+            height: c.h as u32,
+            depth_or_array_layers: 1,
+        },
         TextureDimension::D2,
         c.px.clone(),
         TextureFormat::Rgba8UnormSrgb,
@@ -39,12 +43,22 @@ pub fn make_image(c: &Canvas) -> Image {
 pub fn frame_resource(images: &mut Assets<Image>) -> Frame {
     let canvas = Canvas::new(480, 270);
     let handle = images.add(make_image(&canvas));
-    Frame { handle, canvas, drawn_tick: u64::MAX, size: (480, 270), display: choose(960.0, 540.0, (0.0, 0.0, 0.0, 0.0), false) }
+    Frame {
+        handle,
+        canvas,
+        drawn_tick: u64::MAX,
+        size: (480, 270),
+        display: choose(960.0, 540.0, (0.0, 0.0, 0.0, 0.0), false),
+    }
 }
 
 pub fn spawn_display(commands: &mut Commands, frame: &Frame) {
     commands.spawn((Camera2d, Msaa::Off));
-    commands.spawn((Sprite::from_image(frame.handle.clone()), Transform::default(), FrameSprite));
+    commands.spawn((
+        Sprite::from_image(frame.handle.clone()),
+        Transform::default(),
+        FrameSprite,
+    ));
 }
 
 /// Position the frame sprite for the current window (integer scale, centred).

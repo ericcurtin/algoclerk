@@ -8,7 +8,15 @@ use crate::layout::{Hit, Viewport};
 use crate::ui::{Ctx, Nav, View};
 use algoclerk_media::Rect;
 
-const WALLPAPERS: [(char, char); 7] = [('w', 'E'), ('s', 'B'), ('p', 'r'), ('l', 'g'), ('y', 'Y'), ('A', 'a'), ('c', 'T')];
+const WALLPAPERS: [(char, char); 7] = [
+    ('w', 'E'),
+    ('s', 'B'),
+    ('p', 'r'),
+    ('l', 'g'),
+    ('y', 'Y'),
+    ('A', 'a'),
+    ('c', 'T'),
+];
 const DOOR_W: i32 = 24;
 const DOOR_H: i32 = 32;
 
@@ -70,7 +78,12 @@ impl Select {
                 let doors = (0..n)
                     .map(|i| {
                         let (c, r) = ((i % per_row) as i32, (i / per_row) as i32);
-                        Rect::new(band.x + 4 + c * dw + (dw - DOOR_W) / 2, band.y + 24 + r * 62, DOOR_W, DOOR_H)
+                        Rect::new(
+                            band.x + 4 + c * dw + (dw - DOOR_W) / 2,
+                            band.y + 24 + r * 62,
+                            DOOR_W,
+                            DOOR_H,
+                        )
                     })
                     .collect();
                 out.push(Floor { band, doors, sign });
@@ -82,7 +95,14 @@ impl Select {
                 let area_w = band.w - 100;
                 let dw = (area_w / n.max(1) as i32).min(54);
                 let doors = (0..n)
-                    .map(|i| Rect::new(band.x + 98 + i as i32 * dw + (dw - DOOR_W) / 2, band.y + 22, DOOR_W, DOOR_H))
+                    .map(|i| {
+                        Rect::new(
+                            band.x + 98 + i as i32 * dw + (dw - DOOR_W) / 2,
+                            band.y + 22,
+                            DOOR_W,
+                            DOOR_H,
+                        )
+                    })
                     .collect();
                 out.push(Floor { band, doors, sign });
                 y += h + 4;
@@ -103,7 +123,10 @@ impl Select {
         for f in floors.iter().take(2) {
             for d in &f.doors {
                 let r = d.offset(0, area.y);
-                v.push(Hit::tap("door", Rect::new(r.x, r.y, r.w, r.h + 14)));
+                v.push(Hit::tap(
+                    "door",
+                    Rect::new(r.x + r.w / 2 - 17, r.y - 14, 34, r.h + 32),
+                ));
             }
         }
         v
@@ -125,7 +148,9 @@ impl Select {
         // back
         let home = Rect::new(vp.safe.x + 3, vp.safe.y + 2, 26, 16);
         let min = vp.hit_min();
-        if ptr.tapped_in(&crate::play::tap_rect(home, min, vp.screen())) || cx.input.key(Key::Escape) {
+        if ptr.tapped_in(&crate::play::tap_rect(home, min, vp.screen()))
+            || cx.input.key(Key::Escape)
+        {
             cx.sfx("button");
             return Some(Nav::Title);
         }
@@ -224,14 +249,24 @@ impl Select {
         None
     }
 
-    fn door_at(floors: &[Floor], scroll: i32, area: &Rect, pos: Option<(i32, i32)>) -> Option<(usize, usize)> {
+    fn door_at(
+        floors: &[Floor],
+        scroll: i32,
+        area: &Rect,
+        pos: Option<(i32, i32)>,
+    ) -> Option<(usize, usize)> {
         let (x, y) = pos?;
         if !area.contains(x, y) {
             return None;
         }
         for (pi, f) in floors.iter().enumerate() {
             for (li, d) in f.doors.iter().enumerate() {
-                let r = Rect::new(d.x - 3, d.y - 14 - scroll + area.y, d.w + 6, d.h + 14 + 14 + 4);
+                let r = Rect::new(
+                    d.x + d.w / 2 - 17,
+                    d.y - 14 - scroll + area.y,
+                    34,
+                    d.h + 14 + 14 + 4,
+                );
                 if r.contains(x, y) {
                     return Some((pi, li));
                 }
@@ -249,9 +284,19 @@ impl Select {
         // sky and the street
         g.rect(vp.screen(), 's');
         for i in 0..6 {
-            let x = (i * 97 + (if v.progress.settings.reduce_motion { 0 } else { (g.tick / 6) as i32 })) % (vp.w + 40) - 30;
+            let x = (i * 97
+                + (if v.progress.settings.reduce_motion {
+                    0
+                } else {
+                    (g.tick / 6) as i32
+                }))
+                % (vp.w + 40)
+                - 30;
             g.rect(Rect::new(x, vp.safe.y + 26 + (i * 37) % 120, 22, 4), 'X');
-            g.rect(Rect::new(x + 4, vp.safe.y + 23 + (i * 37) % 120, 12, 3), 'X');
+            g.rect(
+                Rect::new(x + 4, vp.safe.y + 23 + (i * 37) % 120, 12, 3),
+                'X',
+            );
         }
         let saved = g.c.set_clip(area.offset(g.off.0, g.off.1));
         let oy = area.y - self.scroll;
@@ -261,10 +306,18 @@ impl Select {
         g.rect(roof, 'r');
         g.frame(roof, 'K');
         g.hline(roof.x + 1, roof.y + 1, roof.w - 2, 'R');
-        g.text_c(roof.x + roof.w / 2, roof.y + 7, &v.tr.t("packs.title"), 'W', 1);
+        g.text_c(
+            roof.x + roof.w / 2,
+            roof.y + 7,
+            &v.tr.t("packs.title"),
+            'W',
+            1,
+        );
         let progress = v.progress;
         for (pi, f) in floors.iter().enumerate() {
-            let Some(pack) = v.campaign.packs.get(pi) else { continue };
+            let Some(pack) = v.campaign.packs.get(pi) else {
+                continue;
+            };
             let band = f.band.offset(0, oy);
             if band.bottom() < area.y || band.y > area.bottom() {
                 continue;
@@ -272,10 +325,23 @@ impl Select {
             let (wa, wb) = WALLPAPERS[pi % WALLPAPERS.len()];
             let unlocked = v.campaign.pack_unlocked(progress, pi);
             // wallpaper tiles inside the band
-            let sv = g.c.set_clip(band.offset(g.off.0, g.off.1).intersect(&area.offset(g.off.0, g.off.1)));
+            let sv = g.c.set_clip(
+                band.offset(g.off.0, g.off.1)
+                    .intersect(&area.offset(g.off.0, g.off.1)),
+            );
             for ty in 0..=(band.h / 16) {
                 for tx in 0..=(band.w / 16) {
-                    g.sprite_map(if (tx + ty) % 3 == 1 { "tiles/wall_b" } else { "tiles/wall_a" }, 0, band.x + tx * 16, band.y + ty * 16, &[('w', wa), ('E', wb)]);
+                    g.sprite_map(
+                        if (tx + ty) % 3 == 1 {
+                            "tiles/wall_b"
+                        } else {
+                            "tiles/wall_a"
+                        },
+                        0,
+                        band.x + tx * 16,
+                        band.y + ty * 16,
+                        &[('w', wa), ('E', wb)],
+                    );
                 }
             }
             g.c.set_clip(sv);
@@ -285,17 +351,36 @@ impl Select {
             // floor sign
             let sign = f.sign.offset(0, oy);
             g.panel_with(sign, 'W', 'K', false);
-            let solved = pack.levels.iter().filter(|l| progress.record(&l.id).solved).count();
+            let solved = pack
+                .levels
+                .iter()
+                .filter(|l| progress.record(&l.id).solved)
+                .count();
             let cols = ((sign.w - 8) / 6).max(4) as usize;
             if vp.portrait {
-                let t = format!("{}F {}  {}/{}", pi + 1, pack.info.title, solved, pack.levels.len());
+                let t = format!(
+                    "{}F {}  {}/{}",
+                    pi + 1,
+                    pack.info.title,
+                    solved,
+                    pack.levels.len()
+                );
                 g.text(sign.x + 4, sign.y + 4, &clip(&t, cols), 'K');
             } else {
                 g.text(sign.x + 4, sign.y + 4, &format!("{}F", pi + 1), 'R');
-                for (i, l) in algoclerk_media::Font::wrap(&pack.info.title, cols).iter().take(3).enumerate() {
+                for (i, l) in algoclerk_media::Font::wrap(&pack.info.title, cols)
+                    .iter()
+                    .take(3)
+                    .enumerate()
+                {
                     g.text(sign.x + 4, sign.y + 16 + i as i32 * 10, l, 'K');
                 }
-                g.text(sign.x + 4, sign.bottom() - 11, &format!("{}/{}", solved, pack.levels.len()), 'k');
+                g.text(
+                    sign.x + 4,
+                    sign.bottom() - 11,
+                    &format!("{}/{}", solved, pack.levels.len()),
+                    'k',
+                );
                 g.sprite("ui/star_small_on", 0, sign.right() - 15, sign.bottom() - 14);
                 if !unlocked {
                     g.sprite("levels/padlock", 0, sign.right() - 14, sign.y + 4);
@@ -308,17 +393,34 @@ impl Select {
                 }
                 let rec = progress.record(&level.id);
                 let open = v.campaign.level_unlocked(progress, pi, li);
-                let key = if !open { "levels/door_locked" } else if rec.solved { "levels/door_done" } else { "levels/door_open" };
+                let key = if !open {
+                    "levels/door_locked"
+                } else if rec.solved {
+                    "levels/door_done"
+                } else {
+                    "levels/door_open"
+                };
                 g.sprite(key, 0, d.x, d.y);
                 // number plaque on the door
-                let num = format!("{}", v.campaign.all_levels().position(|l| l.id == level.id).map_or(0, |i| i + 1));
+                let num = format!(
+                    "{}",
+                    v.campaign
+                        .all_levels()
+                        .position(|l| l.id == level.id)
+                        .map_or(0, |i| i + 1)
+                );
                 g.tiny_c(d.x + 12, d.y + 7, &num, if open { 'K' } else { 'W' });
                 if !open {
                     g.sprite("levels/padlock", 0, d.x + 7, d.y + 17);
                 }
                 // stars under the door
                 for s in 0..3u8 {
-                    g.star(d.x - 6 + i32::from(s) * 12, d.bottom() + 2, rec.stars > s, false);
+                    g.star(
+                        d.x - 6 + i32::from(s) * 12,
+                        d.bottom() + 2,
+                        rec.stars > s,
+                        false,
+                    );
                 }
                 if rec.solved {
                     g.sprite("icons/stamp_ok", 0, d.right() - 8, d.y - 3);
@@ -336,22 +438,48 @@ impl Select {
             }
         }
         g.c.set_clip(saved);
-        g.scrollbar(Rect::new(vp.safe.right() - 4, area.y + 2, 3, area.h - 4), self.scroll, total, area.h);
+        g.scrollbar(
+            Rect::new(vp.safe.right() - 4, area.y + 2, 3, area.h - 4),
+            self.scroll,
+            total,
+            area.h,
+        );
         // top bar
         let top = Rect::new(vp.safe.x, vp.safe.y, vp.safe.w, 20);
         g.rect(top, 'K');
         g.hline(top.x, top.bottom() - 1, top.w, 'm');
         let home = Rect::new(vp.safe.x + 3, vp.safe.y + 2, 26, 16);
-        g.icon_button(home, "home", crate::gfx::Kind::Normal, crate::ui::widget_state(v.ptr, &crate::play::tap_rect(home, vp.hit_min(), vp.screen()), false, false));
+        g.icon_button(
+            home,
+            "home",
+            crate::gfx::Kind::Normal,
+            crate::ui::widget_state(
+                v.ptr,
+                &crate::play::tap_rect(home, vp.hit_min(), vp.screen()),
+                false,
+                false,
+            ),
+        );
         g.text(home.right() + 6, top.y + 6, &v.tr.t("title.levels"), 'W');
         let stars = format!("{}", progress.total_stars());
         g.text_r(top.right() - 18, top.y + 6, &stars, 'y', 1);
         g.star(top.right() - 14, top.y + 4, true, false);
         if let Some((t, _)) = &self.toast {
             let w = g.text_w(t, 1) + 16;
-            let r = Rect::new(vp.safe.x + (vp.safe.w - w.min(vp.safe.w - 8)) / 2, vp.safe.bottom() - 26, w.min(vp.safe.w - 8), 18);
+            let r = Rect::new(
+                vp.safe.x + (vp.safe.w - w.min(vp.safe.w - 8)) / 2,
+                vp.safe.bottom() - 26,
+                w.min(vp.safe.w - 8),
+                18,
+            );
             g.panel_with(r, 'y', 'K', true);
-            g.text_c(r.x + r.w / 2, r.y + 5, &clip(t, ((r.w - 8) / 6) as usize), 'K', 1);
+            g.text_c(
+                r.x + r.w / 2,
+                r.y + 5,
+                &clip(t, ((r.w - 8) / 6) as usize),
+                'K',
+                1,
+            );
         }
     }
 }

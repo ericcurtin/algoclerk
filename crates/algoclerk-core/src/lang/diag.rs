@@ -20,15 +20,30 @@ pub struct Diag {
 impl Diag {
     /// A diagnostic attached to a text range.
     pub fn at(span: Span, code: &'static str, msg: impl Into<String>) -> Diag {
-        Diag { span: Some(span), node: None, code, msg: msg.into() }
+        Diag {
+            span: Some(span),
+            node: None,
+            code,
+            msg: msg.into(),
+        }
     }
     /// A diagnostic attached to a node.
     pub fn node(node: NodeId, code: &'static str, msg: impl Into<String>) -> Diag {
-        Diag { span: None, node: Some(node), code, msg: msg.into() }
+        Diag {
+            span: None,
+            node: Some(node),
+            code,
+            msg: msg.into(),
+        }
     }
     /// A diagnostic with no location.
     pub fn plain(code: &'static str, msg: impl Into<String>) -> Diag {
-        Diag { span: None, node: None, code, msg: msg.into() }
+        Diag {
+            span: None,
+            node: None,
+            code,
+            msg: msg.into(),
+        }
     }
 }
 
@@ -45,6 +60,11 @@ pub fn line_col(text: &str, offset: u32) -> (usize, usize) {
     let off = (offset as usize).min(text.len());
     let before = &text.as_bytes()[..off];
     let line = before.iter().filter(|&&b| b == b'\n').count() + 1;
-    let col = off - before.iter().rposition(|&b| b == b'\n').map_or(0, |p| p + 1) + 1;
+    let col = off
+        - before
+            .iter()
+            .rposition(|&b| b == b'\n')
+            .map_or(0, |p| p + 1)
+        + 1;
     (line, col)
 }

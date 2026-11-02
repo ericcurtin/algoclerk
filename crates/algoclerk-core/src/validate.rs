@@ -46,10 +46,16 @@ pub fn validate_level(level: &Level) -> Vec<String> {
     if level.technique.trim().is_empty() {
         p("missing technique".into());
     }
-    if !(level.medals.size[0] >= level.medals.size[1] && level.medals.size[1] >= level.medals.size[2] && level.medals.size[2] > 0) {
+    if !(level.medals.size[0] >= level.medals.size[1]
+        && level.medals.size[1] >= level.medals.size[2]
+        && level.medals.size[2] > 0)
+    {
         p("size medal targets must be bronze >= silver >= gold > 0".into());
     }
-    if !(level.medals.speed[0] >= level.medals.speed[1] && level.medals.speed[1] >= level.medals.speed[2] && level.medals.speed[2] > 0) {
+    if !(level.medals.speed[0] >= level.medals.speed[1]
+        && level.medals.speed[1] >= level.medals.speed[2]
+        && level.medals.speed[2] > 0)
+    {
         p("speed medal targets must be bronze >= silver >= gold > 0".into());
     }
     let judge = match Judge::new(level) {
@@ -61,31 +67,53 @@ pub fn validate_level(level: &Level) -> Vec<String> {
     };
     let scalar_only = level.signature.params.iter().all(|p| p.ty.is_scalar());
     if !scalar_only && !level.generate.iter().any(|g| g.large) {
-        p("needs at least one large generator (performance tests and the complexity sweep)".into());
+        p(
+            "needs at least one large generator (performance tests and the complexity sweep)"
+                .into(),
+        );
     }
     let v = judge.reference_verdict();
     if !v.passed {
-        p(format!("the reference solution fails: {:?}", v.failure.map(|f| (f.kind, f.case.args, f.got, f.error.map(|e| e.msg)))));
+        p(format!(
+            "the reference solution fails: {:?}",
+            v.failure
+                .map(|f| (f.kind, f.case.args, f.got, f.error.map(|e| e.msg)))
+        ));
         return problems;
     }
     if v.medals.size != Medal::Gold {
-        p(format!("reference size {} misses the gold size target {}", v.size, level.medals.size[2]));
+        p(format!(
+            "reference size {} misses the gold size target {}",
+            v.size, level.medals.size[2]
+        ));
     }
     if v.medals.speed != Medal::Gold {
-        p(format!("reference speed {:.1} misses the gold speed target {}", v.avg_cost, level.medals.speed[2]));
+        p(format!(
+            "reference speed {:.1} misses the gold speed target {}",
+            v.avg_cost, level.medals.speed[2]
+        ));
     }
     // large tests must leave generous headroom for the reference
     let headroom = |cost: u64, budget: u64| cost.saturating_mul(3) <= budget;
     if !headroom(v.large_cost, level.budgets.large_steps) {
-        p(format!("reference uses {} of the {} large budget; need 3x headroom", v.large_cost, level.budgets.large_steps));
+        p(format!(
+            "reference uses {} of the {} large budget; need 3x headroom",
+            v.large_cost, level.budgets.large_steps
+        ));
     }
     if !headroom(v.max_cost, level.budgets.steps) {
-        p(format!("reference uses {} of the {} standard budget; need 3x headroom", v.max_cost, level.budgets.steps));
+        p(format!(
+            "reference uses {} of the {} standard budget; need 3x headroom",
+            v.max_cost, level.budgets.steps
+        ));
     }
     match (&v.complexity, declared_time_class(&level.big_o)) {
         (Some(c), Some(decl)) => {
             if c.time > decl {
-                p(format!("measured time {} is worse than the declared {}", c.time, decl));
+                p(format!(
+                    "measured time {} is worse than the declared {}",
+                    c.time, decl
+                ));
             }
             if c.time < decl && decl >= Class::Quadratic {
                 // allowed (faster than declared), but suspicious for the stated technique
@@ -93,7 +121,10 @@ pub fn validate_level(level: &Level) -> Vec<String> {
             if let Some(sp) = declared_space_class(&level.big_o)
                 && c.space > sp
             {
-                p(format!("measured space {} is worse than the declared {}", c.space, sp));
+                p(format!(
+                    "measured space {} is worse than the declared {}",
+                    c.space, sp
+                ));
             }
         }
         (None, _) if scalar_only || level.budgets.sweep_n0 <= 0 => {}
@@ -102,17 +133,26 @@ pub fn validate_level(level: &Level) -> Vec<String> {
     }
     if let Some(naive) = &level.naive {
         match compile(naive, &level.check_opts()) {
-            Err(d) => p(format!("naive solution does not compile: {}", d.first().map_or(String::new(), |d| d.msg.clone()))),
+            Err(d) => p(format!(
+                "naive solution does not compile: {}",
+                d.first().map_or(String::new(), |d| d.msg.clone())
+            )),
             Ok(sol) => {
                 // it must be correct on the standard tests ...
                 let mut small = judge_subset(&judge, &sol, false);
                 if let Some(f) = small.take() {
-                    p(format!("naive solution is wrong (not just slow) on {:?}: {:?}", f.case.args, f.kind));
+                    p(format!(
+                        "naive solution is wrong (not just slow) on {:?}: {:?}",
+                        f.case.args, f.kind
+                    ));
                 }
                 // ... and must run out of time on a large test
                 match judge_subset(&judge, &sol, true) {
                     Some(f) if f.kind == FailKind::TimeLimit => {}
-                    Some(f) => p(format!("naive solution fails a large test for the wrong reason: {:?}", f.kind)),
+                    Some(f) => p(format!(
+                        "naive solution fails a large test for the wrong reason: {:?}",
+                        f.kind
+                    )),
                     None => p("naive solution passes the large tests; they do not bite".into()),
                 }
             }
@@ -121,9 +161,22 @@ pub fn validate_level(level: &Level) -> Vec<String> {
     problems
 }
 
-fn judge_subset(judge: &Judge, sol: &crate::lang::run::Compiled, large: bool) -> Option<crate::judge::Failure> {
+fn judge_subset(
+    judge: &Judge,
+    sol: &crate::lang::run::Compiled,
+    large: bool,
+) -> Option<crate::judge::Failure> {
     // Re-use the judge on a filtered suite.
-    let mut sub = Judge { level: judge.level.clone(), reference: judge.reference.clone(), suite: judge.suite.iter().filter(|c| c.large == large).cloned().collect() };
+    let mut sub = Judge {
+        level: judge.level.clone(),
+        reference: judge.reference.clone(),
+        suite: judge
+            .suite
+            .iter()
+            .filter(|c| c.large == large)
+            .cloned()
+            .collect(),
+    };
     if sub.suite.is_empty() {
         sub.suite = vec![];
     }

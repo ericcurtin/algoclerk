@@ -2,7 +2,7 @@
 //! The program editor panel: nested paper cards (the block view), the text view with error squiggles and
 //! an on-screen keyboard, a chip pad for building cards without typing, and undo/redo.
 
-use crate::blocks::{self, CardKind, PALETTE, Row};
+use crate::blocks::{self, CardKind, PALETTE};
 use crate::gfx::{Gfx, Kind, State, clip};
 use crate::input::{Input, Key};
 use crate::layout::Hit;
@@ -76,7 +76,17 @@ pub struct EditorPanel {
 
 impl Default for EditorPanel {
     fn default() -> Self {
-        EditorPanel { tab: Tab::Blocks, sel: None, scroll: 0, kb: Keyboard::default(), kb_open: false, card: None, palette: None, drag: None, note: None }
+        EditorPanel {
+            tab: Tab::Blocks,
+            sel: None,
+            scroll: 0,
+            kb: Keyboard::default(),
+            kb_open: false,
+            card: None,
+            palette: None,
+            drag: None,
+            note: None,
+        }
     }
 }
 
@@ -91,16 +101,46 @@ struct Parts {
     tabs: Rect,
     body: Rect,
     bar: Rect,
+    kb: Rect,
 }
 
-fn parts(vp: &crate::layout::Viewport, area: Rect, kb_open: bool, has_bar: bool, tab: Tab) -> Parts {
-    let th = vp.btn_h().min(24);
+fn parts(
+    vp: &crate::layout::Viewport,
+    area: Rect,
+    kb_open: bool,
+    has_bar: bool,
+    tab: Tab,
+) -> Parts {
+    let th = vp.btn_h();
     let tabs = Rect::new(area.x, area.y, area.w, th);
-    let bar_h = if has_bar || tab == Tab::Text { th + 2 } else { 0 };
-    let kb_h = if kb_open && tab == Tab::Text { (area.h * 2 / 5).clamp(70, 110) } else { 0 };
-    let body = Rect::new(area.x, area.y + th + 2, area.w, area.h - th - 2 - bar_h - kb_h);
+    let bar_h = if has_bar || tab == Tab::Text {
+        th + 2
+    } else {
+        0
+    };
+    let kb_h = if kb_open && tab == Tab::Text {
+        if vp.touch {
+            120
+        } else {
+            (area.h * 2 / 5).clamp(70, 100)
+        }
+    } else {
+        0
+    };
+    let body = Rect::new(
+        area.x,
+        area.y + th + 2,
+        area.w,
+        area.h - th - 2 - bar_h - kb_h,
+    );
     let bar = Rect::new(area.x, body.bottom() + 1, area.w, bar_h);
-    Parts { tabs, body, bar }
+    let kb = Rect::new(area.x, bar.bottom() + 1, area.w, kb_h.max(0));
+    Parts {
+        tabs,
+        body,
+        bar,
+        kb,
+    }
 }
 
 fn tab_rects(r: Rect, n: i32) -> Vec<Rect> {
@@ -108,7 +148,10 @@ fn tab_rects(r: Rect, n: i32) -> Vec<Rect> {
 }
 
 fn fresh_name(text: &str) -> String {
-    (1..).map(|i| format!("v{i}")).find(|n| !text.contains(n.as_str())).unwrap_or_else(|| "v1".into())
+    (1..)
+        .map(|i| format!("v{i}"))
+        .find(|n| !text.contains(n.as_str()))
+        .unwrap_or_else(|| "v1".into())
 }
 
 impl EditorPanel {
@@ -198,14 +241,13 @@ impl EditorPanel {
             }
         }
         s.edit.scroll_to_cursor(rows, cols);
-        if cx.ptr.tapped_in(&kb_btn) || (cx.config.touch && cx.ptr.tapped_in(&ed_rect) && !self.kb_open) {
+        if cx.ptr.tapped_in(&kb_btn)
+            || (cx.config.touch && cx.ptr.tapped_in(&ed_rect) && !self.kb_open)
+        {
             self.kb_open = !self.kb_open || !cx.ptr.tapped_in(&ed_rect);
         }
         if self.kb_open {
-            let kb_h = (p.body.h * 0 + 100).min(110);
-            let area = Rect::new(p.bar.x, p.bar.bottom() + 1, p.bar.w, kb_h);
-            let area = Rect::new(area.x, area.y.min(cx.vp.h - kb_h - 2), area.w, kb_h);
-            for a in self.kb.update(cx.ptr, area) {
+            for a in self.kb.update(cx.ptr, p.kb) {
                 match a {
                     KbAction::Char(c) => s.edit.insert(&c.to_string()),
                     KbAction::Backspace => {
@@ -215,8 +257,13 @@ impl EditorPanel {
                         s.edit.insert("\n");
                         let t = s.edit.text();
                         let (line, _) = s.edit.line_col(s.edit.cursor);
-                        let prev = t.split('\n').nth(line.saturating_sub(1)).unwrap_or("").to_string();
-                        let indent = prev.len() - prev.trim_start().len() + if prev.trim_end().ends_with('{') { 4 } else { 0 };
+                        let prev = t
+                            .split('\n')
+                            .nth(line.saturating_sub(1))
+                            .unwrap_or("")
+                            .to_string();
+                        let indent = prev.len() - prev.trim_start().len()
+                            + if prev.trim_end().ends_with('{') { 4 } else { 0 };
                         s.edit.insert(&" ".repeat(indent));
                     }
                     KbAction::Hide => self.kb_open = false,
@@ -243,7 +290,13 @@ impl EditorPanel {
         if cx.ptr.wheel != 0.0 {
             self.scroll = (self.scroll - (cx.ptr.wheel * rh as f32) as i32).clamp(0, max_scroll);
         }
-        if cx.ptr.touch && cx.ptr.down && cx.ptr.moved && self.drag.is_none() && list.contains(cx.ptr.start.0, cx.ptr.start.1) && cx.ptr.held_ticks < crate::input::LONG_PRESS_TICKS {
+        if cx.ptr.touch
+            && cx.ptr.down
+            && cx.ptr.moved
+            && self.drag.is_none()
+            && list.contains(cx.ptr.start.0, cx.ptr.start.1)
+            && cx.ptr.held_ticks < crate::input::LONG_PRESS_TICKS
+        {
             self.scroll = (self.scroll - cx.ptr.delta.1).clamp(0, max_scroll);
         }
         let mut changed = false;
@@ -254,14 +307,26 @@ impl EditorPanel {
                 if cx.ptr.tapped_in(r) {
                     let text = PALETTE[i].1.replace("{n}", &fresh_name(&s.edit.text()));
                     if let Some(mut prog) = s.good.clone() {
-                        let anchor = self.sel.and_then(|i| rows.get(i)).map(|r| r.node).filter(|n| rows.iter().any(|r| r.node == *n && r.kind != CardKind::Header));
-                        let res = blocks::insert_stmt(&mut prog, anchor, inside && anchor.is_some(), &text);
+                        let anchor =
+                            self.sel
+                                .and_then(|i| rows.get(i))
+                                .map(|r| r.node)
+                                .filter(|n| {
+                                    rows.iter()
+                                        .any(|r| r.node == *n && r.kind != CardKind::Header)
+                                });
+                        let res = blocks::insert_stmt(
+                            &mut prog,
+                            anchor,
+                            inside && anchor.is_some(),
+                            &text,
+                        );
                         match res {
                             Ok(t) => {
                                 s.set_text(&t);
                                 changed = true;
                                 cx.sfx("pick");
-                                self.note = Some("New card added. Tap Edit to change it.".into());
+                                self.note = Some(cx.tr.t("editor.new_card"));
                             }
                             Err(e) => self.note = Some(e),
                         }
@@ -270,7 +335,9 @@ impl EditorPanel {
                     return changed;
                 }
             }
-            if (cx.ptr.released && !cx.ptr.moved && !cells.iter().any(|r| cx.ptr.tapped_in(r))) || cx.input.key(Key::Escape) {
+            if (cx.ptr.released && !cx.ptr.moved && !cells.iter().any(|r| cx.ptr.tapped_in(r)))
+                || cx.input.key(Key::Escape)
+            {
                 self.palette = None;
             }
             return changed;
@@ -288,24 +355,39 @@ impl EditorPanel {
                     self.sel = None;
                 }
             }
-            if ((cx.ptr.long_press() && r.contains(cx.ptr.start.0, cx.ptr.start.1)) || (!cx.ptr.touch && cx.ptr.down && cx.ptr.moved && r.contains(cx.ptr.start.0, cx.ptr.start.1))) && row.kind != CardKind::Header && row.kind != CardKind::Else {
+            if ((cx.ptr.long_press() && r.contains(cx.ptr.start.0, cx.ptr.start.1))
+                || (!cx.ptr.touch
+                    && cx.ptr.down
+                    && cx.ptr.moved
+                    && r.contains(cx.ptr.start.0, cx.ptr.start.1)))
+                && row.kind != CardKind::Header
+                && row.kind != CardKind::Else
+            {
                 self.drag = Some((i, 0));
             }
         }
         if let Some((from, _)) = self.drag {
             if cx.ptr.released {
                 let y = cx.ptr.pos.map_or(0, |p| p.1);
-                let to = (((y - list.y + self.scroll) / rh).max(0) as usize).min(rows.len().saturating_sub(1));
+                let to = (((y - list.y + self.scroll) / rh).max(0) as usize)
+                    .min(rows.len().saturating_sub(1));
                 self.drag = None;
                 if to != from {
-                    if let (Some(mut prog), Some(node)) = (s.good.clone(), rows.get(from).map(|r| r.node)) {
+                    if let (Some(mut prog), Some(node)) =
+                        (s.good.clone(), rows.get(from).map(|r| r.node))
+                    {
                         let up = to < from;
                         let mut last_text = None;
                         for _ in 0..60 {
-                            let Some(t) = blocks::move_stmt(&mut prog, node, up) else { break };
+                            let Some(t) = blocks::move_stmt(&mut prog, node, up) else {
+                                break;
+                            };
                             last_text = Some(t);
                             let nrows = blocks::rows(&prog);
-                            let idx = nrows.iter().position(|r| r.node == node && r.kind != CardKind::Else).unwrap_or(0);
+                            let idx = nrows
+                                .iter()
+                                .position(|r| r.node == node && r.kind != CardKind::Else)
+                                .unwrap_or(0);
                             if (up && idx <= to) || (!up && idx >= to) {
                                 break;
                             }
@@ -344,7 +426,13 @@ impl EditorPanel {
             } else if cx.ptr.tapped_in(&b[2]) && row.kind != CardKind::Else {
                 if let Some(p) = &s.good {
                     let stmt_text = find_header(p, node).unwrap_or_default();
-                    self.card = Some(CardEdit { node, line: TextEdit::new(&stmt_text, false), pad: Pad::Names, last_var: None, msg: None });
+                    self.card = Some(CardEdit {
+                        node,
+                        line: TextEdit::new(&stmt_text, false),
+                        pad: Pad::Names,
+                        last_var: None,
+                        msg: None,
+                    });
                     if let Some(c) = &mut self.card {
                         c.line.focused = true;
                     }
@@ -373,7 +461,10 @@ impl EditorPanel {
         }
         // keyboard navigation
         if cx.input.key(Key::Down) {
-            self.sel = Some(self.sel.map_or(1, |i| (i + 1).min(rows.len().saturating_sub(1))));
+            self.sel = Some(
+                self.sel
+                    .map_or(1, |i| (i + 1).min(rows.len().saturating_sub(1))),
+            );
         }
         if cx.input.key(Key::Up) {
             self.sel = Some(self.sel.map_or(0, |i| i.saturating_sub(1)));
@@ -383,7 +474,13 @@ impl EditorPanel {
                 if let (Some(row), Some(p)) = (rows.get(i), &s.good) {
                     if row.kind != CardKind::Header && row.kind != CardKind::Else {
                         let t = find_header(p, row.node).unwrap_or_default();
-                        self.card = Some(CardEdit { node: row.node, line: TextEdit::new(&t, false), pad: Pad::Names, last_var: None, msg: None });
+                        self.card = Some(CardEdit {
+                            node: row.node,
+                            line: TextEdit::new(&t, false),
+                            pad: Pad::Names,
+                            last_var: None,
+                            msg: None,
+                        });
                     }
                 }
             }
@@ -396,7 +493,18 @@ impl EditorPanel {
         let cols = 2;
         let cw = (list.w - 8) / cols;
         let ch = 18;
-        PALETTE.iter().enumerate().map(|(i, _)| Rect::new(list.x + 4 + (i as i32 % cols) * cw, list.y + 14 + (i as i32 / cols) * (ch + 2), cw - 2, ch)).collect()
+        PALETTE
+            .iter()
+            .enumerate()
+            .map(|(i, _)| {
+                Rect::new(
+                    list.x + 4 + (i as i32 % cols) * cw,
+                    list.y + 14 + (i as i32 / cols) * (ch + 2),
+                    cw - 2,
+                    ch,
+                )
+            })
+            .collect()
     }
 
     // ---- card editor ----
@@ -406,7 +514,12 @@ impl EditorPanel {
         match card.pad {
             Pad::Names => {
                 if let Ok(c) = &s.compiled {
-                    let fidx = c.program.fns.iter().position(|f| f.name == s.entry_name()).unwrap_or(0);
+                    let fidx = c
+                        .program
+                        .fns
+                        .iter()
+                        .position(|f| f.name == s.entry_name())
+                        .unwrap_or(0);
                     let mut seen = Vec::new();
                     for (n, t) in &c.info.fns[fidx].locals {
                         if !seen.contains(n) {
@@ -423,17 +536,27 @@ impl EditorPanel {
                 }
             }
             Pad::Numbers => {
-                for d in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "true", "false", "null", "none", "\"\"", "''", "[]", "-"] {
+                for d in [
+                    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "true", "false", "null",
+                    "none", "\"\"", "''", "[]", "-",
+                ] {
                     v.push((d.to_string(), d.to_string()));
                 }
             }
             Pad::Ops => {
-                for d in ["+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "and", "or", "not", "(", ")", "[", "]", ",", "=", "+=", "-=", ".", "..", "&", "|", "^", "<<", ">>"] {
+                for d in [
+                    "+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "and", "or", "not",
+                    "(", ")", "[", "]", ",", "=", "+=", "-=", ".", "..", "&", "|", "^", "<<", ">>",
+                ] {
                     v.push((d.to_string(), format!(" {d} ").replace("  ", " ")));
                 }
             }
             Pad::Tools => {
-                let allowed = s.level.as_ref().map(|l| l.check_opts().allowed.builtins).unwrap_or(None);
+                let allowed = s
+                    .level
+                    .as_ref()
+                    .map(|l| l.check_opts().allowed.builtins)
+                    .unwrap_or(None);
                 let ok = |n: &str| allowed.as_ref().is_none_or(|a| a.contains(n));
                 for n in FREE_BUILTINS {
                     if ok(n) && !matches!(*n, "enumerate" | "zip") {
@@ -452,7 +575,21 @@ impl EditorPanel {
                 }
             }
             Pad::Words => {
-                for d in ["let", "if", "else", "while", "for", "in", "range(", "return", "break;", "continue;", "{", "}", ";"] {
+                for d in [
+                    "let",
+                    "if",
+                    "else",
+                    "while",
+                    "for",
+                    "in",
+                    "range(",
+                    "return",
+                    "break;",
+                    "continue;",
+                    "{",
+                    "}",
+                    ";",
+                ] {
                     v.push((d.to_string(), format!("{d} ").replace("( ", "(")));
                 }
             }
@@ -460,7 +597,11 @@ impl EditorPanel {
         v
     }
 
-    fn card_layout(&self, vp: &crate::layout::Viewport, area: Rect) -> (Rect, Rect, Rect, Vec<Rect>, Rect, Rect, Rect) {
+    fn card_layout(
+        &self,
+        vp: &crate::layout::Viewport,
+        area: Rect,
+    ) -> (Rect, Rect, Rect, Vec<Rect>, Rect, Rect, Rect) {
         let th = vp.btn_h().min(26);
         let line = Rect::new(area.x + 2, area.y + 14, area.w - 4, th);
         let msg = Rect::new(area.x + 2, line.bottom() + 2, area.w - 4, 18);
@@ -468,11 +609,21 @@ impl EditorPanel {
         let tabs = tab_rects(tabs_r, 5);
         let ok = Rect::new(area.right() - 62, area.bottom() - th - 2, 60, th);
         let cancel = Rect::new(area.x + 2, area.bottom() - th - 2, 60, th);
-        let chips = Rect::new(area.x + 2, tabs_r.bottom() + 2, area.w - 4, ok.y - tabs_r.bottom() - 4);
+        let chips = Rect::new(
+            area.x + 2,
+            tabs_r.bottom() + 2,
+            area.w - 4,
+            ok.y - tabs_r.bottom() - 4,
+        );
         (line, msg, tabs_r, tabs, chips, ok, cancel)
     }
 
-    fn chip_rects(&self, chips: Rect, labels: &[(String, String)], vp: &crate::layout::Viewport) -> Vec<Rect> {
+    fn chip_rects(
+        &self,
+        chips: Rect,
+        labels: &[(String, String)],
+        vp: &crate::layout::Viewport,
+    ) -> Vec<Rect> {
         let h = if vp.touch { 22 } else { 13 };
         let (mut x, mut y) = (chips.x, chips.y);
         let mut out = Vec::new();
@@ -490,7 +641,9 @@ impl EditorPanel {
 
     fn update_card(&mut self, cx: &mut Ctx<'_>, s: &mut Session, area: Rect) -> Out {
         let mut out = Out::default();
-        let Some(mut card) = self.card.take() else { return out };
+        let Some(mut card) = self.card.take() else {
+            return out;
+        };
         let (line_r, _msg, _tabs_r, tabs, chips_r, ok_r, cancel_r) = self.card_layout(&cx.vp, area);
         let o = card.line.handle(cx.input);
         if let Some(t) = o.copy {
@@ -510,11 +663,26 @@ impl EditorPanel {
                 let ins = labels[i].1.clone();
                 if card.pad == Pad::Names {
                     card.last_var = s.compiled.as_ref().ok().and_then(|c| {
-                        let fidx = c.program.fns.iter().position(|f| f.name == s.entry_name()).unwrap_or(0);
-                        c.info.fns[fidx].locals.iter().find(|(n, _)| *n == labels[i].0).map(|(_, t)| t.clone())
+                        let fidx = c
+                            .program
+                            .fns
+                            .iter()
+                            .position(|f| f.name == s.entry_name())
+                            .unwrap_or(0);
+                        c.info.fns[fidx]
+                            .locals
+                            .iter()
+                            .find(|(n, _)| *n == labels[i].0)
+                            .map(|(_, t)| t.clone())
                     });
                     if card.last_var.is_none() {
-                        card.last_var = s.good.as_ref().and_then(|p| p.fns.iter().flat_map(|f| f.params.iter()).find(|pa| pa.name == labels[i].0).map(|pa| pa.ty.clone()));
+                        card.last_var = s.good.as_ref().and_then(|p| {
+                            p.fns
+                                .iter()
+                                .flat_map(|f| f.params.iter())
+                                .find(|pa| pa.name == labels[i].0)
+                                .map(|pa| pa.ty.clone())
+                        });
                     }
                     card.pad = Pad::Tools;
                 }
@@ -553,16 +721,63 @@ impl EditorPanel {
     // ---- drawing ----
 
     /// Draw the panel.
-    pub fn draw(&self, g: &mut Gfx<'_>, v: &View<'_>, s: &Session, area: Rect, executing: Option<u32>) {
+    pub fn draw(
+        &self,
+        g: &mut Gfx<'_>,
+        v: &View<'_>,
+        s: &Session,
+        area: Rect,
+        executing: Option<u32>,
+    ) {
         let vp = v.vp;
         g.panel(area, 'W');
-        let p = parts(&vp, area.inset(2), self.kb_open, self.sel.is_some(), self.tab);
+        let p = parts(
+            &vp,
+            area.inset(2),
+            self.kb_open,
+            self.sel.is_some(),
+            self.tab,
+        );
         let tr = tab_rects(p.tabs, 4);
         let st = |r: &Rect| widget_state(v.ptr, r, false, false);
-        g.button(tr[0], "Cards", if self.tab == Tab::Blocks { Kind::On } else { Kind::Normal }, st(&tr[0]));
-        g.button(tr[1], "Text", if self.tab == Tab::Text { Kind::On } else { Kind::Normal }, st(&tr[1]));
-        g.icon_button(tr[2], "left", Kind::Normal, State { disabled: !s.can_undo(), ..st(&tr[2]) });
-        g.icon_button(tr[3], "right", Kind::Normal, State { disabled: !s.can_redo(), ..st(&tr[3]) });
+        g.button(
+            tr[0],
+            &v.tr.t("editor.cards"),
+            if self.tab == Tab::Blocks {
+                Kind::On
+            } else {
+                Kind::Normal
+            },
+            st(&tr[0]),
+        );
+        g.button(
+            tr[1],
+            &v.tr.t("editor.text"),
+            if self.tab == Tab::Text {
+                Kind::On
+            } else {
+                Kind::Normal
+            },
+            st(&tr[1]),
+        );
+        g.icon_button(
+            tr[2],
+            "left",
+            Kind::Normal,
+            State {
+                disabled: !s.can_undo(),
+                ..st(&tr[2])
+            },
+        );
+        g.icon_button(
+            tr[3],
+            "right",
+            Kind::Normal,
+            State {
+                disabled: !s.can_redo(),
+                ..st(&tr[3])
+            },
+        );
         match self.tab {
             Tab::Blocks => self.draw_blocks(g, v, s, &p, executing),
             Tab::Text => self.draw_text(g, v, s, &p, executing),
@@ -572,7 +787,14 @@ impl EditorPanel {
         }
     }
 
-    fn draw_blocks(&self, g: &mut Gfx<'_>, v: &View<'_>, s: &Session, p: &Parts, executing: Option<u32>) {
+    fn draw_blocks(
+        &self,
+        g: &mut Gfx<'_>,
+        v: &View<'_>,
+        s: &Session,
+        p: &Parts,
+        executing: Option<u32>,
+    ) {
         let vp = v.vp;
         let list = self.rows_rect(p.body);
         let rh = Self::row_h(&vp);
@@ -596,26 +818,55 @@ impl EditorPanel {
                 CardKind::Else => ('w', 'B'),
                 CardKind::Simple => ('W', 'g'),
             };
-            let fill = if running { 'c' } else if selected { 'y' } else { fill };
+            let fill = if running {
+                'c'
+            } else if selected {
+                'y'
+            } else {
+                fill
+            };
             g.round_rect(r, fill, if selected { 'R' } else { 'K' });
             g.rect(Rect::new(r.x + 1, r.y + 1, 3, r.h - 2), stripe);
-            let ink = if row.kind == CardKind::Header { 'W' } else { 'K' };
+            let ink = if row.kind == CardKind::Header {
+                'W'
+            } else {
+                'K'
+            };
             let ty = r.y + (r.h - 7) / 2;
             if rh >= 20 || row.kind != CardKind::Else {
                 if r.h >= 12 && row.kind != CardKind::Else {
-                    g.icon(row.icon, r.x + 6, r.y + (r.h - 9) / 2, if row.kind == CardKind::Header { 'W' } else { 'k' });
+                    g.icon(
+                        row.icon,
+                        r.x + 6,
+                        r.y + (r.h - 9) / 2,
+                        if row.kind == CardKind::Header {
+                            'W'
+                        } else {
+                            'k'
+                        },
+                    );
                 }
             }
             let tx = r.x + 17;
             let cols = ((r.w - 20) / 6).max(4) as usize;
-            g.text(tx, ty, &clip(&row.text, cols), if broken && selected { 'R' } else { ink });
+            g.text(
+                tx,
+                ty,
+                &clip(&row.text, cols),
+                if broken && selected { 'R' } else { ink },
+            );
             if running {
                 g.cursor(r.right() - 11, r.y + (r.h - 9) / 2);
             }
         }
         g.c.set_clip(saved);
         let content = rows.len() as i32 * rh;
-        g.scrollbar(Rect::new(list.right() - 3, list.y + 1, 2, list.h - 2), self.scroll, content, list.h);
+        g.scrollbar(
+            Rect::new(list.right() - 3, list.y + 1, 2, list.h - 2),
+            self.scroll,
+            content,
+            list.h,
+        );
         if let Some(d) = s.problem() {
             let r = Rect::new(list.x + 2, list.bottom() - 32, list.w - 4, 30);
             g.round_rect(r, 'p', 'R');
@@ -635,26 +886,68 @@ impl EditorPanel {
         // action bar
         if self.sel.is_some() {
             let b = crate::layout::columns(p.bar, 6, 2);
-            let labels = [("up", "up"), ("down", "down"), ("pointer", "Edit"), ("trash", "del"), ("plus", "add"), ("plus", "in")];
-            let compound = self.sel.and_then(|i| rows.get(i)).is_some_and(|r| r.kind == CardKind::Compound);
+            let t = |k: &str| v.tr.t(k);
+            let labels = [
+                ("up", t("editor.up")),
+                ("down", t("editor.down")),
+                ("pointer", t("editor.edit")),
+                ("trash", t("editor.del")),
+                ("plus", t("editor.add")),
+                ("plus", t("editor.inside")),
+            ];
+            let compound = self
+                .sel
+                .and_then(|i| rows.get(i))
+                .is_some_and(|r| r.kind == CardKind::Compound);
             for (i, r) in b.iter().enumerate() {
                 let disabled = i == 5 && !compound;
-                let st = State { disabled, ..widget_state(v.ptr, r, false, disabled) };
+                let st = State {
+                    disabled,
+                    ..widget_state(v.ptr, r, false, disabled)
+                };
                 if labels[i].1.len() <= 2 || i == 2 {
-                    g.button(*r, labels[i].1, if i == 3 { Kind::Danger } else { Kind::Normal }, st);
+                    g.button(
+                        *r,
+                        &labels[i].1,
+                        if i == 3 { Kind::Danger } else { Kind::Normal },
+                        st,
+                    );
                 } else {
-                    g.icon_button(*r, labels[i].0, if i == 3 { Kind::Danger } else { Kind::Normal }, st);
+                    g.icon_button(
+                        *r,
+                        labels[i].0,
+                        if i == 3 { Kind::Danger } else { Kind::Normal },
+                        st,
+                    );
                 }
             }
         } else if p.bar.h > 0 {
-            g.button(p.bar, "+ add a card", Kind::Primary, widget_state(v.ptr, &p.bar, false, false));
+            g.button(
+                p.bar,
+                &v.tr.t("editor.add_card"),
+                Kind::Primary,
+                widget_state(v.ptr, &p.bar, false, false),
+            );
         }
         if let Some(inside) = self.palette {
             let r = list.inset(1);
             g.panel(r, 'W');
-            g.header(Rect::new(r.x, r.y, r.w, 12), if inside { "Add inside" } else { "Add after" }, true);
+            g.header(
+                Rect::new(r.x, r.y, r.w, 12),
+                &if inside {
+                    v.tr.t("editor.add_inside")
+                } else {
+                    v.tr.t("editor.add_after")
+                },
+                true,
+            );
             for (i, c) in self.palette_rects(list).iter().enumerate() {
-                g.button(*c, PALETTE[i].0, Kind::Normal, widget_state(v.ptr, c, false, false));
+                g.button(
+                    *c,
+                    PALETTE[i].0,
+                    Kind::Normal,
+                    widget_state(v.ptr, c, false, false),
+                );
             }
         }
         if let Some(n) = &self.note {
@@ -662,7 +955,14 @@ impl EditorPanel {
         }
     }
 
-    fn draw_text(&self, g: &mut Gfx<'_>, v: &View<'_>, s: &Session, p: &Parts, executing: Option<u32>) {
+    fn draw_text(
+        &self,
+        g: &mut Gfx<'_>,
+        v: &View<'_>,
+        s: &Session,
+        p: &Parts,
+        executing: Option<u32>,
+    ) {
         let err = s.problem();
         let span = s.problem_span();
         let exec_line = executing.and_then(|n| {
@@ -674,7 +974,16 @@ impl EditorPanel {
         let err_lines: Vec<usize> = span.map(|x| x.0).into_iter().collect();
         textedit::draw_editor(g, &s.edit, p.body, 1, 9, &err_lines, exec_line, &sq, v.tick);
         let kb_btn = Rect::new(p.bar.x, p.bar.y, (p.bar.w / 2).min(70), p.bar.h);
-        g.button(kb_btn, if self.kb_open { "Hide keys" } else { "Keys" }, Kind::Normal, widget_state(v.ptr, &kb_btn, false, false));
+        g.button(
+            kb_btn,
+            &if self.kb_open {
+                v.tr.t("editor.hide_keys")
+            } else {
+                v.tr.t("editor.keys")
+            },
+            Kind::Normal,
+            widget_state(v.ptr, &kb_btn, false, false),
+        );
         let msg_r = Rect::new(kb_btn.right() + 4, p.bar.y, p.bar.w - kb_btn.w - 4, p.bar.h);
         if let Some(d) = err {
             let lines = algoclerk_media::Font::wrap(&d.msg, (msg_r.w / 6).max(8) as usize);
@@ -682,54 +991,104 @@ impl EditorPanel {
                 g.text(msg_r.x, msg_r.y + 1 + i as i32 * 8, l, 'R');
             }
         } else {
-            g.text(msg_r.x, msg_r.y + (msg_r.h - 7) / 2, "Looks good", 'G');
+            g.text(
+                msg_r.x,
+                msg_r.y + (msg_r.h - 7) / 2,
+                &v.tr.t("editor.looks_good"),
+                'G',
+            );
         }
         if self.kb_open {
-            let kb_h = 100.min(110);
-            let area = Rect::new(p.bar.x, (p.bar.bottom() + 1).min(v.vp.h - kb_h - 2), p.bar.w, kb_h);
-            self.kb.draw(g, area, v.ptr);
+            self.kb.draw(g, p.kb, v.ptr);
         }
     }
 
     fn draw_card(&self, g: &mut Gfx<'_>, v: &View<'_>, s: &Session, area: Rect, card: &CardEdit) {
         g.panel(area, 'W');
-        g.header(Rect::new(area.x, area.y, area.w, 12), "Edit card", true);
+        g.header(
+            Rect::new(area.x, area.y, area.w, 12),
+            &v.tr.t("editor.edit_card"),
+            true,
+        );
         let (line_r, msg_r, _tabs_r, tabs, chips_r, ok_r, cancel_r) = self.card_layout(&v.vp, area);
         g.rect(line_r, 'X');
         g.frame(line_r, 'K');
         let txt = card.line.text();
         let cols = ((line_r.w - 6) / 6).max(4) as usize;
-        let shown: String = if txt.chars().count() > cols { txt.chars().skip(txt.chars().count() - cols).collect() } else { txt.clone() };
+        let shown: String = if txt.chars().count() > cols {
+            txt.chars().skip(txt.chars().count() - cols).collect()
+        } else {
+            txt.clone()
+        };
         g.text(line_r.x + 3, line_r.y + (line_r.h - 7) / 2, &shown, 'K');
         let caret_x = line_r.x + 3 + shown.chars().count() as i32 * 6;
         if (v.tick / 30) % 2 == 0 {
             g.rect(Rect::new(caret_x, line_r.y + 3, 1, line_r.h - 6), 'R');
         }
         let (text, colour) = match &card.msg {
-            Some(m) if m == "ok" => ("This card is fine.".to_string(), 'G'),
+            Some(m) if m == "ok" => (v.tr.t("editor.card_fine"), 'G'),
             Some(m) => (m.clone(), 'R'),
             None => (String::new(), 'K'),
         };
-        for (i, l) in algoclerk_media::Font::wrap(&text, (msg_r.w / 6) as usize).iter().take(2).enumerate() {
+        for (i, l) in algoclerk_media::Font::wrap(&text, (msg_r.w / 6) as usize)
+            .iter()
+            .take(2)
+            .enumerate()
+        {
             g.text(msg_r.x, msg_r.y + i as i32 * 8, l, colour);
         }
-        let names = ["Names", "123", "Ops", "Tools", "Words"];
+        let names = [
+            v.tr.t("editor.names"),
+            v.tr.t("editor.numbers"),
+            v.tr.t("editor.ops"),
+            v.tr.t("editor.tools"),
+            v.tr.t("editor.words"),
+        ];
         let pads = [Pad::Names, Pad::Numbers, Pad::Ops, Pad::Tools, Pad::Words];
         for (i, r) in tabs.iter().enumerate() {
-            g.button(*r, names[i], if card.pad == pads[i] { Kind::On } else { Kind::Normal }, widget_state(v.ptr, r, false, false));
+            g.button(
+                *r,
+                &names[i],
+                if card.pad == pads[i] {
+                    Kind::On
+                } else {
+                    Kind::Normal
+                },
+                widget_state(v.ptr, r, false, false),
+            );
         }
         let labels = self.pad_chips(s, card);
         for (i, r) in self.chip_rects(chips_r, &labels, &v.vp).iter().enumerate() {
             if r.bottom() > chips_r.bottom() {
                 break;
             }
-            g.button(*r, &labels[i].0, Kind::Normal, widget_state(v.ptr, r, false, false));
+            g.button(
+                *r,
+                &labels[i].0,
+                Kind::Normal,
+                widget_state(v.ptr, r, false, false),
+            );
         }
         if card.pad == Pad::Tools && card.last_var.is_none() {
-            g.text(chips_r.x, chips_r.bottom() - 9, "Pick a name first for its methods", 'k');
+            g.text(
+                chips_r.x,
+                chips_r.bottom() - 9,
+                &v.tr.t("editor.pick_name"),
+                'k',
+            );
         }
-        g.button(ok_r, "OK", Kind::Good, widget_state(v.ptr, &ok_r, false, false));
-        g.button(cancel_r, "Cancel", Kind::Normal, widget_state(v.ptr, &cancel_r, false, false));
+        g.button(
+            ok_r,
+            &v.tr.t("common.ok"),
+            Kind::Good,
+            widget_state(v.ptr, &ok_r, false, false),
+        );
+        g.button(
+            cancel_r,
+            &v.tr.t("common.cancel"),
+            Kind::Normal,
+            widget_state(v.ptr, &cancel_r, false, false),
+        );
     }
 }
 

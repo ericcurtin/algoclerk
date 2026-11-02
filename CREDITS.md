@@ -2,39 +2,38 @@
 
 ## Code
 
-AlgoClerk is licensed under the Apache License 2.0 (see `LICENSE` and `NOTICE`). Third-party Rust
-crates are all permissively licensed; `cargo deny check licenses` verifies this in CI and the
-accepted licence list is in `deny.toml`. The full list of dependencies and their licences can be
-produced with `cargo deny list`.
+AlgoClerk is licensed under the Apache License 2.0 (see `LICENSE` and `NOTICE`). Every Rust file starts with
+an SPDX header. Third-party crates are all permissively licensed; `cargo deny check licenses bans` verifies
+this in CI and the accepted licence list is in `deny.toml`.
+
+### Reused from Falabichos
+
+The sibling project [Falabichos](https://github.com/ericcurtin/falabichos) (same owner, Apache-2.0) is the
+origin of the pixel-art engine design that was adapted here: the palette / `.px` sprite / bitmap font /
+canvas / text-song synthesiser crate (`algoclerk-media`), the integer-scaled virtual screen and safe-area
+handling (`algoclerk-game/src/layout.rs`), the Bevy shell structure (`algoclerk-app`), the Android
+GameActivity and iOS project skeletons, and the headless screenshot approach. **No art, music or text was
+copied from Falabichos**: all sprites, the font glyph set, the palettes, the songs and every screen of
+AlgoClerk are new.
 
 ### Dual-licensed dependencies
 
-`self_cell` (a dependency of the text layout stack inside egui) is licensed
-`Apache-2.0 OR GPL-2.0-only`. AlgoClerk uses it under the Apache-2.0 alternative, which `cargo deny`
-accepts because `deny.toml` does not allow the copyleft alternative. (`r-efi`, which appears in
-`Cargo.lock` only for UEFI targets, has the same kind of expression and is not part of any supported
-build.)
+Some crates in the Bevy dependency tree are dual licensed (`MIT OR Apache-2.0`, and in a few cases
+`Apache-2.0 OR GPL-2.0-only` such as `self_cell`). AlgoClerk uses them under the permissive alternative,
+which `cargo deny` accepts because `deny.toml` does not allow the copyleft alternative.
 
-## Fonts
+## Art, font, music, levels and text
 
-| Asset | Author | Licence | Where |
-| --- | --- | --- | --- |
-| JetBrains Mono (NL, Regular) | The JetBrains Mono Project Authors | SIL Open Font License 1.1 | `assets/fonts/JetBrainsMonoNL-Regular.ttf`, licence text in `assets/fonts/OFL.txt` |
-
-egui's own default fonts are **not** used (they include fonts under other licences); the
-`default_fonts` feature is disabled and the font above is used for everything.
-
-## Art, sounds, levels and text
-
-- All visuals (the clerk, belts, crates, tiles, icons, the application icon) are drawn in code with
-  vector shapes (`crates/algoclerk-app/src/{office,widgets,shot}.rs`); the icon PNGs in
-  `assets/icons/` and the platform icon sets are rendered from that code. No external image files.
-- Sound effects (optional `audio` feature) are synthesised in code
-  (`crates/algoclerk-app/src/sound.rs`); there are no audio files.
-- All levels, stories, statements, hints and UI strings were written for this project.
+- All sprites (`assets/art/**/*.px`), the 5x7 and 3x5 bitmap fonts, the three palettes and the clerk
+  templates were drawn for this project as text definitions. No external image files, no scanned or traced
+  art, nothing from Human Resource Machine or any other game.
+- All music and sound effects (`assets/music/*.song`) are original text-defined chiptune scores rendered by
+  the built-in synthesiser at run time; there are no audio recordings.
+- The application icon PNGs in `assets/icons/` were rendered from the game's own art.
+- All 80 levels, stories, statements, hints, oracles and UI strings were written for this project. Problems
+  are described in the project's own words.
 
 ## Inspiration
 
-AlgoClerk is inspired by the genre of programming puzzle games and by classic algorithm interview
-topics. No assets, text, names, characters, level designs or problem statements were copied from
-any game or website.
+AlgoClerk is inspired by the genre of programming puzzle games and by classic algorithm interview topics.
+No assets, text, names, characters, level designs or problem statements were copied from any game or website.

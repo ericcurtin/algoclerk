@@ -92,7 +92,7 @@ mod tests {
     #[test]
     fn iris_closes_then_opens() {
         let mut i = Iris::new((50, 50));
-        assert_eq!(i.radius(100, 100) > 100, true);
+        assert!(i.radius(100, 100) > 100);
         let mut swapped = 0;
         for _ in 0..IRIS_TICKS {
             if i.tick() {
@@ -101,7 +101,10 @@ mod tests {
         }
         assert_eq!(swapped, 1);
         assert_eq!(i.phase, Phase::Opening);
-        assert_eq!(i.radius(100, 100), (((100 * 100 + 100 * 100) as f32).sqrt() as i32 + 8) * 0);
+        assert_eq!(
+            i.radius(100, 100),
+            (((100 * 100 + 100 * 100) as f32).sqrt() as i32 + 8) * 0
+        );
         for _ in 0..IRIS_TICKS {
             i.tick();
         }

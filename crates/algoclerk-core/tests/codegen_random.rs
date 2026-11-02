@@ -2,6 +2,13 @@
 //! Random type-correct programs: the interpreter and the generated C, C++ and Rust (compiled with every
 //! available compiler) must print identical results.
 
+#![allow(
+    clippy::ptr_arg,
+    clippy::needless_range_loop,
+    clippy::type_complexity,
+    clippy::manual_range_contains
+)]
+
 use algoclerk_core::codegen::compile::{available, compile_and_run};
 use algoclerk_core::codegen::{Lang, generate, harness};
 use algoclerk_core::judge::canonical;
@@ -69,11 +76,16 @@ impl G<'_> {
         }
     }
     fn str_lit(&mut self) -> String {
-        format!("\"{}\"", self.pick(&["a", "b", "ab", "xyz", "", "Hi", "a b"]))
+        format!(
+            "\"{}\"",
+            self.pick(&["a", "b", "ab", "xyz", "", "Hi", "a b"])
+        )
     }
     fn boolean(&mut self, d: u32) -> String {
         if d == 0 || self.rng.chance(20) {
-            return self.pick(&["true", "false", "(x < y)", "v.is_empty()", "(len(s) > 2)"]).to_string();
+            return self
+                .pick(&["true", "false", "(x < y)", "v.is_empty()", "(len(s) > 2)"])
+                .to_string();
         }
         let (a, b) = (self.int(d - 1), self.int(d - 1));
         match self.rng.range(0, 12) {
@@ -94,7 +106,11 @@ impl G<'_> {
     }
     fn string(&mut self, d: u32) -> String {
         if d == 0 || self.rng.chance(30) {
-            return if self.rng.chance(50) { "s".into() } else { self.str_lit() };
+            return if self.rng.chance(50) {
+                "s".into()
+            } else {
+                self.str_lit()
+            };
         }
         let a = self.int(d - 1);
         match self.rng.range(0, 9) {
@@ -256,7 +272,13 @@ fn program(seed: u64, funcs: usize) -> String {
     let rng = Rng::new(seed);
     let mut src = String::new();
     for f in 0..funcs {
-        let mut g = G { rng: &rng, out: String::new(), ind: 1, scopes: vec![vec![]], counter: 0 };
+        let mut g = G {
+            rng: &rng,
+            out: String::new(),
+            ind: 1,
+            scopes: vec![vec![]],
+            counter: 0,
+        };
         g.line("let x = 3;");
         g.line("let y = 5;");
         g.line("let v: vec<int> = [1, 2, 3];");
@@ -266,8 +288,14 @@ fn program(seed: u64, funcs: usize) -> String {
         g.line("let t = (1, 2);");
         let n = rng.range(6, 12) as usize;
         g.stmts(n, 2);
-        let tail = format!("    return (x + y + len(m) + len(st) + t.0 + t.1, {}, s);\n", g.vec(2));
-        src.push_str(&format!("fn f{f}() -> (int, vec<int>, string) {{\n{}{tail}}}\n\n", g.out));
+        let tail = format!(
+            "    return (x + y + len(m) + len(st) + t.0 + t.1, {}, s);\n",
+            g.vec(2)
+        );
+        src.push_str(&format!(
+            "fn f{f}() -> (int, vec<int>, string) {{\n{}{tail}}}\n\n",
+            g.out
+        ));
     }
     src.push_str("fn entry(k: int) -> (int, vec<int>, string) {\n");
     for f in 0..funcs {
@@ -281,10 +309,16 @@ fn run_batch(seed: u64) {
     let funcs = 24;
     let src = program(seed, funcs);
     let sig_ret = Ty::Tuple(vec![Ty::Int, Ty::vec(Ty::Int), Ty::Str]);
-    let opts = CheckOpts { allowed: Allowed::all(), entry: None };
+    let opts = CheckOpts {
+        allowed: Allowed::all(),
+        entry: None,
+    };
     let c = match compile(&src, &opts) {
         Ok(c) => c,
-        Err(d) => panic!("seed {seed}: generated program does not type-check: {}\n{src}", d[0].msg),
+        Err(d) => panic!(
+            "seed {seed}: generated program does not type-check: {}\n{src}",
+            d[0].msg
+        ),
     };
     let mut expected = Vec::new();
     let mut cases = Vec::new();
@@ -297,7 +331,11 @@ fn run_batch(seed: u64) {
         }
         cases.push(args);
     }
-    let sig = EntrySig { name: "entry".into(), params: c.program.find("entry").unwrap().params.clone(), ret: sig_ret.clone() };
+    let sig = EntrySig {
+        name: "entry".into(),
+        params: c.program.find("entry").unwrap().params.clone(),
+        ret: sig_ret.clone(),
+    };
     let dir = std::env::temp_dir().join(format!("algoclerk-rand-{}-{seed}", std::process::id()));
     let mut problems = Vec::new();
     for lang in Lang::ALL {
@@ -311,12 +349,15 @@ fn run_batch(seed: u64) {
         };
         for comp in available(lang) {
             match compile_and_run(&comp, &text, &dir, &format!("r{seed}-{}", lang.id()), false) {
-                Err(e) => problems.push(format!("[{}] {e}\n--- generated source:\n{text}", comp.exe)),
+                Err(e) => {
+                    problems.push(format!("[{}] {e}\n--- generated source:\n{text}", comp.exe))
+                }
                 Ok(out) => {
                     for (k, (line, want)) in out.lines().zip(expected.iter()).enumerate() {
                         let got = canonical(line, &sig_ret, Compare::Exact);
                         if &got != want {
-                            problems.push(format!("[{}] f{k}: expected {want}, got {got}", comp.exe));
+                            problems
+                                .push(format!("[{}] f{k}: expected {want}, got {got}", comp.exe));
                         }
                     }
                     if out.lines().count() != expected.len() {
@@ -327,7 +368,12 @@ fn run_batch(seed: u64) {
         }
     }
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(problems.is_empty(), "seed {seed}: {} problems\n{}\n=== program ===\n{src}", problems.len(), problems.join("\n"));
+    assert!(
+        problems.is_empty(),
+        "seed {seed}: {} problems\n{}\n=== program ===\n{src}",
+        problems.len(),
+        problems.join("\n")
+    );
 }
 
 #[test]
@@ -337,7 +383,10 @@ fn random_programs_agree_across_all_languages() {
         .map(|s| s.split(',').filter_map(|x| x.parse().ok()).collect())
         .unwrap_or_else(|| (1..=4).collect());
     std::thread::scope(|s| {
-        let handles: Vec<_> = seeds.iter().map(|&seed| s.spawn(move || run_batch(seed))).collect();
+        let handles: Vec<_> = seeds
+            .iter()
+            .map(|&seed| s.spawn(move || run_batch(seed)))
+            .collect();
         for h in handles {
             if let Err(e) = h.join() {
                 std::panic::resume_unwind(e);

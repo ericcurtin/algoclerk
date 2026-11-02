@@ -39,7 +39,7 @@ jobs:
       # The code generator is compile-tested with gcc, g++, clang and rustc.
       - name: Install compilers (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y gcc g++ clang libasound2-dev
+        run: sudo apt-get update && sudo apt-get install -y gcc g++ clang libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev libx11-dev libxcursor-dev libxi-dev libxrandr-dev pkg-config
       - name: Install compilers (Windows)
         if: runner.os == 'Windows'
         run: choco install -y llvm mingw --no-progress
@@ -59,7 +59,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo run -q -p algoclerk-cli -- validate
-      - run: cargo run -q -p algoclerk-cli -- judge --all --reference
+      - run: cargo run -q -p algoclerk-cli -- table
+      - run: cargo test -p algoclerk-levels --test oracles --test shipped
 
   deny:
     name: cargo-deny (licences, bans, advisories)
@@ -80,7 +81,7 @@ jobs:
       - run: |
           sudo apt-get update
           sudo apt-get install -y xvfb xdotool imagemagick mesa-vulkan-drivers libvulkan1 \
-            libxkbcommon-x11-0 libxcursor1 libxi6 libxrandr2
+            libxkbcommon-x11-0 libxcursor1 libxi6 libxrandr2 libudev-dev libasound2-dev libwayland-dev libxkbcommon-dev pkg-config
       - run: scripts/gui-smoke.sh
       - uses: actions/upload-artifact@v4
         with:
@@ -102,7 +103,7 @@ jobs:
           ndk-version: r27c
       - run: cargo install cargo-ndk --locked
       - name: cargo check for the three Android ABIs
-        run: cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 check -p algoclerk-app --lib
+        run: cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 check -p algoclerk-app --lib --features android-game-activity
         env:
           ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
       - name: Core crates for Android targets

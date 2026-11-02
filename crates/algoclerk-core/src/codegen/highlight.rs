@@ -27,25 +27,128 @@ pub enum Class {
 }
 
 const KEYWORDS_C: &[&str] = &[
-    "if", "else", "for", "while", "do", "return", "break", "continue", "static", "inline", "typedef", "struct", "const", "sizeof", "new", "delete",
-    "namespace", "using", "template", "class", "auto", "true", "false", "nullptr", "NULL", "switch", "case", "default", "unsigned", "size_t",
+    "if",
+    "else",
+    "for",
+    "while",
+    "do",
+    "return",
+    "break",
+    "continue",
+    "static",
+    "inline",
+    "typedef",
+    "struct",
+    "const",
+    "sizeof",
+    "new",
+    "delete",
+    "namespace",
+    "using",
+    "template",
+    "class",
+    "auto",
+    "true",
+    "false",
+    "nullptr",
+    "NULL",
+    "switch",
+    "case",
+    "default",
+    "unsigned",
+    "size_t",
 ];
-const TYPES_C: &[&str] = &["int", "long", "char", "bool", "void", "double", "float", "string", "vector", "unordered_map", "unordered_set", "stack", "queue", "deque", "priority_queue", "optional", "pair", "tuple", "ListNode", "TreeNode", "Str"];
+const TYPES_C: &[&str] = &[
+    "int",
+    "long",
+    "char",
+    "bool",
+    "void",
+    "double",
+    "float",
+    "string",
+    "vector",
+    "unordered_map",
+    "unordered_set",
+    "stack",
+    "queue",
+    "deque",
+    "priority_queue",
+    "optional",
+    "pair",
+    "tuple",
+    "ListNode",
+    "TreeNode",
+    "Str",
+];
 const KEYWORDS_RS: &[&str] = &[
-    "fn", "let", "mut", "if", "else", "for", "while", "loop", "in", "return", "break", "continue", "match", "struct", "impl", "const", "use", "as", "true", "false", "pub", "static", "thread_local", "self", "Some", "None",
+    "fn",
+    "let",
+    "mut",
+    "if",
+    "else",
+    "for",
+    "while",
+    "loop",
+    "in",
+    "return",
+    "break",
+    "continue",
+    "match",
+    "struct",
+    "impl",
+    "const",
+    "use",
+    "as",
+    "true",
+    "false",
+    "pub",
+    "static",
+    "thread_local",
+    "self",
+    "Some",
+    "None",
 ];
-const TYPES_RS: &[&str] = &["i64", "usize", "u8", "bool", "char", "String", "Vec", "HashMap", "HashSet", "VecDeque", "BinaryHeap", "Option", "ListRef", "TreeRef", "RefCell", "str"];
+const TYPES_RS: &[&str] = &[
+    "i64",
+    "usize",
+    "u8",
+    "bool",
+    "char",
+    "String",
+    "Vec",
+    "HashMap",
+    "HashSet",
+    "VecDeque",
+    "BinaryHeap",
+    "Option",
+    "ListRef",
+    "TreeRef",
+    "RefCell",
+    "str",
+];
 
 /// Colour every line of `text`: one vector of `(text, class)` spans per line (spans cover each line fully).
 pub fn highlight(lang: Lang, text: &str) -> Vec<Vec<(String, Class)>> {
-    let (kw, ty) = if lang == Lang::Rust { (KEYWORDS_RS, TYPES_RS) } else { (KEYWORDS_C, TYPES_C) };
+    let (kw, ty) = if lang == Lang::Rust {
+        (KEYWORDS_RS, TYPES_RS)
+    } else {
+        (KEYWORDS_C, TYPES_C)
+    };
     let mut in_block = false;
     let mut out = Vec::new();
     for line in text.split('\n') {
         let chars: Vec<char> = line.chars().collect();
         let mut spans: Vec<(String, Class)> = Vec::new();
         let mut i = 0;
-        if chars.iter().collect::<String>().trim_start().starts_with('#') && !in_block && lang != Lang::Rust {
+        if chars
+            .iter()
+            .collect::<String>()
+            .trim_start()
+            .starts_with('#')
+            && !in_block
+            && lang != Lang::Rust
+        {
             out.push(vec![(line.to_string(), Class::Preproc)]);
             continue;
         }
@@ -75,7 +178,11 @@ pub fn highlight(lang: Lang, text: &str) -> Vec<Vec<(String, Class)>> {
                     in_block = false;
                 }
                 spans.push((chars[start..i].iter().collect(), Class::Comment));
-            } else if c == '"' || (c == '\'' && lang != Lang::Rust) || (c == '\'' && chars.get(i + 2) == Some(&'\'')) || (c == '\'' && chars.get(i + 1) == Some(&'\\')) {
+            } else if c == '"'
+                || (c == '\'' && lang != Lang::Rust)
+                || (c == '\'' && chars.get(i + 2) == Some(&'\''))
+                || (c == '\'' && chars.get(i + 1) == Some(&'\\'))
+            {
                 let q = c;
                 i += 1;
                 while i < chars.len() && chars[i] != q {
@@ -98,9 +205,15 @@ pub fn highlight(lang: Lang, text: &str) -> Vec<Vec<(String, Class)>> {
                 let w: String = chars[start..i].iter().collect();
                 let class = if kw.contains(&w.as_str()) {
                     Class::Keyword
-                } else if ty.contains(&w.as_str()) || (w.chars().next().is_some_and(char::is_uppercase) && w.len() > 2 && chars.get(i) != Some(&'(')) {
+                } else if ty.contains(&w.as_str())
+                    || (w.chars().next().is_some_and(char::is_uppercase)
+                        && w.len() > 2
+                        && chars.get(i) != Some(&'('))
+                {
                     Class::Type
-                } else if chars.get(i) == Some(&'(') || (chars.get(i) == Some(&'!') && lang == Lang::Rust) {
+                } else if chars.get(i) == Some(&'(')
+                    || (chars.get(i) == Some(&'!') && lang == Lang::Rust)
+                {
                     Class::Func
                 } else {
                     Class::Plain
@@ -136,7 +249,10 @@ mod tests {
 
     #[test]
     fn rust_chars_and_lifetimes() {
-        let lines = highlight(Lang::Rust, "let c = 'a'; let s: &str = \"x\"; fn f<'a>() {}");
+        let lines = highlight(
+            Lang::Rust,
+            "let c = 'a'; let s: &str = \"x\"; fn f<'a>() {}",
+        );
         assert!(lines[0].iter().any(|s| s.1 == Class::Str && s.0 == "'a'"));
         assert!(lines[0].iter().any(|s| s.1 == Class::Keyword));
     }

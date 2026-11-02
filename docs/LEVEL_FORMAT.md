@@ -1,190 +1,93 @@
-# Level file format
+# Level format
 
-Levels are **data, not code**. Each level is one TOML file at `levels/<pack>/<id>.toml`; each pack
-directory has a `pack.toml`. The files are embedded in the binary at build time (no runtime file
-access on mobile) and extra packs can be loaded from a user folder on desktop. You can add a puzzle
-with a pull request that only touches `levels/`.
-
-Check your work with the headless CLI:
-
-```sh
-cargo run -p algoclerk-cli -- validate levels/my-pack          # static + dynamic checks
-cargo run -p algoclerk-cli -- judge --level my-level --reference
-cargo run -p algoclerk-cli -- tune --level my-level            # suggests [targets]
-cargo test -p algoclerk-levels                                 # everything, incl. codegen compile tests
-```
-
-## `pack.toml`
+A level is one TOML file under `levels/<pack>/<id>.toml`; the file name (without `.toml`) is the id. A pack is
+a directory with a `pack.toml` (`title`, `blurb`, `order`). Levels are embedded in the binary at build time
+and extra packs can be loaded from a user directory on desktop (`ALGOCLERK_LEVELS=/path` or the data
+directory's `levels/`). Run `algoclerk-cli validate` to check everything.
 
 ```toml
-title = "Mail Room"                 # shown in the level list
-blurb = "Your first day."           # one line
-order = 1                           # position of the pack
-```
+title = "Matching Pair"
+order = 1                       # sort key inside the pack
+story = "The accountant has a shelf of invoices ..."          # original office flavour
+statement = "Find two different positions i < j ..."          # the plain problem
+signature = "fn two_sum(nums: vec<int>, target: int) -> vec<int>"   # fixed header the player cannot change
+constraints = ["0 <= len(nums) <= 20000", "all values in nums are different"]
+technique = "Hash map lookup"   # the standard technique, shown on victory
+big_o = "O(n) time, O(n) space" # must match what the estimator measures (it may be better, never worse)
+types = ["map", "vec"]          # unlocked type families (those in the signature are always unlocked)
+builtins = ["contains", "len"]  # unlocked tools; ["*"] unlocks everything
+locked = [{ name = "sorted", why = "The point is to do the sorting yourself." }]
+compare = "exact"               # or "sort_outer" / "sort_all" when the answer order is free
+hints = ["...", "...", "..."]   # at least three, shown as sticky notes
+reference = '''fn two_sum(...) -> vec<int> { ... }'''
+naive = '''fn two_sum(...) -> vec<int> { ... }'''   # optional: correct but slow; must TIME OUT on the large tests
 
-## `<id>.toml`
+[unlock]                        # optional
+helpers = false                 # allow extra functions
+recursion = false               # allow recursion
 
-The file name (without `.toml`) must equal `id`. Ids are lowercase letters, digits and dashes and unique
-across all packs. Unknown keys are errors (typos are caught).
+[budgets]                       # optional
+steps = 200000                  # cost budget per standard test
+large_steps = 3000000           # cost budget per large test
+sweep_n0 = 64                   # first size of the complexity sweep (0 disables the sweep)
 
-```toml
-id = "max-of"
-title = "Top of the Pile"
-order = 3                           # position inside the pack
-summary = "Find the largest number in a list."          # one line (menus)
-story = "..."                                           # short ORIGINAL flavour text
-statement = "..."                                       # the problem, in your own words
-constraints = ["The list has between 1 and 8 numbers."] # shown as bullets
-hints = ["gentle", "more specific", "nearly the answer"]  # the hint ladder (at least 1)
-display = "number"                  # or "char": draw values as characters
-```
+[medals]
+size = [60, 48, 38]             # bronze, silver, gold: program size (lower is better)
+speed = [900, 520, 400]         # bronze, silver, gold: average cost on the standard tests
 
-### Examples
-
-Shown in the statement and also run as visible tests. `input` and `output` are either arrays of
-integers or a string (each character becomes its code point; `"ab\u0000"` ends with a 0 marker).
-
-```toml
-[[examples]]
-input = [3, -2, 7, 0]
-output = [7]
+[[examples]]                    # at least two; shown in the memo
+args = ["[2, 7, 11, 15]", "9"]  # one literal per parameter
+expect = "[0, 1]"
 note = "optional explanation"
-floor = [{ at = 0, values = [1, 2, 3] }]   # optional: extra values on floor tiles for this test
-```
 
-### Machine
+[[tests]]                       # hidden hand-written edge cases (same shape, no note)
+args = ["[]", "0"]
+expect = "[]"
 
-```toml
-[machine]
-floor = 4                          # number of floor tiles (1..128)
-names = ["best", "candidate"]      # optional tile names (index = tile); used in the UI and generated code
-allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "jump", "jumpz", "jumpn", "indirect"]
-
-[machine.prefill]                  # tiles that start with a value (constants!)
-0 = 0
-3 = 99
-```
-
-`allowed` accepts the instruction names (`inbox`, `outbox`, `copyto`, `copyfrom`, `add`, `sub`,
-`bumpup`, `bumpdn`, `mul`, `div`, `mod`, `jump`, `jumpz`, `jumpn`) and the pseudo key `indirect`.
-`inbox` and `outbox` are mandatory. Remember there is no "load constant" instruction: constants such
-as 0, 1 or 10 come from prefilled tiles, which also makes levels a little puzzle of their own.
-
-### Tests
-
-```toml
-[tests]
-seed = 203                         # makes generated cases deterministic on every platform
-step_limit = 20000                 # optional, instructions per test run
-
-[[tests.fixed]]                    # hand-written edge cases: at least 3 with an explicit output
-input = [-5, 0]
-output = [-5]
-note = "single negative number"
-
-[[tests.generators]]               # generated cases
-count = 9
-inbox = [{ kind = "list", len = [1, 8], range = [-9, 9], nonzero = true, terminator = 0 }]
-```
-
-Expected outputs of generated cases are computed by running the reference solution, so a level needs
-at least 8 tests overall, a correct `[solution]`, and hand-written cases that pin down the intended
-behaviour. The repository additionally cross-checks every shipped level against an independent Rust
-implementation (`crates/algoclerk-levels/tests/oracles.rs`); adding an oracle for your level is
-welcome but not required.
-
-#### Generator segments
-
-A generator has up to three lists of **segments**: `vars` (generated first, never emitted), `floor`
-(`{ at = <first tile>, seg = {...} }`) and `inbox` (concatenated into the inbox). `of = N` refers to
-the N-th earlier segment, counting `vars`, then `floor`, then `inbox` segments.
-
-| `kind` | Produces | Options |
-| --- | --- | --- |
-| `list` (default) | random list | `len = [min, max]`, `range = [lo, hi]`, `sort = "asc"/"desc"`, `distinct`, `nonzero`, `len_multiple` |
-| `int` | one random integer | `range`, `nonzero` |
-| `const` | fixed values | `values = [...]` |
-| `pick` | an element of segment `of` (probability `chance` %), else random in `range` | `of`, `chance`, `range` |
-| `perm` | shuffled consecutive integers starting at `range[0]` | `len`, `drop` (removes elements) |
-| `balanced` | `+k` / `-k` bracket sequence, balanced with probability `chance` % | `len`, `kinds`, `chance` |
-| `palindrome` | palindromic list with probability `chance` %, else a near miss | `len`, `range`, `chance` |
-| `majority` | shuffled list where one value occurs in more than half the positions | `len`, `range` |
-| `linked` | a linked list in floor slots (value, next index or -1; `stride` slots per node), aux = head | `len`, `range`, `stride` |
-| `aux` | the auxiliary value (head) of segment `of` | `of` |
-| `copy` | the values of segment `of` again | `of` |
-| `len` | the length of segment `of` as one value | `of` |
-| `pairsum` | the sum of two different elements of segment `of` (probability `chance` %), else random | `of`, `chance`, `range` |
-
-Any segment can add `prefix_len = true` (emit the length first) and `terminator = 0` (append a marker).
-Everything is driven by a built-in SplitMix64 generator (`crates/algoclerk-core/src/testgen.rs`), so
-the same seed gives the same tests on every platform and in every release.
-
-### Targets
-
-```toml
-[targets]
-size_par = 13      # instructions for a staple
-size_ace = 12      # instructions for a gold seal
-speed_par = 80     # average steps for a staple
-speed_ace = 60     # average steps for a gold seal
-```
-
-`algoclerk-cli tune` suggests numbers from your reference solution. The validator requires the
-reference to meet both `par` targets.
-
-### Reference solution
-
-```toml
-[solution]
-asm = """
-    INBOX
-    ...
-"""
-```
-
-The reference is used by tests and for generated expectations. The game hides it until the player
-has solved the level or explicitly asks for it behind a warning.
-
-### Code generation metadata (`[code]`) and `[explain]`
-
-These make the translated C, C++ and Rust read like an answer to the interview question. See
-[CODEGEN.md](CODEGEN.md) for details.
-
-```toml
-[code]
-function = "max_of"                 # snake_case name
-doc = "Returns the largest value."  # one-line comment
-returns = "scalar"                  # "scalar" (first OUTBOX value) or "list" (all outputs)
-return_type = "int"                 # or "bool"
-params = [
-  { name = "target", kind = "scalar" },          # one inbox value
-  { name = "values", kind = "terminated" },      # inbox values followed by a 0 marker (terminator = 0)
+[[generate]]                    # seeded generators; expected values come from the reference solution
+seed = 202
+count = 8
+large = true                    # performance tests: run with large_steps
+n = 20000                       # value of n in size expressions
+args = [
+  { kind = "vec_int", len = "n", range = [-1000000, 1000000], distinct = true },
+  { kind = "int", range = [3000000, 3000000] },
 ]
+
+[sweep]                         # optional generator for the complexity sweep (defaults to the first large block)
+args = [ ... ]
 ```
 
-Parameter `kind`s:
+## Value literals
 
-- `scalar`: one inbox value,
-- `list`: all remaining inbox values (last inbox parameter only),
-- `counted`: the length, then that many values,
-- `terminated`: the values, then a terminator (default `terminator = 0`),
-- `length`: the length of an earlier list parameter named by `of` (not a function argument).
+Arguments and expected values use the same text form the interpreter prints: `42`, `true`, `'a'`,
+`"text"`, `[1, 2]`, `(1, "a")`, `{1, 2}` (set), `{"a": 1}` (map), `some(3)` / `none`, a linked list as
+`[1, 2, 3]` (or `[1, 2, 3] @1` for a tail that points back to index 1), and a tree in level order with holes
+`[1, 2, 3, null, 4]`.
 
-Add `at = <tile>` to put a parameter on the floor instead of the inbox (a scalar goes to one tile, a
-list fills tiles from `at`; `cap` limits the list). The validator checks that for every test the
-arguments rebuild exactly the original inbox and floor.
+## Generators
 
-```toml
-[explain]
-algorithm = "Linear scan for the maximum"
-text = "A few sentences: the standard name of the idea and why it works."
-```
+`kind` is one of `int`, `bool`, `char`, `string`, `vec_int`, `vec_bool`, `vec_char`, `vec_string`, `grid_int`,
+`grid_char`, `pairs`, `edges`, `list`, `tree`, `sorted_lists`, `rpn`. Sizes (`len`, `rows`, `nodes`, `m`, ...) are
+a number, a `[lo, hi]` range or an expression in `n` (`"n"`, `"n/2"`, `"3*n/2"`, `"sqrt(n)"`, `"n-1"`).
+Useful options: `range`, `sorted`, `distinct`, `rotated`, `descending`, `perm_missing`, `single_out`, `alphabet`,
+`words`, `palindrome`, `periodic`, `prefix`, `suffix`, `brackets` + `balanced_pct` + `nested`,
+`anagram_of = <earlier argument>` + `change_pct`, `pick_from`, `sum_of`, `index_of`, `in_len_of`, `below`
+(relations to earlier arguments), `intervals`, `directed`, `dag`, `connected`, `chain`, `bst`, `swap_pct`,
+`cycle_pct`, `square`. The generator source is `crates/algoclerk-core/src/testgen.rs`; a SplitMix64 generator
+keeps the tests identical on every platform.
 
-## Rules for contributed levels
+## What the validator proves (`algoclerk-cli validate`, `crates/algoclerk-levels/tests/shipped.rs`)
 
-- Write the story, statement, hints and names yourself. Do not copy text, puzzles or level designs
-  from other games or from problem sites; classic algorithm *topics* are fair game.
-- Keep tile names different from parameter names and from `hand`, `next`, `inbox`, `outbox`, `floor`
-  (a test checks this).
-- Tile names must be unique within a level.
-- Run `cargo test -p algoclerk-levels` before opening the pull request.
+- the signature parses, the reference type-checks under the level's unlock lists and passes **all** tests
+  within the step budgets (with 3x headroom), earning gold in both medals;
+- the measured time and space class are no worse than `big_o`;
+- the `naive` solution compiles, passes every standard test, and **times out on a large test**;
+- at least two examples, three hints, a story, a technique, and at least one large generator;
+- independent oracles written in plain Rust (`crates/algoclerk-levels/tests/oracles.rs`) agree with the
+  expected value of every test of every level;
+- the generated C, C++ and Rust of every reference solution compile and match the interpreter
+  (`crates/algoclerk-levels/tests/codegen_compile.rs`).
+
+Medal targets are computed with `algoclerk-cli tune --all --write` from the reference solution (size
+x1.6 / x1.25 / x1.0 and cost x3 / x1.6 / x1.1).

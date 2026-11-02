@@ -11,13 +11,20 @@ use algoclerk_core::lang::run::compile;
 
 /// Translate a program to C, C++ or Rust.
 pub fn codegen(args: &Args) -> Result<u8, String> {
-    let lang = Lang::parse(args.opt("lang").unwrap_or("rust")).ok_or("--lang must be c, cpp or rust")?;
+    let lang =
+        Lang::parse(args.opt("lang").unwrap_or("rust")).ok_or("--lang must be c, cpp or rust")?;
     let (text, entry, level) = if let Some(file) = args.opt("file") {
         let text = std::fs::read_to_string(file).map_err(|e| format!("cannot read {file}: {e}"))?;
         (text, None, None)
     } else {
         let c = campaign(args);
-        let l = find_level(&c, args.positional.first().ok_or("usage: codegen LEVEL|--file FILE --lang c|cpp|rust")?)?.clone();
+        let l = find_level(
+            &c,
+            args.positional
+                .first()
+                .ok_or("usage: codegen LEVEL|--file FILE --lang c|cpp|rust")?,
+        )?
+        .clone();
         let text = match args.positional.get(1) {
             Some(f) => std::fs::read_to_string(f).map_err(|e| format!("cannot read {f}: {e}"))?,
             None => l.reference.clone(),
@@ -25,9 +32,19 @@ pub fn codegen(args: &Args) -> Result<u8, String> {
         let n = l.signature.name.clone();
         (text, Some(n), Some(l))
     };
-    let opts = level.as_ref().map_or(CheckOpts { allowed: Allowed::all(), entry: None }, |l| l.check_opts());
-    let sol = compile(&text, &opts).map_err(|d| d.first().map(|d| d.msg.clone()).unwrap_or_default())?;
-    let entry_name = entry.clone().or_else(|| sol.program.fns.last().map(|f| f.name.clone())).unwrap_or_default();
+    let opts = level.as_ref().map_or(
+        CheckOpts {
+            allowed: Allowed::all(),
+            entry: None,
+        },
+        |l| l.check_opts(),
+    );
+    let sol =
+        compile(&text, &opts).map_err(|d| d.first().map(|d| d.msg.clone()).unwrap_or_default())?;
+    let entry_name = entry
+        .clone()
+        .or_else(|| sol.program.fns.last().map(|f| f.name.clone()))
+        .unwrap_or_default();
     let g = generate(&sol, lang, &entry_name);
     if !args.flag("verify") {
         if !args.flag("no-prelude") {
@@ -61,7 +78,11 @@ pub fn codegen(args: &Args) -> Result<u8, String> {
                     .filter(|(l, c)| canonical(l, &level.signature.ret, level.compare) != c.expect)
                     .count();
                 if mism == 0 && out.lines().count() == cases.len() {
-                    println!("{}: ok ({} tests match the interpreter)", comp.exe, cases.len());
+                    println!(
+                        "{}: ok ({} tests match the interpreter)",
+                        comp.exe,
+                        cases.len()
+                    );
                 } else {
                     bad += 1;
                     println!("{}: {mism} mismatches", comp.exe);

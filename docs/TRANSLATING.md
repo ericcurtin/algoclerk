@@ -9,16 +9,16 @@ id, with English as the fallback for any missing key. The catalogues live in
 1. Copy `crates/algoclerk-core/lang/en.toml` to `<code>.toml` where `<code>` is a short language
    code (`de`, `fr`, `pt-BR`, ...).
 2. Set `[meta] language = "Deutsch"` (the name in the language itself) and translate the values.
-3. **Keep the keys and `{placeholders}` unchanged.** `{slot}`, `{line}`, `{text}`, `{op}`, `{limit}`,
-   `{test}`, `{got}`, `{expected}` are replaced at run time. Keep sentences short: phone screens are small.
+3. **Keep the keys and `{placeholders}` unchanged.** `{n}`, `{pos}`, `{total}`, `{cost}`, `{out}`, `{want}`, `{size}`, `{technique}` and similar names are replaced at run time. Keep sentences short: phone screens are small.
 4. Run `cargo test -p algoclerk-core` (checks that the file parses) and start the game: the language
    appears in Settings, Language.
 5. Open a pull request. You do not need to translate everything at once; untranslated keys fall back
-   to English. Please keep technical names of instructions (`INBOX`, `COPYTO`, ...) as they are.
+   to English. Please keep the names of ClerkScript types and tools (`vec`, `push`, ...) as they are: they are code.
 
 ## What is translated
 
-- UI texts, error messages ("The clerk's hand is empty..."), tooltips, About text.
+- All UI chrome of the pixel front end (menus, buttons, memo, editor, victory, settings, about).
+- **Not yet:** compiler and runtime messages (English strings with stable codes such as `type.mismatch`).
 - **Not yet:** level stories, statements and hints (they are part of the level files). The plan is
   to allow `levels/<pack>/<id>.<lang>.toml` overlay files that replace the text fields only; see the
   [roadmap](../ROADMAP.md).
@@ -26,6 +26,7 @@ id, with English as the fallback for any missing key. The catalogues live in
 
 ## Fonts
 
-The bundled font covers Latin scripts, Greek and Cyrillic. Scripts that need other glyphs (CJK,
-Arabic, Indic scripts) require a font that is permissively licensed (OFL is fine). Adding a fallback
-font is a good first issue; see `crates/algoclerk-app/src/fonts.rs` and `CREDITS.md`.
+The pixel font (`assets/art/font.txt`) is a 5x7 bitmap font covering printable ASCII. A test checks it against
+every string of every shipped catalogue, so a translation using other letters needs new glyphs in
+`font.txt` (original or OFL/CC0 designs, credited in `CREDITS.md`). Adding accented Latin letters is a good
+first issue.

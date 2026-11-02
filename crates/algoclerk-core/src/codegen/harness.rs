@@ -50,7 +50,11 @@ fn cpp_value(v: &Value, t: &Ty, nodes: &[NodeData]) -> Result<String, String> {
     let ty = cpp::ty_name(t);
     Ok(match (v, t) {
         (Value::Int(n), _) => {
-            if *n == i64::MIN { "(-9223372036854775807LL - 1)".to_string() } else { format!("{n}LL") }
+            if *n == i64::MIN {
+                "(-9223372036854775807LL - 1)".to_string()
+            } else {
+                format!("{n}LL")
+            }
         }
         (Value::Bool(b), _) => b.to_string(),
         (Value::Char(c), _) => char_lit(*c),
@@ -66,28 +70,50 @@ fn cpp_value(v: &Value, t: &Ty, nodes: &[NodeData]) -> Result<String, String> {
         (Value::Map(items), Ty::Map(kt, vt)) => {
             let mut parts = Vec::new();
             for (k, x) in items.iter() {
-                parts.push(format!("{{{}, {}}}", cpp_value(k, kt, nodes)?, cpp_value(x, vt, nodes)?));
+                parts.push(format!(
+                    "{{{}, {}}}",
+                    cpp_value(k, kt, nodes)?,
+                    cpp_value(x, vt, nodes)?
+                ));
             }
             format!("{ty}{{{}}}", parts.join(", "))
         }
         (Value::Tuple(items), Ty::Tuple(ts)) => {
-            let parts: Result<Vec<_>, _> = items.iter().zip(ts.iter()).map(|(x, t)| cpp_value(x, t, nodes)).collect();
+            let parts: Result<Vec<_>, _> = items
+                .iter()
+                .zip(ts.iter())
+                .map(|(x, t)| cpp_value(x, t, nodes))
+                .collect();
             format!("{ty}({})", parts?.join(", "))
         }
         (Value::Opt(None), _) => format!("{ty}()"),
         (Value::Opt(Some(x)), Ty::Option(et)) => format!("{ty}({})", cpp_value(x, et, nodes)?),
         (Value::Node(h), Ty::LNode) => {
             let (vals, cyc) = list_parts(*h, nodes);
-            format!("h::build_list({{{}}}, {cyc})", vals.iter().map(|v| format!("{v}LL")).collect::<Vec<_>>().join(", "))
+            format!(
+                "h::build_list({{{}}}, {cyc})",
+                vals.iter()
+                    .map(|v| format!("{v}LL"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         }
         (Value::Node(h), Ty::TNode) => {
             let items = tree_parts(*h, nodes);
             format!(
                 "h::build_tree({{{}}})",
-                items.iter().map(|v| v.map_or("std::nullopt".to_string(), |x| format!("{x}LL"))).collect::<Vec<_>>().join(", ")
+                items
+                    .iter()
+                    .map(|v| v.map_or("std::nullopt".to_string(), |x| format!("{x}LL")))
+                    .collect::<Vec<_>>()
+                    .join(", ")
             )
         }
-        _ => return Err(format!("cannot pass a value of type {t} to the C++ harness")),
+        _ => {
+            return Err(format!(
+                "cannot pass a value of type {t} to the C++ harness"
+            ));
+        }
     })
 }
 
@@ -204,7 +230,9 @@ TreeNode* build_tree(const std::vector<std::optional<long long>>& items) {
 "#;
 
 fn cpp_program(sig: &EntrySig, g: &Generated, cases: &[Vec<String>]) -> Result<String, String> {
-    let mut out = String::from("#include <algorithm>\n#include <cstdio>\n#include <optional>\n#include <string>\n#include <tuple>\n#include <unordered_map>\n#include <unordered_set>\n#include <vector>\n#include <utility>\n");
+    let mut out = String::from(
+        "#include <algorithm>\n#include <cstdio>\n#include <optional>\n#include <string>\n#include <tuple>\n#include <unordered_map>\n#include <unordered_set>\n#include <vector>\n#include <utility>\n",
+    );
     out.push_str(&g.prelude);
     // make sure both node structs exist for the harness printers
     if !g.prelude.contains("struct ListNode") {
@@ -223,7 +251,11 @@ fn cpp_program(sig: &EntrySig, g: &Generated, cases: &[Vec<String>]) -> Result<S
         out.push_str("    {\n");
         for (i, (p, lit)) in sig.params.iter().zip(case.iter()).enumerate() {
             let v = parse_value(lit, &p.ty, &mut nodes)?;
-            out.push_str(&format!("        {} a{i} = {};\n", cpp::ty_name(&p.ty), cpp_value(&v, &p.ty, &nodes)?));
+            out.push_str(&format!(
+                "        {} a{i} = {};\n",
+                cpp::ty_name(&p.ty),
+                cpp_value(&v, &p.ty, &nodes)?
+            ));
             names.push(format!("a{i}"));
         }
         out.push_str(&format!("        auto r = {}({});\n        std::ostringstream o;\n        h::show(o, r);\n        std::puts(o.str().c_str());\n    }}\n", ident(&sig.name), names.join(", ")));
@@ -233,7 +265,12 @@ fn cpp_program(sig: &EntrySig, g: &Generated, cases: &[Vec<String>]) -> Result<S
 }
 
 /// A complete program that runs `cases` through the entry function and prints one result per line.
-pub fn program(lang: Lang, sig: &EntrySig, g: &Generated, cases: &[Vec<String>]) -> Result<String, String> {
+pub fn program(
+    lang: Lang,
+    sig: &EntrySig,
+    g: &Generated,
+    cases: &[Vec<String>],
+) -> Result<String, String> {
     match lang {
         Lang::Cpp => cpp_program(sig, g, cases),
         Lang::Rust => rust_program(sig, g, cases),
@@ -244,7 +281,11 @@ pub fn program(lang: Lang, sig: &EntrySig, g: &Generated, cases: &[Vec<String>])
 fn rust_value(v: &Value, t: &Ty, nodes: &[NodeData]) -> Result<String, String> {
     Ok(match (v, t) {
         (Value::Int(n), _) => {
-            if *n == i64::MIN { "i64::MIN".to_string() } else { format!("{n}_i64") }
+            if *n == i64::MIN {
+                "i64::MIN".to_string()
+            } else {
+                format!("{n}_i64")
+            }
         }
         (Value::Bool(b), _) => b.to_string(),
         (Value::Char(c), _) => char_lit(*c),
@@ -252,7 +293,12 @@ fn rust_value(v: &Value, t: &Ty, nodes: &[NodeData]) -> Result<String, String> {
         (Value::Vec(items), Ty::Vec(et)) => {
             let parts: Result<Vec<_>, _> = items.iter().map(|x| rust_value(x, et, nodes)).collect();
             let ty = rust::ty_name(t);
-            if items.is_empty() { format!("Vec::<{}>::new()", rust::ty_name(et)) } else { let _ = ty; format!("vec![{}]", parts?.join(", ")) }
+            if items.is_empty() {
+                format!("Vec::<{}>::new()", rust::ty_name(et))
+            } else {
+                let _ = ty;
+                format!("vec![{}]", parts?.join(", "))
+            }
         }
         (Value::Set(items), Ty::Set(et)) => {
             let parts: Result<Vec<_>, _> = items.iter().map(|x| rust_value(x, et, nodes)).collect();
@@ -261,25 +307,55 @@ fn rust_value(v: &Value, t: &Ty, nodes: &[NodeData]) -> Result<String, String> {
         (Value::Map(items), Ty::Map(kt, vt)) => {
             let mut parts = Vec::new();
             for (k, x) in items.iter() {
-                parts.push(format!("({}, {})", rust_value(k, kt, nodes)?, rust_value(x, vt, nodes)?));
+                parts.push(format!(
+                    "({}, {})",
+                    rust_value(k, kt, nodes)?,
+                    rust_value(x, vt, nodes)?
+                ));
             }
-            format!("HashMap::<{}, {}>::from([{}])", rust::ty_name(kt), rust::ty_name(vt), parts.join(", "))
+            format!(
+                "HashMap::<{}, {}>::from([{}])",
+                rust::ty_name(kt),
+                rust::ty_name(vt),
+                parts.join(", ")
+            )
         }
         (Value::Tuple(items), Ty::Tuple(ts)) => {
-            let parts: Result<Vec<_>, _> = items.iter().zip(ts.iter()).map(|(x, t)| rust_value(x, t, nodes)).collect();
+            let parts: Result<Vec<_>, _> = items
+                .iter()
+                .zip(ts.iter())
+                .map(|(x, t)| rust_value(x, t, nodes))
+                .collect();
             format!("({})", parts?.join(", "))
         }
         (Value::Opt(None), Ty::Option(et)) => format!("None::<{}>", rust::ty_name(et)),
         (Value::Opt(Some(x)), Ty::Option(et)) => format!("Some({})", rust_value(x, et, nodes)?),
         (Value::Node(h), Ty::LNode) => {
             let (vals, cyc) = list_parts(*h, nodes);
-            format!("build_list(&[{}], {cyc})", vals.iter().map(|v| format!("{v}_i64")).collect::<Vec<_>>().join(", "))
+            format!(
+                "build_list(&[{}], {cyc})",
+                vals.iter()
+                    .map(|v| format!("{v}_i64"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         }
         (Value::Node(h), Ty::TNode) => {
             let items = tree_parts(*h, nodes);
-            format!("build_tree(&[{}])", items.iter().map(|v| v.map_or("None".to_string(), |x| format!("Some({x}_i64)"))).collect::<Vec<_>>().join(", "))
+            format!(
+                "build_tree(&[{}])",
+                items
+                    .iter()
+                    .map(|v| v.map_or("None".to_string(), |x| format!("Some({x}_i64)")))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         }
-        _ => return Err(format!("cannot pass a value of type {t} to the Rust harness")),
+        _ => {
+            return Err(format!(
+                "cannot pass a value of type {t} to the Rust harness"
+            ));
+        }
     })
 }
 
@@ -416,12 +492,17 @@ fn build_tree(items: &[Option<i64>]) -> TreeRef {
 "#;
 
 fn rust_program(sig: &EntrySig, g: &Generated, cases: &[Vec<String>]) -> Result<String, String> {
-    let mut out = String::from("#![allow(unused, dead_code)]
+    let mut out = String::from(
+        "#![allow(unused, dead_code)]
 use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
-");
+",
+    );
     let mut pre = g.prelude.clone();
     // the harness always needs both node kinds (the printers mention them)
-    let (has_l, has_t) = (pre.contains("struct ListRef"), pre.contains("struct TreeRef"));
+    let (has_l, has_t) = (
+        pre.contains("struct ListRef"),
+        pre.contains("struct TreeRef"),
+    );
     pre = pre
         .lines()
         .filter(|l| !l.starts_with("use std::collections::"))
@@ -442,7 +523,11 @@ use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
         out.push_str("    {\n");
         for (i, (p, lit)) in sig.params.iter().zip(case.iter()).enumerate() {
             let v = parse_value(lit, &p.ty, &mut nodes)?;
-            out.push_str(&format!("        let a{i}: {} = {};\n", rust::ty_name(&p.ty), rust_value(&v, &p.ty, &nodes)?));
+            out.push_str(&format!(
+                "        let a{i}: {} = {};\n",
+                rust::ty_name(&p.ty),
+                rust_value(&v, &p.ty, &nodes)?
+            ));
             names.push(format!("a{i}"));
         }
         out.push_str(&format!("        let r = {}({});\n        let mut s = String::new();\n        r.show(&mut s);\n        println!(\"{{}}\", s);\n    }}\n", ident(&sig.name), names.join(", ")));
@@ -460,7 +545,11 @@ fn nodes_prelude_for_harness(has_l: bool, has_t: bool) -> String {
 fn c_build(v: &Value, t: &Ty, nodes: &[NodeData]) -> Result<String, String> {
     Ok(match (v, t) {
         (Value::Int(n), _) => {
-            if *n == i64::MIN { "(-9223372036854775807LL - 1)".to_string() } else { format!("{n}LL") }
+            if *n == i64::MIN {
+                "(-9223372036854775807LL - 1)".to_string()
+            } else {
+                format!("{n}LL")
+            }
         }
         (Value::Bool(b), _) => b.to_string(),
         (Value::Char(c), _) => char_lit(*c),
@@ -470,22 +559,41 @@ fn c_build(v: &Value, t: &Ty, nodes: &[NodeData]) -> Result<String, String> {
             if items.is_empty() {
                 format!("{sn}_new()")
             } else {
-                let parts: Result<Vec<_>, _> = items.iter().map(|x| c_build(x, et, nodes)).collect();
-                format!("{sn}_from(({}[]){{{}}}, {})", c::cty(et), parts?.join(", "), items.len())
+                let parts: Result<Vec<_>, _> =
+                    items.iter().map(|x| c_build(x, et, nodes)).collect();
+                format!(
+                    "{sn}_from(({}[]){{{}}}, {})",
+                    c::cty(et),
+                    parts?.join(", "),
+                    items.len()
+                )
             }
         }
         (Value::Tuple(items), Ty::Tuple(ts)) => {
-            let parts: Result<Vec<_>, _> = items.iter().zip(ts.iter()).map(|(x, t)| c_build(x, t, nodes)).collect();
+            let parts: Result<Vec<_>, _> = items
+                .iter()
+                .zip(ts.iter())
+                .map(|(x, t)| c_build(x, t, nodes))
+                .collect();
             format!("{}_make({})", c::sname(t), parts?.join(", "))
         }
         (Value::Opt(None), _) => format!("{}_none()", c::sname(t)),
-        (Value::Opt(Some(x)), Ty::Option(et)) => format!("{}_some({})", c::sname(t), c_build(x, et, nodes)?),
+        (Value::Opt(Some(x)), Ty::Option(et)) => {
+            format!("{}_some({})", c::sname(t), c_build(x, et, nodes)?)
+        }
         (Value::Node(h), Ty::LNode) => {
             let (vals, cyc) = list_parts(*h, nodes);
             if vals.is_empty() {
                 "NULL".to_string()
             } else {
-                format!("h_build_list((long long[]){{{}}}, {}, {cyc})", vals.iter().map(|v| format!("{v}LL")).collect::<Vec<_>>().join(", "), vals.len())
+                format!(
+                    "h_build_list((long long[]){{{}}}, {}, {cyc})",
+                    vals.iter()
+                        .map(|v| format!("{v}LL"))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    vals.len()
+                )
             }
         }
         (Value::Node(h), Ty::TNode) => {
@@ -495,8 +603,16 @@ fn c_build(v: &Value, t: &Ty, nodes: &[NodeData]) -> Result<String, String> {
             } else {
                 format!(
                     "h_build_tree((long long[]){{{}}}, (bool[]){{{}}}, {})",
-                    items.iter().map(|v| format!("{}LL", v.unwrap_or(0))).collect::<Vec<_>>().join(", "),
-                    items.iter().map(|v| v.is_some().to_string()).collect::<Vec<_>>().join(", "),
+                    items
+                        .iter()
+                        .map(|v| format!("{}LL", v.unwrap_or(0)))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    items
+                        .iter()
+                        .map(|v| v.is_some().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
                     items.len()
                 )
             }
@@ -520,7 +636,10 @@ fn c_show_fns(t: &Ty, done: &mut std::collections::BTreeSet<String>, out: &mut S
         Ty::Str => Some("h_show_str(x);".to_string()),
         Ty::Vec(a) | Ty::Stack(a) => {
             c_show_fns(a, done, out);
-            Some(format!("putchar('['); for (size_t i = 0; i < x.len; i++) {{ if (i) fputs(\", \", stdout); h_show_{}(x.data[i]); }} putchar(']');", c::mangle(a)))
+            Some(format!(
+                "putchar('['); for (size_t i = 0; i < x.len; i++) {{ if (i) fputs(\", \", stdout); h_show_{}(x.data[i]); }} putchar(']');",
+                c::mangle(a)
+            ))
         }
         Ty::Tuple(ts) => {
             let mut b = String::from("putchar('(');");
@@ -536,12 +655,19 @@ fn c_show_fns(t: &Ty, done: &mut std::collections::BTreeSet<String>, out: &mut S
         }
         Ty::Option(a) => {
             c_show_fns(a, done, out);
-            Some(format!("if (x.has) {{ fputs(\"some(\", stdout); h_show_{}(x.v); putchar(')'); }} else fputs(\"none\", stdout);", c::mangle(a)))
+            Some(format!(
+                "if (x.has) {{ fputs(\"some(\", stdout); h_show_{}(x.v); putchar(')'); }} else fputs(\"none\", stdout);",
+                c::mangle(a)
+            ))
         }
         Ty::Set(a) => {
             c_show_fns(a, done, out);
             let vs = c::sname(&Ty::Vec(a.clone()));
-            Some(format!("{vs} v = {}_sorted(x); putchar('{{'); for (size_t i = 0; i < v.len; i++) {{ if (i) fputs(\", \", stdout); h_show_{}(v.data[i]); }} putchar('}}');", c::sname(t), c::mangle(a)))
+            Some(format!(
+                "{vs} v = {}_sorted(x); putchar('{{'); for (size_t i = 0; i < v.len; i++) {{ if (i) fputs(\", \", stdout); h_show_{}(v.data[i]); }} putchar('}}');",
+                c::sname(t),
+                c::mangle(a)
+            ))
         }
         Ty::Map(k, v) => {
             c_show_fns(k, done, out);
@@ -549,7 +675,10 @@ fn c_show_fns(t: &Ty, done: &mut std::collections::BTreeSet<String>, out: &mut S
             let ks = c::sname(&Ty::Vec(k.clone()));
             Some(format!(
                 "{ks} ks = {}_keys(x); putchar('{{'); for (size_t i = 0; i < ks.len; i++) {{ if (i) fputs(\", \", stdout); h_show_{}(ks.data[i]); fputs(\": \", stdout); h_show_{}(*{}_at(&x, ks.data[i])); }} putchar('}}');",
-                c::sname(t), c::mangle(k), c::mangle(v), c::sname(t)
+                c::sname(t),
+                c::mangle(k),
+                c::mangle(v),
+                c::sname(t)
             ))
         }
         Ty::LNode => Some("h_show_list(x);".to_string()),
@@ -670,10 +799,23 @@ fn c_program(sig: &EntrySig, g: &Generated, cases: &[Vec<String>]) -> Result<Str
         out.push_str("    {\n");
         for (i, (p, lit)) in sig.params.iter().zip(case.iter()).enumerate() {
             let v = parse_value(lit, &p.ty, &mut nodes)?;
-            out.push_str(&format!("        {} a{i} = {};\n", c::cty(&p.ty), c_build(&v, &p.ty, &nodes)?));
-            names.push(if p.by_ref { format!("&a{i}") } else { format!("a{i}") });
+            out.push_str(&format!(
+                "        {} a{i} = {};\n",
+                c::cty(&p.ty),
+                c_build(&v, &p.ty, &nodes)?
+            ));
+            names.push(if p.by_ref {
+                format!("&a{i}")
+            } else {
+                format!("a{i}")
+            });
         }
-        out.push_str(&format!("        {} r = {}({});\n        h_show_{ret_m}(r);\n        putchar('\\n');\n    }}\n", c::cty(&sig.ret), ident(&sig.name), names.join(", ")));
+        out.push_str(&format!(
+            "        {} r = {}({});\n        h_show_{ret_m}(r);\n        putchar('\\n');\n    }}\n",
+            c::cty(&sig.ret),
+            ident(&sig.name),
+            names.join(", ")
+        ));
     }
     out.push_str("    return 0;\n}\n");
     Ok(out)

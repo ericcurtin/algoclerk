@@ -2,12 +2,14 @@
 //! Audio: procedural chiptune music and sound effects (text `.song` files rendered at runtime by
 //! `algoclerk-media`). A missing or broken song is silently skipped; the game is fully playable muted.
 
-use bevy::audio::{AudioPlayer, AudioSink, AudioSinkPlayback, AudioSource, PlaybackSettings, Volume};
-use bevy::prelude::*;
 use algoclerk_core::progress::Settings;
-use algoclerk_media::Assets as AssetBundle;
 use algoclerk_game::GameEvent;
+use algoclerk_media::Assets as AssetBundle;
 use algoclerk_media::synth::{SAMPLE_RATE, Song, wav_bytes};
+use bevy::audio::{
+    AudioPlayer, AudioSink, AudioSinkPlayback, AudioSource, PlaybackSettings, Volume,
+};
+use bevy::prelude::*;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -38,7 +40,11 @@ impl Sound {
     }
 
     /// Render (once) and cache a song / sfx by name. Returns the handle and whether it loops.
-    fn song(&mut self, name: &str, sources: &mut Assets<AudioSource>) -> Option<(Handle<AudioSource>, bool)> {
+    fn song(
+        &mut self,
+        name: &str,
+        sources: &mut Assets<AudioSource>,
+    ) -> Option<(Handle<AudioSource>, bool)> {
         if let Some(c) = self.cache.get(name) {
             return c.clone();
         }
@@ -69,7 +75,8 @@ impl Sound {
                 if let Some((h, _)) = self.song(name, sources) {
                     commands.spawn((
                         AudioPlayer::new(h),
-                        PlaybackSettings::DESPAWN.with_volume(Volume::Linear(gain(settings.sfx_volume))),
+                        PlaybackSettings::DESPAWN
+                            .with_volume(Volume::Linear(gain(settings.sfx_volume))),
                     ));
                 }
             }
@@ -100,7 +107,11 @@ impl Sound {
         }
     }
 
-    pub fn apply_volume(&self, sinks: &mut Query<&mut AudioSink, With<MusicMarker>>, settings: &Settings) {
+    pub fn apply_volume(
+        &self,
+        sinks: &mut Query<&mut AudioSink, With<MusicMarker>>,
+        settings: &Settings,
+    ) {
         for mut s in sinks.iter_mut() {
             s.set_volume(Volume::Linear(gain(settings.music_volume)));
         }

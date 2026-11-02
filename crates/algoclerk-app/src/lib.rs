@@ -116,10 +116,17 @@ pub fn main() {
     run_window(args, assets);
 }
 
-fn run_window(args: cli::Args, #[cfg_attr(not(feature = "audio"), allow(unused_variables))] assets: Arc<AssetBundle>) {
+fn run_window(
+    args: cli::Args,
+    #[cfg_attr(not(feature = "audio"), allow(unused_variables))] assets: Arc<AssetBundle>,
+) {
     let mobile = platform::is_mobile();
     let storage = FileStorage::new(platform::data_dir(&args));
-    let config = GameConfig { can_quit: !mobile, touch: mobile || args.touch, system_clipboard: !mobile };
+    let config = GameConfig {
+        can_quit: !mobile,
+        touch: mobile || args.touch,
+        system_clipboard: !mobile,
+    };
     let mut game = match Game::new(&assets, Box::new(storage), config) {
         Ok(g) => g,
         Err(e) => {
@@ -133,7 +140,11 @@ fn run_window(args: cli::Args, #[cfg_attr(not(feature = "audio"), allow(unused_v
         title: "AlgoClerk".into(),
         resolution: (960, 540).into(),
         resizable: true,
-        mode: if fullscreen { WindowMode::BorderlessFullscreen(MonitorSelection::Current) } else { WindowMode::Windowed },
+        mode: if fullscreen {
+            WindowMode::BorderlessFullscreen(MonitorSelection::Current)
+        } else {
+            WindowMode::Windowed
+        },
         ..default()
     };
     let mut app = App::new();
@@ -144,16 +155,38 @@ fn run_window(args: cli::Args, #[cfg_attr(not(feature = "audio"), allow(unused_v
         .insert_resource(Latch::default())
         .insert_resource(Clip(arboard_shim::Clipboard::new()))
         .insert_resource(SafeInsets(platform::safe_insets()))
-        .insert_resource(Opts { args, smoke_tick: 0, shot_taken: false })
-        .add_plugins(DefaultPlugins.set(WindowPlugin { primary_window: Some(window), ..default() }).set(ImagePlugin::default_nearest()))
+        .insert_resource(Opts {
+            args,
+            smoke_tick: 0,
+            shot_taken: false,
+        })
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(window),
+                    ..default()
+                })
+                .set(ImagePlugin::default_nearest()),
+        )
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (collect_input, draw_frame, display::layout_frame, apply_events, lifecycle, autoquit, window_shot, toggle_fullscreen_key).chain(),
+            (
+                collect_input,
+                draw_frame,
+                display::layout_frame,
+                apply_events,
+                lifecycle,
+                autoquit,
+                window_shot,
+                toggle_fullscreen_key,
+            )
+                .chain(),
         )
         .add_systems(FixedUpdate, tick_game);
     #[cfg(feature = "audio")]
-    app.insert_resource(audio::Sound::new(assets.clone())).add_systems(Update, play_audio.after(apply_events));
+    app.insert_resource(audio::Sound::new(assets.clone()))
+        .add_systems(Update, play_audio.after(apply_events));
     app.add_systems(Last, on_exit).run();
 }
 
@@ -210,8 +243,17 @@ fn tick_game(
     mut opts: ResMut<Opts>,
 ) {
     let l = std::mem::take(&mut *latch);
-    let mut input = Input { keys: l.keys, typed: l.typed, wheel: l.wheel, paste: l.paste, ..Input::default() };
-    input.ctrl = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight) || keys.pressed(KeyCode::SuperLeft) || keys.pressed(KeyCode::SuperRight);
+    let mut input = Input {
+        keys: l.keys,
+        typed: l.typed,
+        wheel: l.wheel,
+        paste: l.paste,
+        ..Input::default()
+    };
+    input.ctrl = keys.pressed(KeyCode::ControlLeft)
+        || keys.pressed(KeyCode::ControlRight)
+        || keys.pressed(KeyCode::SuperLeft)
+        || keys.pressed(KeyCode::SuperRight);
     input.shift = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
     if let Ok(w) = windows.single() {
         let sf = w.scale_factor();
@@ -231,6 +273,12 @@ fn tick_game(
     if opts.args.smoke {
         opts.smoke_tick += 1;
         smoke(&mut input, opts.smoke_tick);
+    }
+    if std::env::var_os("ALGOCLERK_DEBUG_INPUT").is_some() && (input.pressed || input.released) {
+        eprintln!(
+            "pointer {:?} pressed={} released={} touch={}",
+            input.pointer, input.pressed, input.released, input.touch
+        );
     }
     game.0.tick(&input);
 }
@@ -288,10 +336,10 @@ fn apply_events(
     mut sprite: Query<&mut Sprite, With<display::FrameSprite>>,
     frame: Res<Frame>,
 ) {
-    if let Ok(mut s) = sprite.single_mut() {
-        if s.image != frame.handle {
-            s.image = frame.handle.clone();
-        }
+    if let Ok(mut s) = sprite.single_mut()
+        && s.image != frame.handle
+    {
+        s.image = frame.handle.clone();
     }
     for ev in game.0.take_events() {
         match &ev {
@@ -300,7 +348,11 @@ fn apply_events(
             }
             GameEvent::Fullscreen(on) => {
                 if let Ok(mut w) = windows.single_mut() {
-                    w.mode = if *on { WindowMode::BorderlessFullscreen(MonitorSelection::Current) } else { WindowMode::Windowed };
+                    w.mode = if *on {
+                        WindowMode::BorderlessFullscreen(MonitorSelection::Current)
+                    } else {
+                        WindowMode::Windowed
+                    };
                 }
             }
             GameEvent::Copy(t) => {
@@ -360,7 +412,9 @@ fn window_shot(mut commands: Commands, time: Res<Time>, mut opts: ResMut<Opts>) 
         && time.elapsed_secs() > opts.args.window_shot_after
     {
         opts.shot_taken = true;
-        commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path));
+        commands
+            .spawn(Screenshot::primary_window())
+            .observe(save_to_disk(path));
     }
 }
 
@@ -372,13 +426,21 @@ fn autoquit(time: Res<Time>, opts: Res<Opts>, mut exit: MessageWriter<AppExit>) 
     }
 }
 
-fn toggle_fullscreen_key(keys: Res<ButtonInput<KeyCode>>, mut windows: Query<&mut Window, With<PrimaryWindow>>, mut game: ResMut<GameRes>) {
+fn toggle_fullscreen_key(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+    mut game: ResMut<GameRes>,
+) {
     let alt = keys.pressed(KeyCode::AltLeft) || keys.pressed(KeyCode::AltRight);
     if (keys.just_pressed(KeyCode::F11) || (alt && keys.just_pressed(KeyCode::Enter)))
         && let Ok(mut w) = windows.single_mut()
     {
         let on = matches!(w.mode, WindowMode::Windowed);
-        w.mode = if on { WindowMode::BorderlessFullscreen(MonitorSelection::Current) } else { WindowMode::Windowed };
+        w.mode = if on {
+            WindowMode::BorderlessFullscreen(MonitorSelection::Current)
+        } else {
+            WindowMode::Windowed
+        };
         game.0.progress.settings.fullscreen = on;
     }
 }
