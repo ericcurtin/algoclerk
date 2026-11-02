@@ -125,5 +125,6 @@ fn sum_loop() {
         Heap::default(),
         &Limits::default(),
     );
-    assert_eq!(r.result.unwrap_err().kind, RtKind::Time);
+    // the running sum overflows `int` long before the step budget is spent
+    assert_eq!(r.result.unwrap_err().kind, RtKind::Overflow);
 }
