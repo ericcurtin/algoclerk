@@ -1,46 +1,46 @@
 title = "Separate Networks"
 order = 8
 story = "The IT department has a list of cables between computers. How many separate networks are there?"
-statement = "n nodes (0 to n-1) and undirected edges as [a, b] pairs. Return the number of connected components (an isolated node counts as one)."
-signature = "fn count_components(n: int, edges: vec<vec<int>>) -> int"
-constraints = ["0 <= n <= 4000", "0 <= len(edges) <= 6000"]
+statement = "n nodes (0 to n-1) and undirected edges as {a, b} pairs. Return the number of connected components (an isolated node counts as one)."
+prelude = '''
+#include <vector>
+'''
+signature = "int countComponents(int n, const std::vector<std::vector<int>>& edges)"
+constraints = ["0 <= n <= 4000", "0 <= edges.size() <= 6000"]
 technique = "Depth-first search with a stack"
 big_o = "O(n) time, O(n) space"
-types = ["map", "set", "stack", "vec"]
-builtins = ["add", "contains", "get", "is_empty", "pop", "push"]
+unlocked = ["<stack>"]
 hints = [
-  "Build an adjacency map first.",
+  "Build an adjacency list first: `std::vector<std::vector<int>> adj(n);` and add both directions of every edge.",
   "For each node not yet seen, start a new component and explore everything it reaches.",
-  "A stack (or queue) of nodes to explore, plus a `set<int>` of seen nodes.",
+  "A `std::stack<int>` (from `<stack>`) of nodes to explore, plus a `std::vector<int> seen(n, 0)` marking visited nodes. Mark a node when you push it, not when you pop it, so it is never pushed twice.",
 ]
 reference = '''
-fn count_components(n: int, edges: vec<vec<int>>) -> int {
-    let adj = map<int, vec<int>>();
-    for e in edges {
-        if !adj.contains(e[0]) {
-            adj[e[0]] = [];
-        }
-        if !adj.contains(e[1]) {
-            adj[e[1]] = [];
-        }
-        adj[e[0]].push(e[1]);
-        adj[e[1]].push(e[0]);
+#include <stack>
+
+int countComponents(int n, const std::vector<std::vector<int>>& edges) {
+    std::vector<std::vector<int>> adj(n);
+    for (const auto& e : edges) {
+        adj[e[0]].push_back(e[1]);
+        adj[e[1]].push_back(e[0]);
     }
-    let seen = set<int>();
-    let count = 0;
-    for start in range(n) {
-        if !seen.contains(start) {
-            count += 1;
-            let todo = stack<int>();
-            todo.push(start);
-            seen.add(start);
-            while !todo.is_empty() {
-                let u = todo.pop();
-                for v in adj.get(u, []) {
-                    if !seen.contains(v) {
-                        seen.add(v);
-                        todo.push(v);
-                    }
+    std::vector<int> seen(n, 0);
+    int count = 0;
+    for (int start = 0; start < n; ++start) {
+        if (seen[start] != 0) {
+            continue;
+        }
+        ++count;
+        std::stack<int> todo;
+        todo.push(start);
+        seen[start] = 1;
+        while (!todo.empty()) {
+            const int u = todo.top();
+            todo.pop();
+            for (int v : adj[u]) {
+                if (seen[v] == 0) {
+                    seen[v] = 1;
+                    todo.push(v);
                 }
             }
         }
@@ -54,22 +54,22 @@ large_steps = 3000000
 
 [medals]
 size = [165, 129, 103]
-speed = [534, 285, 197]
+speed = [535, 286, 198]
 
 [[examples]]
-args = ["5", "[[0, 1], [1, 2], [3, 4]]"]
+args = ["5", "{{0, 1}, {1, 2}, {3, 4}}"]
 expect = "2"
 
 [[examples]]
-args = ["3", "[]"]
+args = ["3", "{}"]
 expect = "3"
 
 [[examples]]
-args = ["0", "[]"]
+args = ["0", "{}"]
 expect = "0"
 
 [[tests]]
-args = ["4", "[[0, 1], [1, 2], [2, 3]]"]
+args = ["4", "{{0, 1}, {1, 2}, {2, 3}}"]
 expect = "1"
 
 [[generate]]

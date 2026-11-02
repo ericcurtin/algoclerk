@@ -2,32 +2,36 @@ title = "Mirror, Ignoring the Fuss"
 order = 3
 story = "The mail room labels have commas, spaces and mixed case. The painter says only the letters and digits count, and capitals equal small letters."
 statement = "Return true if the letters and digits of s, ignoring case and everything else, read the same backwards."
-signature = "fn is_clean_palindrome(s: string) -> bool"
-constraints = ["0 <= len(s) <= 20000"]
+prelude = '''
+#include <string>
+'''
+signature = "bool isCleanPalindrome(const std::string& s)"
+constraints = ["0 <= s.size() <= 20000", "plain ASCII text"]
 technique = "Two pointers with filtering"
 big_o = "O(n) time, O(1) space"
-types = ["char", "string"]
-builtins = ["is_alnum", "len", "lower"]
+unlocked = ["<cctype>"]
 hints = [
   "Same two-pointer walk as before, but skip anything that is not a letter or digit.",
-  "`c.is_alnum()` tells you whether a character counts; `c.lower()` removes case.",
-  "Move `i` forward while `s[i]` does not count, and `j` backward likewise, then compare.",
+  "`std::isalnum(c)` (from `<cctype>`) tells you whether a character counts; `std::tolower` removes case. The labels are plain ASCII.",
+  "Move `i` forward while `s[i]` does not count, and `j` backward likewise, then compare. Keep `i` and `j` as `int`, so that `j` can go below 0 safely, and read the string through `const std::string&`: no copy is needed.",
 ]
 reference = '''
-fn is_clean_palindrome(s: string) -> bool {
-    let i = 0;
-    let j = len(s) - 1;
-    while i < j {
-        if !s[i].is_alnum() {
-            i += 1;
-        } else if !s[j].is_alnum() {
-            j -= 1;
+#include <cctype>
+
+bool isCleanPalindrome(const std::string& s) {
+    int i = 0;
+    int j = static_cast<int>(s.size()) - 1;
+    while (i < j) {
+        if (!std::isalnum(s[i])) {
+            ++i;
+        } else if (!std::isalnum(s[j])) {
+            --j;
         } else {
-            if s[i].lower() != s[j].lower() {
+            if (std::tolower(s[i]) != std::tolower(s[j])) {
                 return false;
             }
-            i += 1;
-            j -= 1;
+            ++i;
+            --j;
         }
     }
     return true;
@@ -38,8 +42,8 @@ fn is_clean_palindrome(s: string) -> bool {
 large_steps = 2000000
 
 [medals]
-size = [79, 62, 49]
-speed = [207, 111, 77]
+size = [96, 75, 60]
+speed = [216, 116, 81]
 
 [[examples]]
 args = ["\"A man, a plan, a canal: Panama\""]

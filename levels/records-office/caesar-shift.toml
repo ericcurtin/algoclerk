@@ -2,25 +2,29 @@ title = "The Cipher Wheel"
 order = 10
 story = "The night guard writes notes with a brass cipher wheel: every letter moves forward k places around the alphabet. Digits and punctuation stay as they are."
 statement = "Shift each letter of s forward by k places, wrapping z to a and Z to A, keeping case. All other characters are unchanged."
-signature = "fn caesar(s: string, k: int) -> string"
-constraints = ["0 <= len(s) <= 20000", "0 <= k <= 1000"]
-technique = "Character arithmetic with ord and chr"
+prelude = '''
+#include <string>
+'''
+signature = "std::string caesar(const std::string& s, int k)"
+constraints = ["0 <= s.size() <= 20000", "0 <= k <= 1000", "plain ASCII text"]
+technique = "Character arithmetic"
 big_o = "O(n) time, O(n) space"
-types = ["char", "string"]
-builtins = ["chr", "is_lower", "is_upper", "ord"]
+unlocked = ["<cctype>"]
 hints = [
-  "`ord(c)` turns a letter into its number, `chr(n)` turns it back.",
-  "For a lowercase letter, the shifted number is `(ord(c) - ord('a') + k) % 26 + ord('a')`.",
-  "Handle uppercase the same way with 'A', and leave other characters alone.",
+  "A `char` is a small number: `c - 'a'` is the letter's position in the alphabet (0 for 'a', 25 for 'z').",
+  "For a lowercase letter the new character is `'a' + (c - 'a' + k) % 26`. The arithmetic gives an `int`, so write `static_cast<char>(...)` before appending it to the answer.",
+  "Do the same with 'A' for capitals, and append anything else untouched. `std::islower` and `std::isupper` (from `<cctype>`) tell you which case a letter is (the text is plain ASCII).",
 ]
 reference = '''
-fn caesar(s: string, k: int) -> string {
-    let out = "";
-    for c in s {
-        if c.is_lower() {
-            out += chr((ord(c) - ord('a') + k) % 26 + ord('a'));
-        } else if c.is_upper() {
-            out += chr((ord(c) - ord('A') + k) % 26 + ord('A'));
+#include <cctype>
+
+std::string caesar(const std::string& s, int k) {
+    std::string out;
+    for (char c : s) {
+        if (std::islower(c)) {
+            out += static_cast<char>('a' + (c - 'a' + k) % 26);
+        } else if (std::isupper(c)) {
+            out += static_cast<char>('A' + (c - 'A' + k) % 26);
         } else {
             out += c;
         }
@@ -33,8 +37,8 @@ fn caesar(s: string, k: int) -> string {
 large_steps = 1500000
 
 [medals]
-size = [72, 57, 45]
-speed = [194, 104, 72]
+size = [76, 59, 47]
+speed = [184, 98, 69]
 
 [[examples]]
 args = ["\"abc xyz\"", "3"]

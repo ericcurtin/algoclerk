@@ -1,28 +1,36 @@
 title = "Halving the Catalogue"
 order = 1
 story = "The library catalogue is sorted by number. Walking the whole shelf to find one card takes all day; the librarian wants to find it in a few steps."
-statement = "nums is sorted in ascending order with all values different. Return the index of target, or -1 if it is not there. Linear scans are too slow here!"
-signature = "fn search(nums: vec<int>, target: int) -> int"
-constraints = ["0 <= len(nums) <= 20000", "nums is strictly increasing"]
+statement = "nums is sorted in ascending order with all values different. Return the index of target, or -1 if it is not there. Linear scans are too slow here, and the library search tools (`std::find`, `std::binary_search`, `std::lower_bound`, `std::upper_bound`) are locked."
+prelude = '''
+#include <vector>
+'''
+signature = "int binarySearch(const std::vector<int>& nums, int target)"
+constraints = ["0 <= nums.size() <= 20000", "nums is strictly increasing"]
 technique = "Binary search"
 big_o = "O(log n) time, O(1) space"
-types = ["vec"]
-builtins = ["len"]
+locked = [
+  { name = "std::find", why = "A scan looks at every card; halving is the lesson." },
+  { name = "std::binary_search", why = "It would do the whole job for you." },
+  { name = "std::lower_bound", why = "Same family of tools." },
+  { name = "std::upper_bound", why = "Same family of tools." },
+  { name = "<algorithm>", why = "That drawer only holds tools that search the shelf for you." },
+]
 hints = [
   "Look at the middle element: it tells you which half to keep.",
-  "Keep two indices `lo` and `hi` around the part that can still hold target.",
-  "`let mid = lo + (hi - lo) / 2;` then move `lo` or `hi` past `mid`.",
+  "Keep two indices `lo` and `hi` around the part that can still hold target. `nums` is a `const std::vector<int>&`: reading it costs nothing, whereas a by-value `std::vector<int>` would copy the whole shelf before the first step and ruin the O(log n).",
+  "`const int mid = lo + (hi - lo) / 2;` then move `lo` or `hi` past `mid`. Start with `hi = static_cast<int>(nums.size()) - 1`: `size()` is unsigned, so subtracting from an empty shelf's size would wrap around.",
 ]
 reference = '''
-fn search(nums: vec<int>, target: int) -> int {
-    let lo = 0;
-    let hi = len(nums) - 1;
-    while lo <= hi {
-        let mid = lo + (hi - lo) / 2;
-        if nums[mid] == target {
+int binarySearch(const std::vector<int>& nums, int target) {
+    int lo = 0;
+    int hi = static_cast<int>(nums.size()) - 1;
+    while (lo <= hi) {
+        const int mid = lo + (hi - lo) / 2;
+        if (nums[mid] == target) {
             return mid;
         }
-        if nums[mid] < target {
+        if (nums[mid] < target) {
             lo = mid + 1;
         } else {
             hi = mid - 1;
@@ -32,9 +40,10 @@ fn search(nums: vec<int>, target: int) -> int {
 }
 '''
 naive = '''
-fn search(nums: vec<int>, target: int) -> int {
-    for i in range(len(nums)) {
-        if nums[i] == target {
+int binarySearch(const std::vector<int>& nums, int target) {
+    const int n = static_cast<int>(nums.size());
+    for (int i = 0; i < n; ++i) {
+        if (nums[i] == target) {
             return i;
         }
     }
@@ -48,27 +57,27 @@ large_steps = 20000
 sweep_n0 = 128
 
 [medals]
-size = [72, 57, 45]
-speed = [92, 49, 35]
+size = [87, 68, 54]
+speed = [110, 59, 41]
 
 [[examples]]
-args = ["[-1, 0, 3, 5, 9, 12]", "9"]
+args = ["{-1, 0, 3, 5, 9, 12}", "9"]
 expect = "4"
 
 [[examples]]
-args = ["[-1, 0, 3, 5, 9, 12]", "2"]
+args = ["{-1, 0, 3, 5, 9, 12}", "2"]
 expect = "-1"
 
 [[examples]]
-args = ["[]", "1"]
+args = ["{}", "1"]
 expect = "-1"
 
 [[tests]]
-args = ["[5]", "5"]
+args = ["{5}", "5"]
 expect = "0"
 
 [[tests]]
-args = ["[1, 3]", "3"]
+args = ["{1, 3}", "3"]
 expect = "1"
 
 [[generate]]

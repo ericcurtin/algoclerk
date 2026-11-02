@@ -1,41 +1,51 @@
 title = "Three Flag Colours"
 order = 9
 story = "A flag factory has bolts of red (0), white (1) and blue (2) cloth mixed together. Put them in flag order without using the sorting machine."
-statement = "nums only holds 0, 1 and 2. Return it sorted ascending. The `sorted` and `sort` tools are locked: use the fact that there are only three values."
-signature = "fn sort_colors(nums: vec<int>) -> vec<int>"
-constraints = ["0 <= len(nums) <= 20000", "nums[i] is 0, 1 or 2"]
+statement = "nums only holds 0, 1 and 2. Return it sorted ascending. The library sorting tools (`std::sort`, `std::stable_sort`, `std::partial_sort`) are locked: use the fact that there are only three values."
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<int> sortColors(const std::vector<int>& nums)"
+constraints = ["0 <= nums.size() <= 20000", "nums[i] is 0, 1 or 2"]
 technique = "Counting sort"
 big_o = "O(n) time, O(n) space"
-types = ["vec"]
-builtins = ["len", "push", "swap"]
-locked = [{ name = "sorted", why = "The point is to exploit having only three values." }, { name = "sort", why = "Same reason." }]
+unlocked = ["<utility>"]
+locked = [
+  { name = "std::sort", why = "The point is to exploit having only three values." },
+  { name = "std::stable_sort", why = "Same reason." },
+  { name = "std::partial_sort", why = "Same reason." },
+  { name = "<algorithm>", why = "That drawer only holds tools that sort or count for you." },
+]
 hints = [
   "Count how many 0s, 1s and 2s there are.",
-  "A shelf of three counters is enough: `let counts = [0; 3];`.",
-  "Rebuild the answer: first all the 0s, then 1s, then 2s.",
+  "A shelf of three counters is enough: `std::vector<int> counts(3, 0);` and then `++counts[x];` for every x in `nums`.",
+  "Rebuild the answer: first all the 0s, then 1s, then 2s, with `out.push_back(c)` inside two nested loops. `nums` is a read-only `const&`, so counting costs no copy.",
 ]
 reference = '''
-fn sort_colors(nums: vec<int>) -> vec<int> {
-    let counts = [0; 3];
-    for x in nums {
-        counts[x] += 1;
+std::vector<int> sortColors(const std::vector<int>& nums) {
+    std::vector<int> counts(3, 0);
+    for (int x : nums) {
+        ++counts[x];
     }
-    let out: vec<int> = [];
-    for c in range(3) {
-        for i in range(counts[c]) {
-            out.push(c);
+    std::vector<int> out;
+    for (int c = 0; c < 3; ++c) {
+        for (int i = 0; i < counts[c]; ++i) {
+            out.push_back(c);
         }
     }
     return out;
 }
 '''
 naive = '''
-fn sort_colors(nums: vec<int>) -> vec<int> {
-    let out = nums;
-    for i in range(len(out)) {
-        for j in range(len(out) - 1 - i) {
-            if out[j] > out[j + 1] {
-                out.swap(j, j + 1);
+#include <utility>
+
+std::vector<int> sortColors(const std::vector<int>& nums) {
+    std::vector<int> out = nums;
+    const int n = static_cast<int>(out.size());
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n - 1 - i; ++j) {
+            if (out[j] > out[j + 1]) {
+                std::swap(out[j], out[j + 1]);
             }
         }
     }
@@ -47,24 +57,24 @@ fn sort_colors(nums: vec<int>) -> vec<int> {
 large_steps = 2500000
 
 [medals]
-size = [40, 32, 25]
-speed = [162, 87, 61]
+size = [63, 49, 39]
+speed = [261, 140, 97]
 
 [[examples]]
-args = ["[2, 0, 2, 1, 1, 0]"]
-expect = "[0, 0, 1, 1, 2, 2]"
+args = ["{2, 0, 2, 1, 1, 0}"]
+expect = "{0, 0, 1, 1, 2, 2}"
 
 [[examples]]
-args = ["[1]"]
-expect = "[1]"
+args = ["{1}"]
+expect = "{1}"
 
 [[examples]]
-args = ["[]"]
-expect = "[]"
+args = ["{}"]
+expect = "{}"
 
 [[tests]]
-args = ["[2, 2, 2]"]
-expect = "[2, 2, 2]"
+args = ["{2, 2, 2}"]
+expect = "{2, 2, 2}"
 
 [[generate]]
 seed = 481

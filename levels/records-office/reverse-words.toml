@@ -2,36 +2,63 @@ title = "Reverse the Memo"
 order = 4
 story = "The boss dictates memos from the last word to the first when he is in a mood. The typist needs the words in reverse order, each word spelled normally."
 statement = "The words of s are separated by single spaces. Return the same words in reverse order, separated by single spaces."
-signature = "fn reverse_words(s: string) -> string"
-constraints = ["0 <= len(s) <= 20000", "words are separated by exactly one space; no leading or trailing space"]
+prelude = '''
+#include <string>
+#include <vector>
+'''
+signature = "std::string reverseWords(const std::string& s)"
+constraints = ["0 <= s.size() <= 20000", "words are separated by exactly one space; no leading or trailing space"]
 technique = "Split and join"
 big_o = "O(n) time, O(n) space"
-types = ["char", "string", "vec"]
-builtins = ["join", "len", "push", "split"]
 hints = [
-  "`s.split(' ')` gives a shelf of the words.",
-  "Walk the shelf from the last index to the first and push each word on a new shelf.",
-  "`join(words, \" \")` glues them back together.",
+  "First split s into a `std::vector<std::string>` of words: walk the characters, append letters to a `current` word and, at every ' ', push the word and `clear()` it. Do not forget the last word.",
+  "Walk the vector from the last index to the first. With an unsigned index count down like this: `for (std::size_t i = words.size(); i > 0; --i) { words[i - 1]; }`.",
+  "Append a ' ' before every word except the first one, and use `out += word;` (in place) rather than `out = out + word;` (a fresh copy each time).",
 ]
 reference = '''
-fn reverse_words(s: string) -> string {
-    let parts = s.split(' ');
-    let out: vec<string> = [];
-    for i in range(len(parts) - 1, -1, -1) {
-        out.push(parts[i]);
+std::string reverseWords(const std::string& s) {
+    std::vector<std::string> words;
+    std::string current;
+    for (char c : s) {
+        if (c == ' ') {
+            words.push_back(current);
+            current.clear();
+        } else {
+            current += c;
+        }
     }
-    return join(out, " ");
+    words.push_back(current);
+    std::string out;
+    for (std::size_t i = words.size(); i > 0; --i) {
+        if (i != words.size()) {
+            out += ' ';
+        }
+        out += words[i - 1];
+    }
+    return out;
 }
 '''
 naive = '''
-fn reverse_words(s: string) -> string {
-    let parts = s.split(' ');
-    let out = "";
-    for w in parts {
-        if len(out) > 0 {
-            out = w + " " + out;
+std::string reverseWords(const std::string& s) {
+    std::vector<std::string> words;
+    std::string current;
+    for (char c : s) {
+        if (c == ' ') {
+            words.push_back(current);
+            current.clear();
         } else {
+            current += c;
+        }
+    }
+    words.push_back(current);
+    std::string out;
+    bool first = true;
+    for (const auto& w : words) {
+        if (first) {
             out = w;
+            first = false;
+        } else {
+            out = w + " " + out;
         }
     }
     return out;
@@ -42,8 +69,8 @@ fn reverse_words(s: string) -> string {
 large_steps = 1500000
 
 [medals]
-size = [37, 29, 23]
-speed = [127, 68, 48]
+size = [100, 78, 62]
+speed = [305, 163, 113]
 
 [[examples]]
 args = ["\"the sky is blue\""]

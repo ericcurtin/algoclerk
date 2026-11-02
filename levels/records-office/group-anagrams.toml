@@ -2,49 +2,60 @@ title = "Family Folders"
 order = 8
 story = "Files whose names are rearrangements of each other belong in one folder. The records clerk needs the folders, not the order they come out in."
 statement = "Group the words so that words that are anagrams of each other share a group. Return the groups in any order; words inside a group may also be in any order."
-signature = "fn group_anagrams(words: vec<string>) -> vec<vec<string>>"
-constraints = ["0 <= len(words) <= 5000", "0 <= len(words[i]) <= 20"]
+prelude = '''
+#include <string>
+#include <vector>
+'''
+signature = "std::vector<std::vector<std::string>> groupAnagrams(const std::vector<std::string>& words)"
+constraints = ["0 <= words.size() <= 5000", "0 <= words[i].size() <= 20"]
 technique = "Hash map keyed by sorted letters"
 big_o = "O(n) time, O(n) space"
+unlocked = ["<algorithm>", "<unordered_map>", "<map>"]
 compare = "sort_all"
-types = ["map", "string", "vec"]
-builtins = ["contains", "len", "push", "sorted", "values"]
 hints = [
   "Two words are anagrams exactly when their sorted letters are equal.",
-  "`sorted(w)` gives the letters of a word in order: use that as the map key.",
-  "A `map<string, vec<string>>` collects the words per key; `groups.values()` returns the groups.",
+  "Copy the word, sort the copy with `std::sort(key.begin(), key.end());` (from `<algorithm>`) and use the copy as the key of a `std::unordered_map<std::string, std::vector<std::string>>`.",
+  "`groups[key].push_back(w);` collects the words per key. Finally walk the map with `for (const auto& entry : groups)` and push `entry.second` into the result.",
 ]
 reference = '''
-fn group_anagrams(words: vec<string>) -> vec<vec<string>> {
-    let groups = map<string, vec<string>>();
-    for w in words {
-        let key = sorted(w);
-        if !groups.contains(key) {
-            groups[key] = [];
-        }
-        groups[key].push(w);
+#include <algorithm>
+#include <unordered_map>
+
+std::vector<std::vector<std::string>> groupAnagrams(const std::vector<std::string>& words) {
+    std::unordered_map<std::string, std::vector<std::string>> groups;
+    for (const auto& w : words) {
+        std::string key = w;
+        std::sort(key.begin(), key.end());
+        groups[key].push_back(w);
     }
-    return groups.values();
+    std::vector<std::vector<std::string>> result;
+    for (const auto& entry : groups) {
+        result.push_back(entry.second);
+    }
+    return result;
 }
 '''
 naive = '''
-fn group_anagrams(words: vec<string>) -> vec<vec<string>> {
-    let keys: vec<string> = [];
-    let groups: vec<vec<string>> = [];
-    for w in words {
-        let key = sorted(w);
-        let found = -1;
-        for i in range(len(keys)) {
-            if keys[i] == key {
+#include <algorithm>
+
+std::vector<std::vector<std::string>> groupAnagrams(const std::vector<std::string>& words) {
+    std::vector<std::string> keys;
+    std::vector<std::vector<std::string>> groups;
+    for (const auto& w : words) {
+        std::string key = w;
+        std::sort(key.begin(), key.end());
+        int found = -1;
+        for (int i = 0; i < static_cast<int>(keys.size()); ++i) {
+            if (keys[i] == key) {
                 found = i;
                 break;
             }
         }
-        if found < 0 {
-            keys.push(key);
-            groups.push([w]);
+        if (found < 0) {
+            keys.push_back(key);
+            groups.push_back({w});
         } else {
-            groups[found].push(w);
+            groups[found].push_back(w);
         }
     }
     return groups;
@@ -55,25 +66,25 @@ fn group_anagrams(words: vec<string>) -> vec<vec<string>> {
 large_steps = 3000000
 
 [medals]
-size = [42, 33, 26]
-speed = [261, 139, 97]
+size = [55, 43, 34]
+speed = [324, 173, 120]
 
 [[examples]]
-args = ["[\"eat\", \"tea\", \"tan\", \"ate\", \"nat\", \"bat\"]"]
-expect = "[[\"bat\"], [\"nat\", \"tan\"], [\"ate\", \"eat\", \"tea\"]]"
+args = ["{\"eat\", \"tea\", \"tan\", \"ate\", \"nat\", \"bat\"}"]
+expect = "{{\"bat\"}, {\"nat\", \"tan\"}, {\"ate\", \"eat\", \"tea\"}}"
 note = "Order does not matter."
 
 [[examples]]
-args = ["[\"\"]"]
-expect = "[[\"\"]]"
+args = ["{\"\"}"]
+expect = "{{\"\"}}"
 
 [[tests]]
-args = ["[]"]
-expect = "[]"
+args = ["{}"]
+expect = "{}"
 
 [[tests]]
-args = ["[\"a\", \"b\", \"a\"]"]
-expect = "[[\"a\", \"a\"], [\"b\"]]"
+args = ["{\"a\", \"b\", \"a\"}"]
+expect = "{{\"a\", \"a\"}, {\"b\"}}"
 
 [[generate]]
 seed = 171

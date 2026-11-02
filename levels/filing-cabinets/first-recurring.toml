@@ -2,34 +2,38 @@ title = "First Repeat Offender"
 order = 4
 story = "The security desk logs badge numbers. The guard wants the first badge that gets scanned a second time."
 statement = "Scan nums left to right. Return the value that is seen for the second time earliest (the smallest index of a repeated sighting), or -1 if all values are different."
-signature = "fn first_recurring(nums: vec<int>) -> int"
-constraints = ["0 <= len(nums) <= 20000"]
+prelude = '''
+#include <vector>
+'''
+signature = "int firstRecurring(const std::vector<int>& nums)"
+constraints = ["0 <= nums.size() <= 20000"]
 technique = "Hash set membership"
 big_o = "O(n) time, O(n) space"
-types = ["set", "vec"]
-builtins = ["add", "contains", "len"]
+unlocked = ["<unordered_set>"]
 hints = [
   "Walk left to right and remember the numbers you have seen.",
-  "The first number that is already remembered is the answer.",
-  "Return -1 after the loop if nothing repeated.",
+  "A `std::unordered_set<int>` remembers them and `seen.count(x)` tells in one step whether `x` is among them. Read `nums` through the `const&`: it costs nothing.",
+  "The first number that is already remembered is the answer: `return x;` inside the loop, and `seen.insert(x);` otherwise. Return -1 after the loop if nothing repeated.",
 ]
 reference = '''
-fn first_recurring(nums: vec<int>) -> int {
-    let seen = set<int>();
-    for x in nums {
-        if seen.contains(x) {
+#include <unordered_set>
+
+int firstRecurring(const std::vector<int>& nums) {
+    std::unordered_set<int> seen;
+    for (int x : nums) {
+        if (!seen.insert(x).second) {
             return x;
         }
-        seen.add(x);
     }
     return -1;
 }
 '''
 naive = '''
-fn first_recurring(nums: vec<int>) -> int {
-    for j in range(len(nums)) {
-        for i in range(j) {
-            if nums[i] == nums[j] {
+int firstRecurring(const std::vector<int>& nums) {
+    const int n = static_cast<int>(nums.size());
+    for (int j = 0; j < n; ++j) {
+        for (int i = 0; i < j; ++i) {
+            if (nums[i] == nums[j]) {
                 return nums[j];
             }
         }
@@ -42,27 +46,27 @@ fn first_recurring(nums: vec<int>) -> int {
 large_steps = 2500000
 
 [medals]
-size = [26, 20, 16]
-speed = [40, 22, 16]
+size = [28, 22, 17]
+speed = [48, 26, 19]
 
 [[examples]]
-args = ["[2, 1, 3, 5, 3, 2]"]
+args = ["{2, 1, 3, 5, 3, 2}"]
 expect = "3"
 
 [[examples]]
-args = ["[1, 2, 3]"]
+args = ["{1, 2, 3}"]
 expect = "-1"
 
 [[examples]]
-args = ["[5, 5]"]
+args = ["{5, 5}"]
 expect = "5"
 
 [[tests]]
-args = ["[]"]
+args = ["{}"]
 expect = "-1"
 
 [[tests]]
-args = ["[1, 2, 1, 2]"]
+args = ["{1, 2, 1, 2}"]
 expect = "1"
 
 [[generate]]

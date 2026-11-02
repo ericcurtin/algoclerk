@@ -2,45 +2,49 @@ title = "Unbroken Numbers"
 order = 8
 story = "Case files are numbered but scattered. The clerk wants the longest run of numbers that follow each other with no gap (like 4, 5, 6, 7)."
 statement = "Return the length of the longest sequence of consecutive integers that all appear in nums (order on the shelf does not matter)."
-signature = "fn longest_run(nums: vec<int>) -> int"
-constraints = ["0 <= len(nums) <= 20000"]
+prelude = '''
+#include <vector>
+'''
+signature = "int longestRun(const std::vector<int>& nums)"
+constraints = ["0 <= nums.size() <= 20000"]
 technique = "Hash set, start only at run beginnings"
 big_o = "O(n) time, O(n) space"
-types = ["set", "vec"]
-builtins = ["add", "contains", "max", "sorted"]
+unlocked = ["<unordered_set>", "<algorithm>"]
 hints = [
-  "Put all numbers in a set so that membership costs one step.",
-  "A number x starts a run only if x - 1 is not in the set.",
-  "From each run start, count upwards while the next number is present.",
+  "Put all numbers in a `std::unordered_set<int>` so that membership costs one step: `std::unordered_set<int> present(nums.begin(), nums.end());` (it also drops duplicates).",
+  "A number x starts a run only if `present.count(x - 1) == 0`. Walk the set, not the vector: a value that appears many times would otherwise start the same run over and over.",
+  "From each run start, count upwards while `present.count(y + 1) != 0`, and keep the longest with `std::max` from `<algorithm>`.",
 ]
 reference = '''
-fn longest_run(nums: vec<int>) -> int {
-    let present = set<int>();
-    for x in nums {
-        present.add(x);
-    }
-    let best = 0;
-    for x in sorted(present) {
-        if !present.contains(x - 1) {
-            let y = x;
-            while present.contains(y + 1) {
-                y += 1;
+#include <algorithm>
+#include <unordered_set>
+
+int longestRun(const std::vector<int>& nums) {
+    std::unordered_set<int> present(nums.begin(), nums.end());
+    int best = 0;
+    for (int x : present) {
+        if (present.count(x - 1) == 0) {
+            int y = x;
+            while (present.count(y + 1) != 0) {
+                ++y;
             }
-            best = max(best, y - x + 1);
+            best = std::max(best, y - x + 1);
         }
     }
     return best;
 }
 '''
 naive = '''
-fn longest_run(nums: vec<int>) -> int {
-    let best = 0;
-    for x in nums {
-        let y = x;
-        while nums.contains(y + 1) {
-            y += 1;
+#include <algorithm>
+
+int longestRun(const std::vector<int>& nums) {
+    int best = 0;
+    for (int x : nums) {
+        int y = x;
+        while (std::find(nums.begin(), nums.end(), y + 1) != nums.end()) {
+            ++y;
         }
-        best = max(best, y - x + 1);
+        best = std::max(best, y - x + 1);
     }
     return best;
 }
@@ -50,27 +54,27 @@ fn longest_run(nums: vec<int>) -> int {
 large_steps = 3000000
 
 [medals]
-size = [68, 53, 42]
-speed = [248, 133, 92]
+size = [80, 63, 50]
+speed = [212, 113, 79]
 
 [[examples]]
-args = ["[100, 4, 200, 1, 3, 2]"]
+args = ["{100, 4, 200, 1, 3, 2}"]
 expect = "4"
 
 [[examples]]
-args = ["[0, 3, 7, 2, 5, 8, 4, 6, 0, 1]"]
+args = ["{0, 3, 7, 2, 5, 8, 4, 6, 0, 1}"]
 expect = "9"
 
 [[examples]]
-args = ["[]"]
+args = ["{}"]
 expect = "0"
 
 [[tests]]
-args = ["[5]"]
+args = ["{5}"]
 expect = "1"
 
 [[tests]]
-args = ["[1, 1, 1]"]
+args = ["{1, 1, 1}"]
 expect = "1"
 
 [[generate]]

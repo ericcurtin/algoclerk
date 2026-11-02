@@ -2,39 +2,47 @@ title = "Through the Maze"
 order = 5
 story = "The night guard walks from the top-left door to the bottom-right door through a maze of corridors. How many steps is the shortest way?"
 statement = "'.' is a free cell and '#' is a wall. Starting at the top-left and moving up, down, left or right through free cells, return the fewest steps to reach the bottom-right cell, or -1 if there is no way (or either end is a wall)."
-signature = "fn maze_steps(grid: vec<vec<char>>) -> int"
-constraints = ["1 <= rows, cols", "rows * cols <= 6400"]
+prelude = '''
+#include <vector>
+'''
+signature = "int mazeSteps(const std::vector<std::vector<char>>& grid)"
+constraints = ["1 <= rows, cols", "rows * cols <= 6400", "cells are '.' or '#'"]
 technique = "Breadth-first search on a grid"
 big_o = "O(n) time, O(n) space"
-types = ["char", "queue", "tuple", "vec"]
-builtins = ["is_empty", "len", "pop", "push"]
+unlocked = ["<queue>", "<utility>"]
 hints = [
   "Breadth-first search finds shortest paths when every step costs the same.",
-  "Keep a `dist` grid filled with -1 and a queue of cells to expand.",
-  "Stop as soon as you pop the bottom-right cell.",
+  "Keep a `dist` grid filled with -1 (`std::vector<std::vector<int>> dist(rows, std::vector<int>(cols, -1));`) and a `std::queue<std::pair<int, int>>` of cells to expand. The grid is a `const&`, so it is yours to read only.",
+  "Stop as soon as you pop the bottom-right cell; `auto [y, x] = q.front(); q.pop();` unpacks the pair. Check the bounds of a neighbour before you index with it.",
 ]
 reference = '''
-fn maze_steps(grid: vec<vec<char>>) -> int {
-    let rows = len(grid);
-    let cols = len(grid[0]);
-    if grid[0][0] == '#' or grid[rows - 1][cols - 1] == '#' {
+#include <queue>
+#include <utility>
+
+int mazeSteps(const std::vector<std::vector<char>>& grid) {
+    const int rows = static_cast<int>(grid.size());
+    const int cols = static_cast<int>(grid[0].size());
+    if (grid[0][0] == '#' || grid[rows - 1][cols - 1] == '#') {
         return -1;
     }
-    let dist = [[-1; cols]; rows];
+    const int dy[4] = {1, -1, 0, 0};
+    const int dx[4] = {0, 0, 1, -1};
+    std::vector<std::vector<int>> dist(rows, std::vector<int>(cols, -1));
     dist[0][0] = 0;
-    let q = queue<(int, int)>();
-    q.push((0, 0));
-    while !q.is_empty() {
-        let (y, x) = q.pop();
-        if y == rows - 1 and x == cols - 1 {
+    std::queue<std::pair<int, int>> q;
+    q.push({0, 0});
+    while (!q.empty()) {
+        auto [y, x] = q.front();
+        q.pop();
+        if (y == rows - 1 && x == cols - 1) {
             return dist[y][x];
         }
-        for (dy, dx) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-            let ny = y + dy;
-            let nx = x + dx;
-            if ny >= 0 and ny < rows and nx >= 0 and nx < cols and grid[ny][nx] == '.' and dist[ny][nx] < 0 {
+        for (int d = 0; d < 4; ++d) {
+            const int ny = y + dy[d];
+            const int nx = x + dx[d];
+            if (ny >= 0 && ny < rows && nx >= 0 && nx < cols && grid[ny][nx] == '.' && dist[ny][nx] < 0) {
                 dist[ny][nx] = dist[y][x] + 1;
-                q.push((ny, nx));
+                q.push({ny, nx});
             }
         }
     }
@@ -46,23 +54,23 @@ fn maze_steps(grid: vec<vec<char>>) -> int {
 large_steps = 3000000
 
 [medals]
-size = [242, 189, 151]
-speed = [1551, 827, 570]
+size = [293, 229, 183]
+speed = [1852, 988, 680]
 
 [[examples]]
-args = ["[['.', '.', '#'], ['#', '.', '.'], ['#', '#', '.']]"]
+args = ["{{'.', '.', '#'}, {'#', '.', '.'}, {'#', '#', '.'}}"]
 expect = "4"
 
 [[examples]]
-args = ["[['.']]"]
+args = ["{{'.'}}"]
 expect = "0"
 
 [[examples]]
-args = ["[['.', '#'], ['#', '.']]"]
+args = ["{{'.', '#'}, {'#', '.'}}"]
 expect = "-1"
 
 [[tests]]
-args = ["[['#', '.']]"]
+args = ["{{'#', '.'}}"]
 expect = "-1"
 
 [[generate]]

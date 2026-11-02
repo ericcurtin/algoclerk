@@ -1,25 +1,32 @@
 title = "Where Does It Go?"
 order = 3
 story = "A new card arrives for the sorted catalogue. The librarian only needs to know the position where it belongs."
-statement = "nums is sorted ascending (duplicates allowed). Return the smallest index i such that nums[i] >= target, or len(nums) if every value is smaller."
-signature = "fn lower_bound(nums: vec<int>, target: int) -> int"
-constraints = ["0 <= len(nums) <= 20000"]
+statement = "nums is sorted ascending (duplicates allowed). Return the smallest index i such that nums[i] >= target, or nums.size() if every value is smaller. `std::lower_bound` and its relatives are locked."
+prelude = '''
+#include <vector>
+'''
+signature = "int insertPosition(const std::vector<int>& nums, int target)"
+constraints = ["0 <= nums.size() <= 20000"]
 technique = "Binary search on the answer boundary"
 big_o = "O(log n) time, O(1) space"
-types = ["vec"]
-builtins = ["len"]
+locked = [
+  { name = "std::lower_bound", why = "It is exactly this question, answered for you." },
+  { name = "std::upper_bound", why = "Same family of tools." },
+  { name = "std::binary_search", why = "Same family of tools." },
+  { name = "<algorithm>", why = "That drawer only holds tools that search the shelf for you." },
+]
 hints = [
   "Search the half-open range [lo, hi) for the first position that is not smaller than target.",
-  "If `nums[mid] < target` the answer is right of mid, otherwise mid itself may be the answer.",
-  "`lo = mid + 1` or `hi = mid`; stop when they meet.",
+  "If `nums[mid] < target` the answer is right of mid, otherwise mid itself may be the answer. Start with `hi = static_cast<int>(nums.size())`.",
+  "`lo = mid + 1` or `hi = mid`; stop when they meet. Keep `nums` as the `const&` it arrives as: a by-value copy would cost the whole shelf.",
 ]
 reference = '''
-fn lower_bound(nums: vec<int>, target: int) -> int {
-    let lo = 0;
-    let hi = len(nums);
-    while lo < hi {
-        let mid = lo + (hi - lo) / 2;
-        if nums[mid] < target {
+int insertPosition(const std::vector<int>& nums, int target) {
+    int lo = 0;
+    int hi = static_cast<int>(nums.size());
+    while (lo < hi) {
+        const int mid = lo + (hi - lo) / 2;
+        if (nums[mid] < target) {
             lo = mid + 1;
         } else {
             hi = mid;
@@ -29,13 +36,14 @@ fn lower_bound(nums: vec<int>, target: int) -> int {
 }
 '''
 naive = '''
-fn lower_bound(nums: vec<int>, target: int) -> int {
-    for i in range(len(nums)) {
-        if nums[i] >= target {
+int insertPosition(const std::vector<int>& nums, int target) {
+    const int n = static_cast<int>(nums.size());
+    for (int i = 0; i < n; ++i) {
+        if (nums[i] >= target) {
             return i;
         }
     }
-    return len(nums);
+    return n;
 }
 '''
 
@@ -44,27 +52,27 @@ steps = 200000
 large_steps = 20000
 
 [medals]
-size = [53, 42, 33]
-speed = [97, 52, 37]
+size = [64, 50, 40]
+speed = [117, 62, 44]
 
 [[examples]]
-args = ["[1, 3, 5, 6]", "5"]
+args = ["{1, 3, 5, 6}", "5"]
 expect = "2"
 
 [[examples]]
-args = ["[1, 3, 5, 6]", "2"]
+args = ["{1, 3, 5, 6}", "2"]
 expect = "1"
 
 [[examples]]
-args = ["[1, 3, 5, 6]", "7"]
+args = ["{1, 3, 5, 6}", "7"]
 expect = "4"
 
 [[examples]]
-args = ["[]", "3"]
+args = ["{}", "3"]
 expect = "0"
 
 [[tests]]
-args = ["[2, 2, 2]", "2"]
+args = ["{2, 2, 2}", "2"]
 expect = "0"
 
 [[generate]]

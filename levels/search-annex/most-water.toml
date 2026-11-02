@@ -2,39 +2,46 @@ title = "The Widest Tank"
 order = 8
 story = "Vertical boards stand along a wall. Pick two of them as the sides of a water tank: the tank holds as much as the shorter side allows across the distance between them."
 statement = "heights[i] is the height of board i. Choose two boards i < j; the water held is min(heights[i], heights[j]) * (j - i). Return the maximum, or 0 if there are fewer than two boards."
-signature = "fn max_area(heights: vec<int>) -> int"
-constraints = ["0 <= len(heights) <= 20000"]
+prelude = '''
+#include <vector>
+'''
+signature = "int maxArea(const std::vector<int>& heights)"
+constraints = ["0 <= heights.size() <= 20000"]
 technique = "Two pointers"
 big_o = "O(n) time, O(1) space"
-types = ["vec"]
-builtins = ["len", "max", "min"]
+unlocked = ["<algorithm>"]
 hints = [
   "Start with the widest pair: first and last board.",
   "Moving the taller board inward can never help: the height is limited by the shorter one.",
-  "Move the pointer at the shorter board inward and keep the best area.",
+  "Move the pointer at the shorter board inward and keep the best area with `std::max` / `std::min` (both from `<algorithm>`). With `int j = static_cast<int>(heights.size()) - 1;` an empty shelf simply never enters the loop.",
 ]
 reference = '''
-fn max_area(heights: vec<int>) -> int {
-    let i = 0;
-    let j = len(heights) - 1;
-    let best = 0;
-    while i < j {
-        best = max(best, min(heights[i], heights[j]) * (j - i));
-        if heights[i] < heights[j] {
-            i += 1;
+#include <algorithm>
+
+int maxArea(const std::vector<int>& heights) {
+    int i = 0;
+    int j = static_cast<int>(heights.size()) - 1;
+    int best = 0;
+    while (i < j) {
+        best = std::max(best, std::min(heights[i], heights[j]) * (j - i));
+        if (heights[i] < heights[j]) {
+            ++i;
         } else {
-            j -= 1;
+            --j;
         }
     }
     return best;
 }
 '''
 naive = '''
-fn max_area(heights: vec<int>) -> int {
-    let best = 0;
-    for i in range(len(heights)) {
-        for j in range(i + 1, len(heights)) {
-            best = max(best, min(heights[i], heights[j]) * (j - i));
+#include <algorithm>
+
+int maxArea(const std::vector<int>& heights) {
+    const int n = static_cast<int>(heights.size());
+    int best = 0;
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            best = std::max(best, std::min(heights[i], heights[j]) * (j - i));
         }
     }
     return best;
@@ -45,27 +52,27 @@ fn max_area(heights: vec<int>) -> int {
 large_steps = 3000000
 
 [medals]
-size = [71, 55, 44]
-speed = [195, 104, 73]
+size = [84, 65, 52]
+speed = [216, 115, 80]
 
 [[examples]]
-args = ["[1, 8, 6, 2, 5, 4, 8, 3, 7]"]
+args = ["{1, 8, 6, 2, 5, 4, 8, 3, 7}"]
 expect = "49"
 
 [[examples]]
-args = ["[1, 1]"]
+args = ["{1, 1}"]
 expect = "1"
 
 [[examples]]
-args = ["[]"]
+args = ["{}"]
 expect = "0"
 
 [[tests]]
-args = ["[4]"]
+args = ["{4}"]
 expect = "0"
 
 [[tests]]
-args = ["[0, 0, 0]"]
+args = ["{0, 0, 0}"]
 expect = "0"
 
 [[generate]]

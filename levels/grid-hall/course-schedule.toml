@@ -1,42 +1,43 @@
 title = "Prerequisites"
 order = 7
 story = "The training department lists which courses must be taken before others. Can anyone finish every course, or is there a circular rule?"
-statement = "There are n courses (0 to n-1). Each pair [a, b] means course b must be taken before course a. Return true if all courses can be completed."
-signature = "fn can_finish(n: int, prereqs: vec<vec<int>>) -> bool"
-constraints = ["0 <= n <= 4000", "0 <= len(prereqs) <= 6000"]
+statement = "There are n courses (0 to n-1). Each pair {a, b} means course b must be taken before course a. Return true if all courses can be completed."
+prelude = '''
+#include <vector>
+'''
+signature = "bool canFinish(int n, const std::vector<std::vector<int>>& prereqs)"
+constraints = ["0 <= n <= 4000", "0 <= prereqs.size() <= 6000"]
 technique = "Topological sort (Kahn's algorithm)"
 big_o = "O(n) time, O(n) space"
-types = ["map", "queue", "vec"]
-builtins = ["contains", "get", "is_empty", "pop", "push"]
+unlocked = ["<queue>"]
 hints = [
-  "Count how many prerequisites each course still waits for (its in-degree).",
-  "Courses with in-degree 0 can be taken now: put them in a queue.",
-  "Taking a course lowers the in-degree of the courses that need it. If you take all n, it works out.",
+  "Count how many prerequisites each course still waits for (its in-degree): `std::vector<int> indeg(n, 0);`.",
+  "Courses with in-degree 0 can be taken now: put them in a `std::queue<int>` (from `<queue>`).",
+  "Keep for every course the list of courses that need it (`std::vector<std::vector<int>> after(n);`). Taking a course lowers the in-degree of those; when one reaches 0 it is ready too. If you take all n, it works out.",
 ]
 reference = '''
-fn can_finish(n: int, prereqs: vec<vec<int>>) -> bool {
-    let indeg = [0; n];
-    let after = map<int, vec<int>>();
-    for p in prereqs {
-        if !after.contains(p[1]) {
-            after[p[1]] = [];
-        }
-        after[p[1]].push(p[0]);
-        indeg[p[0]] += 1;
+#include <queue>
+
+bool canFinish(int n, const std::vector<std::vector<int>>& prereqs) {
+    std::vector<int> indeg(n, 0);
+    std::vector<std::vector<int>> after(n);
+    for (const auto& p : prereqs) {
+        after[p[1]].push_back(p[0]);
+        ++indeg[p[0]];
     }
-    let ready = queue<int>();
-    for i in range(n) {
-        if indeg[i] == 0 {
+    std::queue<int> ready;
+    for (int i = 0; i < n; ++i) {
+        if (indeg[i] == 0) {
             ready.push(i);
         }
     }
-    let done = 0;
-    while !ready.is_empty() {
-        let u = ready.pop();
-        done += 1;
-        for v in after.get(u, []) {
-            indeg[v] -= 1;
-            if indeg[v] == 0 {
+    int done = 0;
+    while (!ready.empty()) {
+        const int u = ready.front();
+        ready.pop();
+        ++done;
+        for (int v : after[u]) {
+            if (--indeg[v] == 0) {
                 ready.push(v);
             }
         }
@@ -50,22 +51,22 @@ large_steps = 3000000
 
 [medals]
 size = [143, 112, 89]
-speed = [401, 214, 148]
+speed = [387, 206, 143]
 
 [[examples]]
-args = ["2", "[[1, 0]]"]
+args = ["2", "{{1, 0}}"]
 expect = "true"
 
 [[examples]]
-args = ["2", "[[1, 0], [0, 1]]"]
+args = ["2", "{{1, 0}, {0, 1}}"]
 expect = "false"
 
 [[examples]]
-args = ["0", "[]"]
+args = ["0", "{}"]
 expect = "true"
 
 [[tests]]
-args = ["3", "[[1, 0], [2, 1]]"]
+args = ["3", "{{1, 0}, {2, 1}}"]
 expect = "true"
 
 [[generate]]

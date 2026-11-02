@@ -2,48 +2,52 @@ title = "Anagram Check"
 order = 1
 story = "The records clerk swears two files with the same letters in a different order are the same family. Prove it before she stamps them as duplicates."
 statement = "Return true when b is a rearrangement of the letters of a: same letters, same number of each. Case matters."
-signature = "fn is_anagram(a: string, b: string) -> bool"
-constraints = ["0 <= len(a), len(b) <= 20000", "plain ASCII text"]
+prelude = '''
+#include <string>
+'''
+signature = "bool isAnagram(const std::string& a, const std::string& b)"
+constraints = ["0 <= a.size(), b.size() <= 20000", "plain ASCII text"]
 technique = "Hash map counting"
 big_o = "O(n) time, O(k) space"
-types = ["char", "map", "string", "vec"]
-builtins = ["chars", "get", "index_of", "len", "remove"]
+unlocked = ["<unordered_map>"]
 hints = [
   "Two words are anagrams when every letter occurs equally often in both.",
-  "Count the letters of a in a map: `counts[c] = counts.get(c, 0) + 1;`.",
-  "Walk b and count down; if a letter has no count left, return false.",
+  "Count the letters of a in a `std::unordered_map<char, int>`: `++counts[c];` (a missing key starts at 0).",
+  "Walk b and count down; if a letter has no count left (`counts.find(c)` is `end()` or its value is 0), return false. Take both strings by `const&`: copying them would cost their lengths.",
 ]
 reference = '''
-fn is_anagram(a: string, b: string) -> bool {
-    if len(a) != len(b) {
+#include <unordered_map>
+
+bool isAnagram(const std::string& a, const std::string& b) {
+    if (a.size() != b.size()) {
         return false;
     }
-    let counts = map<char, int>();
-    for c in a {
-        counts[c] = counts.get(c, 0) + 1;
+    std::unordered_map<char, int> counts;
+    for (char c : a) {
+        ++counts[c];
     }
-    for c in b {
-        let left = counts.get(c, 0);
-        if left == 0 {
+    for (char c : b) {
+        auto it = counts.find(c);
+        if (it == counts.end() || it->second == 0) {
             return false;
         }
-        counts[c] = left - 1;
+        --it->second;
     }
     return true;
 }
 '''
 naive = '''
-fn is_anagram(a: string, b: string) -> bool {
-    if len(a) != len(b) {
+bool isAnagram(const std::string& a, const std::string& b) {
+    if (a.size() != b.size()) {
         return false;
     }
-    let rest = b.chars();
-    for c in a {
-        let i = rest.index_of(c);
-        if i < 0 {
+    std::string rest = b;
+    for (char c : a) {
+        const std::size_t pos = rest.find(c);
+        if (pos == std::string::npos) {
             return false;
         }
-        rest.remove(i);
+        rest.erase(pos, 1);
     }
     return true;
 }
@@ -53,8 +57,8 @@ fn is_anagram(a: string, b: string) -> bool {
 large_steps = 2000000
 
 [medals]
-size = [71, 55, 44]
-speed = [157, 84, 59]
+size = [77, 60, 48]
+speed = [201, 108, 75]
 
 [[examples]]
 args = ["\"listen\"", "\"silent\""]

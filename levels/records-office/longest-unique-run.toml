@@ -2,44 +2,53 @@ title = "The Longest Clean Stretch"
 order = 7
 story = "A ticker tape prints letters all day. The supervisor wants the longest stretch of tape where no letter appears twice, to test a new typewriter."
 statement = "Return the length of the longest substring of s in which all characters are different."
-signature = "fn longest_unique(s: string) -> int"
-constraints = ["0 <= len(s) <= 20000"]
+prelude = '''
+#include <string>
+'''
+signature = "int longestUnique(const std::string& s)"
+constraints = ["0 <= s.size() <= 20000"]
 technique = "Sliding window"
 big_o = "O(n) time, O(k) space"
-types = ["char", "map", "set", "string"]
-builtins = ["add", "contains", "len", "max"]
+unlocked = ["<algorithm>", "<unordered_map>", "<unordered_set>"]
 hints = [
   "Keep a window [start, i] of unique letters and slide it right.",
-  "Remember the last index where each letter was seen in a map.",
-  "When the current letter was last seen inside the window, move `start` just past that spot.",
+  "Remember the last index where each letter was seen in a `std::unordered_map<char, int>`.",
+  "When the current letter was last seen inside the window (`it->second >= start`), move `start` just past that spot. `std::max` (from `<algorithm>`) keeps the best length; both its arguments must be `int`.",
 ]
 reference = '''
-fn longest_unique(s: string) -> int {
-    let last = map<char, int>();
-    let best = 0;
-    let start = 0;
-    for i in range(len(s)) {
-        let c = s[i];
-        if last.contains(c) and last[c] >= start {
-            start = last[c] + 1;
+#include <algorithm>
+#include <unordered_map>
+
+int longestUnique(const std::string& s) {
+    std::unordered_map<char, int> last;
+    int best = 0;
+    int start = 0;
+    for (int i = 0; i < static_cast<int>(s.size()); ++i) {
+        const char c = s[i];
+        if (auto it = last.find(c); it != last.end() && it->second >= start) {
+            start = it->second + 1;
         }
         last[c] = i;
-        best = max(best, i - start + 1);
+        best = std::max(best, i - start + 1);
     }
     return best;
 }
 '''
 naive = '''
-fn longest_unique(s: string) -> int {
-    let best = 0;
-    for i in range(len(s)) {
-        let seen = set<char>();
-        let j = i;
-        while j < len(s) and !seen.contains(s[j]) {
-            seen.add(s[j]);
-            j += 1;
+#include <algorithm>
+#include <unordered_set>
+
+int longestUnique(const std::string& s) {
+    const int n = static_cast<int>(s.size());
+    int best = 0;
+    for (int i = 0; i < n; ++i) {
+        std::unordered_set<char> seen;
+        int j = i;
+        while (j < n && !seen.count(s[j])) {
+            seen.insert(s[j]);
+            ++j;
         }
-        best = max(best, j - i);
+        best = std::max(best, j - i);
     }
     return best;
 }
@@ -49,8 +58,8 @@ fn longest_unique(s: string) -> int {
 large_steps = 2000000
 
 [medals]
-size = [74, 58, 46]
-speed = [201, 108, 75]
+size = [103, 80, 64]
+speed = [344, 184, 128]
 
 [[examples]]
 args = ["\"abcabcbb\""]

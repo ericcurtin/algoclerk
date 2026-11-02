@@ -2,45 +2,48 @@ title = "Telegraph Shorthand"
 order = 9
 story = "The telegraph office charges per character, so repeated letters are written as the letter followed by how many times it repeats."
 statement = "Compress s: each run of the same character becomes that character followed by the run length as digits. \"aaabcc\" becomes \"a3b1c2\"."
-signature = "fn compress(s: string) -> string"
-constraints = ["0 <= len(s) <= 20000", "s has no digits"]
+prelude = '''
+#include <string>
+'''
+signature = "std::string compress(const std::string& s)"
+constraints = ["0 <= s.size() <= 20000", "s has no digits"]
 technique = "Run counting with a string builder"
 big_o = "O(n) time, O(n) space"
-types = ["char", "string"]
-builtins = ["len", "to_string"]
 hints = [
   "Walk the string and count how long the current run is.",
   "When the letter changes (or the string ends), append the letter and the count.",
-  "`out += c;` appends one letter in place; `to_string(count)` makes the number a word.",
+  "`out += c;` appends one letter in place; `out += std::to_string(count);` appends the number. `out = out + c + ...` would build a whole new string on every run, which is much slower on a long telegram.",
 ]
 reference = '''
-fn compress(s: string) -> string {
-    let out = "";
-    let i = 0;
-    while i < len(s) {
-        let c = s[i];
-        let j = i;
-        while j < len(s) and s[j] == c {
-            j += 1;
+std::string compress(const std::string& s) {
+    std::string out;
+    const int n = static_cast<int>(s.size());
+    int i = 0;
+    while (i < n) {
+        const char c = s[i];
+        int j = i;
+        while (j < n && s[j] == c) {
+            ++j;
         }
         out += c;
-        out += to_string(j - i);
+        out += std::to_string(j - i);
         i = j;
     }
     return out;
 }
 '''
 naive = '''
-fn compress(s: string) -> string {
-    let out = "";
-    let i = 0;
-    while i < len(s) {
-        let c = s[i];
-        let j = i;
-        while j < len(s) and s[j] == c {
-            j += 1;
+std::string compress(const std::string& s) {
+    std::string out;
+    const int n = static_cast<int>(s.size());
+    int i = 0;
+    while (i < n) {
+        const char c = s[i];
+        int j = i;
+        while (j < n && s[j] == c) {
+            ++j;
         }
-        out = out + c + to_string(j - i);
+        out = out + c + std::to_string(j - i);
         i = j;
     }
     return out;
@@ -51,8 +54,8 @@ fn compress(s: string) -> string {
 large_steps = 2500000
 
 [medals]
-size = [69, 54, 43]
-speed = [396, 211, 146]
+size = [82, 64, 51]
+speed = [400, 214, 148]
 
 [[examples]]
 args = ["\"aaabcc\""]

@@ -2,64 +2,74 @@ title = "Both Cabinets"
 order = 6
 story = "Two cabinets hold lists of client numbers. Which clients are in both?"
 statement = "Return the numbers that occur in both a and b, each exactly once, in ascending order."
-signature = "fn common_elements(a: vec<int>, b: vec<int>) -> vec<int>"
-constraints = ["0 <= len(a), len(b) <= 20000"]
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<int> commonElements(const std::vector<int>& a, const std::vector<int>& b)"
+constraints = ["0 <= a.size(), b.size() <= 20000"]
 technique = "Hash set intersection"
 big_o = "O(n log n) time, O(n) space"
-types = ["set", "vec"]
-builtins = ["add", "contains", "intersection", "push", "sorted"]
+unlocked = ["<unordered_set>", "<set>", "<algorithm>"]
 hints = [
-  "Turn each shelf into a set.",
-  "Sets know how to `intersection` with each other.",
-  "Finish with `sorted(...)` to get an ascending shelf.",
+  "Turn one shelf into a set so that asking \"is this client in there?\" costs one step.",
+  "`std::unordered_set<int> inA(a.begin(), a.end());` builds the set from a whole shelf. Then walk `b` and ask `inA.count(x)`. Both shelves arrive as `const&`, so reading them never copies.",
+  "Each client must appear once and in ascending order: collect the matches in a `std::set<int>` (it keeps its keys sorted and drops repeats), then copy it into the answer with `std::vector<int>(common.begin(), common.end())`.",
 ]
 reference = '''
-fn common_elements(a: vec<int>, b: vec<int>) -> vec<int> {
-    let left = set<int>();
-    for x in a {
-        left.add(x);
+#include <set>
+#include <unordered_set>
+
+std::vector<int> commonElements(const std::vector<int>& a, const std::vector<int>& b) {
+    std::unordered_set<int> inA(a.begin(), a.end());
+    std::set<int> common;
+    for (int x : b) {
+        if (inA.count(x) != 0) {
+            common.insert(x);
+        }
     }
-    let right = set<int>();
-    for x in b {
-        right.add(x);
-    }
-    return sorted(left.intersection(right));
+    return std::vector<int>(common.begin(), common.end());
 }
 '''
 naive = '''
-fn common_elements(a: vec<int>, b: vec<int>) -> vec<int> {
-    let out: vec<int> = [];
-    for x in a {
-        if b.contains(x) and !out.contains(x) {
-            out.push(x);
+#include <algorithm>
+
+std::vector<int> commonElements(const std::vector<int>& a, const std::vector<int>& b) {
+    std::vector<int> out;
+    for (int x : a) {
+        const bool inB = std::find(b.begin(), b.end(), x) != b.end();
+        const bool seen = std::find(out.begin(), out.end(), x) != out.end();
+        if (inB && !seen) {
+            out.push_back(x);
         }
     }
-    return sorted(out);
+    std::sort(out.begin(), out.end());
+    return out;
 }
 '''
 
 [budgets]
 large_steps = 3000000
+sweep_n0 = 256
 
 [medals]
-size = [34, 27, 21]
-speed = [115, 62, 43]
+size = [52, 40, 32]
+speed = [100, 53, 38]
 
 [[examples]]
-args = ["[1, 2, 2, 1]", "[2, 2]"]
-expect = "[2]"
+args = ["{1, 2, 2, 1}", "{2, 2}"]
+expect = "{2}"
 
 [[examples]]
-args = ["[4, 9, 5]", "[9, 4, 9, 8, 4]"]
-expect = "[4, 9]"
+args = ["{4, 9, 5}", "{9, 4, 9, 8, 4}"]
+expect = "{4, 9}"
 
 [[examples]]
-args = ["[1]", "[2]"]
-expect = "[]"
+args = ["{1}", "{2}"]
+expect = "{}"
 
 [[tests]]
-args = ["[]", "[1]"]
-expect = "[]"
+args = ["{}", "{1}"]
+expect = "{}"
 
 [[generate]]
 seed = 251

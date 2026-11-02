@@ -1,63 +1,77 @@
 title = "Sort It Yourself"
 order = 10
 story = "The sorting machine is broken, and the order desk is open. Sort the numbers by hand, but cleverly: dividing the pile is faster than shuffling it around."
-statement = "Return nums in ascending order. The `sorted` and `sort` tools are locked. Helper functions and recursion are unlocked."
-signature = "fn sort_it(nums: vec<int>) -> vec<int>"
-constraints = ["0 <= len(nums) <= 3000"]
+statement = "Return nums in ascending order. The library sorting tools (`std::sort`, `std::stable_sort`, `std::partial_sort`, `std::merge`, `std::inplace_merge`) are locked. Helper functions and recursion are unlocked."
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<int> sortShelf(const std::vector<int>& nums)"
+constraints = ["0 <= nums.size() <= 3000"]
 technique = "Merge sort (divide and conquer)"
 big_o = "O(n log n) time, O(n) space"
-types = ["vec"]
-builtins = ["len", "push", "swap"]
-locked = [{ name = "sorted", why = "Sorting it yourself is the lesson." }, { name = "sort", why = "Same reason." }]
+locked = [
+  { name = "std::sort", why = "Sorting it yourself is the lesson." },
+  { name = "std::stable_sort", why = "Same reason." },
+  { name = "std::partial_sort", why = "Same reason." },
+  { name = "std::merge", why = "Merging is the half of the lesson you have to write." },
+  { name = "std::inplace_merge", why = "Same reason." },
+  { name = "<algorithm>", why = "That drawer only holds tools that sort or merge for you." },
+]
 hints = [
   "Split the shelf in the middle, sort both halves, then merge.",
-  "Merging two sorted shelves: repeatedly take the smaller front item.",
-  "A helper `fn msort(nums: vec<int>) -> vec<int>` can call itself on the halves `nums[0..mid]` and `nums[mid..]`.",
+  "Merging two sorted shelves: repeatedly take the smaller front item. Write it as a helper `std::vector<int> mergeHalves(const std::vector<int>& left, const std::vector<int>& right)`.",
+  "`sortShelf` can call itself on the halves: `std::vector<int> left(nums.begin(), nums.begin() + mid);` copies the first half (a copy costs its length, which is where the O(n) per level comes from). Take every shelf by `const&` so that only these deliberate copies are charged.",
 ]
 reference = '''
-fn msort(nums: vec<int>) -> vec<int> {
-    if len(nums) <= 1 {
-        return nums;
-    }
-    let mid = len(nums) / 2;
-    let left = msort(nums[0..mid]);
-    let right = msort(nums[mid..]);
-    let out: vec<int> = [];
-    let i = 0;
-    let j = 0;
-    while i < len(left) and j < len(right) {
-        if left[i] <= right[j] {
-            out.push(left[i]);
-            i += 1;
+std::vector<int> mergeHalves(const std::vector<int>& left, const std::vector<int>& right) {
+    const int n = static_cast<int>(left.size());
+    const int m = static_cast<int>(right.size());
+    std::vector<int> out;
+    int i = 0;
+    int j = 0;
+    while (i < n && j < m) {
+        if (left[i] <= right[j]) {
+            out.push_back(left[i]);
+            ++i;
         } else {
-            out.push(right[j]);
-            j += 1;
+            out.push_back(right[j]);
+            ++j;
         }
     }
-    while i < len(left) {
-        out.push(left[i]);
-        i += 1;
+    while (i < n) {
+        out.push_back(left[i]);
+        ++i;
     }
-    while j < len(right) {
-        out.push(right[j]);
-        j += 1;
+    while (j < m) {
+        out.push_back(right[j]);
+        ++j;
     }
     return out;
 }
 
-fn sort_it(nums: vec<int>) -> vec<int> {
-    return msort(nums);
+std::vector<int> sortShelf(const std::vector<int>& nums) {
+    const int n = static_cast<int>(nums.size());
+    if (n <= 1) {
+        return nums;
+    }
+    const int mid = n / 2;
+    const std::vector<int> left = sortShelf(std::vector<int>(nums.begin(), nums.begin() + mid));
+    const std::vector<int> right = sortShelf(std::vector<int>(nums.begin() + mid, nums.end()));
+    return mergeHalves(left, right);
 }
 '''
 naive = '''
-fn sort_it(nums: vec<int>) -> vec<int> {
-    let out = nums;
-    for i in range(1, len(out)) {
-        let j = i;
-        while j > 0 and out[j - 1] > out[j] {
-            out.swap(j - 1, j);
-            j -= 1;
+std::vector<int> sortShelf(const std::vector<int>& nums) {
+    std::vector<int> out = nums;
+    const int n = static_cast<int>(out.size());
+    for (int i = 1; i < n; ++i) {
+        const int value = out[i];
+        int j = i;
+        while (j > 0 && out[j - 1] > value) {
+            out[j] = out[j - 1];
+            --j;
         }
+        out[j] = value;
     }
     return out;
 }
@@ -71,24 +85,24 @@ recursion = true
 large_steps = 3000000
 
 [medals]
-size = [157, 123, 98]
-speed = [973, 519, 358]
+size = [210, 164, 131]
+speed = [1146, 612, 422]
 
 [[examples]]
-args = ["[5, 2, 3, 1]"]
-expect = "[1, 2, 3, 5]"
+args = ["{5, 2, 3, 1}"]
+expect = "{1, 2, 3, 5}"
 
 [[examples]]
-args = ["[]"]
-expect = "[]"
+args = ["{}"]
+expect = "{}"
 
 [[examples]]
-args = ["[3, 3, 1]"]
-expect = "[1, 3, 3]"
+args = ["{3, 3, 1}"]
+expect = "{1, 3, 3}"
 
 [[tests]]
-args = ["[1]"]
-expect = "[1]"
+args = ["{1}"]
+expect = "{1}"
 
 [[generate]]
 seed = 491

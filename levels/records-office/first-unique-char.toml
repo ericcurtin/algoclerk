@@ -2,25 +2,29 @@ title = "The Lonely Letter"
 order = 5
 story = "One letter in every title is printed only once and the archivist wants to know which, so she can start filing from it."
 statement = "Return the index of the first character of s that occurs exactly once in s, or -1 if there is none."
-signature = "fn first_unique(s: string) -> int"
-constraints = ["0 <= len(s) <= 20000"]
+prelude = '''
+#include <string>
+'''
+signature = "int firstUnique(const std::string& s)"
+constraints = ["0 <= s.size() <= 20000"]
 technique = "Hash map counting"
 big_o = "O(n) time, O(k) space"
-types = ["char", "map", "string"]
-builtins = ["count", "get", "len"]
+unlocked = ["<unordered_map>", "<algorithm>"]
 hints = [
   "Counting how often each letter appears needs one pass.",
-  "A second pass finds the first letter whose count is 1.",
-  "`counts.get(c, 0)` reads a count with a default.",
+  "A `std::unordered_map<char, int>` (from `<unordered_map>`) keeps the counts: `++counts[c];` starts a missing letter at 0 for you.",
+  "A second pass finds the first position whose letter has count 1. Loop with `int i` up to `static_cast<int>(s.size())` to avoid signed/unsigned warnings.",
 ]
 reference = '''
-fn first_unique(s: string) -> int {
-    let counts = map<char, int>();
-    for c in s {
-        counts[c] = counts.get(c, 0) + 1;
+#include <unordered_map>
+
+int firstUnique(const std::string& s) {
+    std::unordered_map<char, int> counts;
+    for (char c : s) {
+        ++counts[c];
     }
-    for i in range(len(s)) {
-        if counts[s[i]] == 1 {
+    for (int i = 0; i < static_cast<int>(s.size()); ++i) {
+        if (counts[s[i]] == 1) {
             return i;
         }
     }
@@ -28,9 +32,11 @@ fn first_unique(s: string) -> int {
 }
 '''
 naive = '''
-fn first_unique(s: string) -> int {
-    for i in range(len(s)) {
-        if s.count(s[i]) == 1 {
+#include <algorithm>
+
+int firstUnique(const std::string& s) {
+    for (int i = 0; i < static_cast<int>(s.size()); ++i) {
+        if (std::count(s.begin(), s.end(), s[i]) == 1) {
             return i;
         }
     }
@@ -42,8 +48,8 @@ fn first_unique(s: string) -> int {
 large_steps = 1500000
 
 [medals]
-size = [47, 37, 29]
-speed = [119, 64, 45]
+size = [56, 44, 35]
+speed = [142, 76, 53]
 
 [[examples]]
 args = ["\"leetcode\""]

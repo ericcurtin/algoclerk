@@ -2,28 +2,29 @@ title = "Everyone Else's Product"
 order = 5
 story = "The statistician wants, for every measurement, the product of all the other measurements, and her calculator has no divide key."
 statement = "Return a shelf where slot i holds the product of every number in nums except nums[i]. Do not use division."
-signature = "fn product_except_self(nums: vec<int>) -> vec<int>"
-constraints = ["0 <= len(nums) <= 20000", "products fit in a 64-bit number"]
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<long long> productExceptSelf(const std::vector<long long>& nums)"
+constraints = ["0 <= nums.size() <= 20000", "the product of all numbers fits in a 64-bit number"]
 technique = "Prefix and suffix products"
 big_o = "O(n) time, O(n) space"
-types = ["vec"]
-builtins = ["len", "push"]
 hints = [
   "The answer for slot i is (product of everything left of i) * (product of everything right of i).",
-  "A first pass fills the slots with the left products.",
-  "A second pass from the right multiplies in the right products with a running variable.",
+  "A first pass fills the slots with the left products: `std::vector<long long> out(n, 1);` and a running `long long left = 1;`. Products grow fast, which is why this level uses `long long` instead of `int` (an `int` overflow is undefined behaviour in C++).",
+  "A second pass from the right multiplies in the right products with a running variable: `for (int i = n - 1; i >= 0; --i) { out[i] *= right; right *= nums[i]; }`.",
 ]
 reference = '''
-fn product_except_self(nums: vec<int>) -> vec<int> {
-    let n = len(nums);
-    let out = [1; n];
-    let left = 1;
-    for i in range(n) {
+std::vector<long long> productExceptSelf(const std::vector<long long>& nums) {
+    const int n = static_cast<int>(nums.size());
+    std::vector<long long> out(n, 1);
+    long long left = 1;
+    for (int i = 0; i < n; ++i) {
         out[i] = left;
         left *= nums[i];
     }
-    let right = 1;
-    for i in range(n - 1, -1, -1) {
+    long long right = 1;
+    for (int i = n - 1; i >= 0; --i) {
         out[i] *= right;
         right *= nums[i];
     }
@@ -31,16 +32,17 @@ fn product_except_self(nums: vec<int>) -> vec<int> {
 }
 '''
 naive = '''
-fn product_except_self(nums: vec<int>) -> vec<int> {
-    let out: vec<int> = [];
-    for i in range(len(nums)) {
-        let p = 1;
-        for j in range(len(nums)) {
-            if j != i {
+std::vector<long long> productExceptSelf(const std::vector<long long>& nums) {
+    const int n = static_cast<int>(nums.size());
+    std::vector<long long> out;
+    for (int i = 0; i < n; ++i) {
+        long long p = 1;
+        for (int j = 0; j < n; ++j) {
+            if (j != i) {
                 p *= nums[j];
             }
         }
-        out.push(p);
+        out.push_back(p);
     }
     return out;
 }
@@ -50,28 +52,28 @@ fn product_except_self(nums: vec<int>) -> vec<int> {
 large_steps = 3000000
 
 [medals]
-size = [66, 52, 41]
-speed = [179, 96, 67]
+size = [93, 73, 58]
+speed = [253, 135, 94]
 
 [[examples]]
-args = ["[1, 2, 3, 4]"]
-expect = "[24, 12, 8, 6]"
+args = ["{1, 2, 3, 4}"]
+expect = "{24, 12, 8, 6}"
 
 [[examples]]
-args = ["[-1, 1, 0, -3, 3]"]
-expect = "[0, 0, 9, 0, 0]"
+args = ["{-1, 1, 0, -3, 3}"]
+expect = "{0, 0, 9, 0, 0}"
 
 [[examples]]
-args = ["[]"]
-expect = "[]"
+args = ["{}"]
+expect = "{}"
 
 [[tests]]
-args = ["[5]"]
-expect = "[1]"
+args = ["{5}"]
+expect = "{1}"
 
 [[tests]]
-args = ["[2, 3]"]
-expect = "[3, 2]"
+args = ["{2, 3}"]
+expect = "{3, 2}"
 
 [[generate]]
 seed = 441

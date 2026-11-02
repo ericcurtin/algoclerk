@@ -2,53 +2,64 @@ title = "Matching Brackets"
 order = 1
 story = "The typesetter's drawers hold three kinds of brackets. A page is only printable when every bracket that opens is closed by the right kind, in the right order."
 statement = "s contains only the characters ( ) [ ] { }. Return true if every opening bracket is closed by the same kind of closing bracket in the correct order."
-signature = "fn is_balanced(s: string) -> bool"
-constraints = ["0 <= len(s) <= 20000", "s uses only ( ) [ ] { }"]
+prelude = '''
+#include <string>
+'''
+signature = "bool isBalanced(const std::string& s)"
+constraints = ["0 <= s.size() <= 20000", "s uses only ( ) [ ] { }"]
 technique = "Stack"
 big_o = "O(n) time, O(n) space"
-types = ["char", "stack", "string"]
-builtins = ["is_empty", "len", "pop", "push", "replace"]
+unlocked = ["<stack>"]
 hints = [
-  "The most recent unclosed bracket must be closed first: that is a stack.",
-  "Push every opening bracket. For a closing bracket, pop and compare.",
-  "Fail if the stack is empty on a closing bracket, and also fail if it is not empty at the end.",
+  "The most recent unclosed bracket must be closed first: that is a `std::stack<char>` (from `<stack>`).",
+  "Push every opening bracket. For a closing bracket, read `top()`, call `pop()` and compare.",
+  "Fail if the stack is empty on a closing bracket (`top()` of an empty stack is an error), and also fail if it is not empty at the end.",
 ]
 reference = '''
-fn is_balanced(s: string) -> bool {
-    let open = stack<char>();
-    for c in s {
-        if c == '(' or c == '[' or c == '{' {
+#include <stack>
+
+bool isBalanced(const std::string& s) {
+    std::stack<char> open;
+    for (char c : s) {
+        if (c == '(' || c == '[' || c == '{') {
             open.push(c);
         } else {
-            if open.is_empty() {
+            if (open.empty()) {
                 return false;
             }
-            let top = open.pop();
-            if c == ')' and top != '(' {
+            const char top = open.top();
+            open.pop();
+            if (c == ')' && top != '(') {
                 return false;
             }
-            if c == ']' and top != '[' {
+            if (c == ']' && top != '[') {
                 return false;
             }
-            if c == '}' and top != '{' {
+            if (c == '}' && top != '{') {
                 return false;
             }
         }
     }
-    return open.is_empty();
+    return open.empty();
 }
 '''
 naive = '''
-fn is_balanced(s: string) -> bool {
-    let cur = s;
-    while len(cur) > 0 {
-        let next = cur.replace("()", "").replace("[]", "").replace("{}", "");
-        if len(next) == len(cur) {
-            return false;
+bool isBalanced(const std::string& s) {
+    std::string cur = s;
+    bool changed = true;
+    while (changed) {
+        changed = false;
+        for (std::size_t i = 0; i + 1 < cur.size(); ++i) {
+            const char a = cur[i];
+            const char b = cur[i + 1];
+            if ((a == '(' && b == ')') || (a == '[' && b == ']') || (a == '{' && b == '}')) {
+                cur.erase(i, 2);
+                changed = true;
+                break;
+            }
         }
-        cur = next;
     }
-    return true;
+    return cur.empty();
 }
 '''
 
@@ -56,8 +67,8 @@ fn is_balanced(s: string) -> bool {
 large_steps = 3000000
 
 [medals]
-size = [98, 77, 61]
-speed = [213, 114, 80]
+size = [120, 94, 75]
+speed = [230, 123, 86]
 
 [[examples]]
 args = ["\"()[]{}\""]

@@ -2,38 +2,45 @@ title = "Back-to-Front Calculator"
 order = 3
 story = "The old office calculator takes its numbers first and its operator last: 3 4 + means 3 plus 4. The clerk needs a program that reads such tapes."
 statement = "tokens is a valid expression in reverse Polish notation: numbers as text, and the operators + - * /. Return its value. Division truncates toward zero."
-signature = "fn eval_rpn(tokens: vec<string>) -> int"
-constraints = ["1 <= len(tokens) <= 20001", "the expression is valid and never divides by zero"]
+prelude = '''
+#include <string>
+#include <vector>
+'''
+signature = "int evalRpn(const std::vector<std::string>& tokens)"
+constraints = ["1 <= tokens.size() <= 20001", "the expression is valid and never divides by zero", "every value fits in an int"]
 technique = "Stack evaluation"
 big_o = "O(n) time, O(n) space"
-types = ["stack", "string", "vec"]
-builtins = ["pop", "push", "to_int"]
+unlocked = ["<stack>"]
 hints = [
-  "Numbers go on a stack. An operator takes the two top numbers.",
-  "Pop `b` first, then `a`: the result is `a op b`.",
-  "`to_int(token)` turns a numeral into a number; compare tokens with `==`.",
+  "Numbers go on a `std::stack<int>` (from `<stack>`). An operator takes the two top numbers.",
+  "Read `top()` and call `pop()` for `b` first, then for `a`: the result is `a op b`.",
+  "`std::stoi(token)` turns a numeral into a number (negative ones like \"-4\" too, so check `token.size() == 1` before you treat a '-' as an operator). Compare tokens with `==`, and loop with `const auto& t` to avoid copying each string.",
 ]
 reference = '''
-fn eval_rpn(tokens: vec<string>) -> int {
-    let st = stack<int>();
-    for t in tokens {
-        if t == "+" or t == "-" or t == "*" or t == "/" {
-            let b = st.pop();
-            let a = st.pop();
-            if t == "+" {
+#include <stack>
+
+int evalRpn(const std::vector<std::string>& tokens) {
+    std::stack<int> st;
+    for (const auto& t : tokens) {
+        if (t == "+" || t == "-" || t == "*" || t == "/") {
+            const int b = st.top();
+            st.pop();
+            const int a = st.top();
+            st.pop();
+            if (t == "+") {
                 st.push(a + b);
-            } else if t == "-" {
+            } else if (t == "-") {
                 st.push(a - b);
-            } else if t == "*" {
+            } else if (t == "*") {
                 st.push(a * b);
             } else {
                 st.push(a / b);
             }
         } else {
-            st.push(to_int(t));
+            st.push(std::stoi(t));
         }
     }
-    return st.pop();
+    return st.top();
 }
 '''
 
@@ -41,27 +48,27 @@ fn eval_rpn(tokens: vec<string>) -> int {
 large_steps = 2500000
 
 [medals]
-size = [112, 88, 70]
-speed = [338, 181, 125]
+size = [149, 117, 93]
+speed = [482, 257, 178]
 
 [[examples]]
-args = ["[\"2\", \"1\", \"+\", \"3\", \"*\"]"]
+args = ["{\"2\", \"1\", \"+\", \"3\", \"*\"}"]
 expect = "9"
 
 [[examples]]
-args = ["[\"4\", \"13\", \"5\", \"/\", \"+\"]"]
+args = ["{\"4\", \"13\", \"5\", \"/\", \"+\"}"]
 expect = "6"
 
 [[examples]]
-args = ["[\"7\"]"]
+args = ["{\"7\"}"]
 expect = "7"
 
 [[tests]]
-args = ["[\"3\", \"-4\", \"+\"]"]
+args = ["{\"3\", \"-4\", \"+\"}"]
 expect = "-1"
 
 [[tests]]
-args = ["[\"-7\", \"2\", \"/\"]"]
+args = ["{\"-7\", \"2\", \"/\"}"]
 expect = "-3"
 
 [[generate]]

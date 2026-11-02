@@ -2,26 +2,27 @@ title = "Swap Rows and Columns"
 order = 1
 story = "The seating chart was drawn sideways. Flip it so that every row becomes a column."
 statement = "Return the transpose of grid: the item at row r, column c moves to row c, column r. grid has at least one row and every row has the same length."
-signature = "fn transpose(grid: vec<vec<int>>) -> vec<vec<int>>"
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<std::vector<int>> transpose(const std::vector<std::vector<int>>& grid)"
 constraints = ["1 <= rows, cols", "rows * cols <= 40000"]
 technique = "Nested loops over a matrix"
 big_o = "O(n) time, O(n) space"
-types = ["vec"]
-builtins = ["len", "push"]
 hints = [
   "The answer has as many rows as the input has columns.",
-  "Build one new row at a time: the new row c collects `grid[r][c]` for every r.",
-  "Two nested loops: the outer over columns, the inner over rows.",
+  "Start from a fresh matrix of the right shape: `std::vector<std::vector<int>> out(cols, std::vector<int>(rows));`.",
+  "Two nested loops: `out[c][r] = grid[r][c];`. Take `grid` by `const&`: a by-value copy would cost one unit per item before you even start.",
 ]
 reference = '''
-fn transpose(grid: vec<vec<int>>) -> vec<vec<int>> {
-    let out: vec<vec<int>> = [];
-    for c in range(len(grid[0])) {
-        let row: vec<int> = [];
-        for r in range(len(grid)) {
-            row.push(grid[r][c]);
+std::vector<std::vector<int>> transpose(const std::vector<std::vector<int>>& grid) {
+    const int rows = static_cast<int>(grid.size());
+    const int cols = static_cast<int>(grid[0].size());
+    std::vector<std::vector<int>> out(cols, std::vector<int>(rows));
+    for (int r = 0; r < rows; ++r) {
+        for (int c = 0; c < cols; ++c) {
+            out[c][r] = grid[r][c];
         }
-        out.push(row);
     }
     return out;
 }
@@ -31,20 +32,20 @@ fn transpose(grid: vec<vec<int>>) -> vec<vec<int>> {
 large_steps = 3000000
 
 [medals]
-size = [42, 33, 26]
-speed = [162, 87, 61]
+size = [77, 60, 48]
+speed = [247, 132, 92]
 
 [[examples]]
-args = ["[[1, 2, 3], [4, 5, 6]]"]
-expect = "[[1, 4], [2, 5], [3, 6]]"
+args = ["{{1, 2, 3}, {4, 5, 6}}"]
+expect = "{{1, 4}, {2, 5}, {3, 6}}"
 
 [[examples]]
-args = ["[[7]]"]
-expect = "[[7]]"
+args = ["{{7}}"]
+expect = "{{7}}"
 
 [[tests]]
-args = ["[[1], [2], [3]]"]
-expect = "[[1, 2, 3]]"
+args = ["{{1}, {2}, {3}}"]
+expect = "{{1, 2, 3}}"
 
 [[generate]]
 seed = 601

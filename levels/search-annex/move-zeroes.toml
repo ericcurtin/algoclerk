@@ -1,33 +1,43 @@
 title = "Zeroes to the Back"
 order = 11
 story = "A shelf of folders has empty folders (marked 0) scattered through it. Push them all to the back without changing the order of the others, and without adding or removing slots."
-statement = "Return nums with every 0 moved to the end, keeping the order of the non-zero items. The tools that grow or shrink a shelf (push, insert, remove) are locked: write into slots with a write pointer."
-signature = "fn move_zeroes(nums: vec<int>) -> vec<int>"
-constraints = ["0 <= len(nums) <= 20000"]
+statement = "Return nums with every 0 moved to the end, keeping the order of the non-zero items. The tools that grow or shrink a shelf (`push_back`, `insert`, `erase`, `std::remove`) are locked: write into slots with a write pointer."
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<int> moveZeroes(std::vector<int> nums)"
+constraints = ["0 <= nums.size() <= 20000"]
 technique = "Two pointers (read and write)"
 big_o = "O(n) time, O(n) space"
-types = ["vec"]
-builtins = ["len"]
-locked = [{ name = "push", why = "Overwrite slots instead." }, { name = "insert", why = "Overwrite slots instead." }, { name = "remove", why = "Overwrite slots instead." }]
+locked = [
+  { name = "std::vector::push_back", why = "Overwrite slots instead." },
+  { name = "std::vector::emplace_back", why = "Overwrite slots instead." },
+  { name = "std::vector::insert", why = "Overwrite slots instead." },
+  { name = "std::vector::erase", why = "Overwrite slots instead." },
+  { name = "std::remove", why = "It is the whole write-pointer trick, done for you." },
+  { name = "std::remove_if", why = "Same reason." },
+  { name = "std::stable_partition", why = "Same reason." },
+  { name = "<algorithm>", why = "That drawer only holds tools that shuffle the shelf for you." },
+]
 hints = [
   "Keep a write index `w` that points at the next slot for a non-zero item.",
-  "Walk the shelf; every non-zero item is copied to slot `w`, then `w` grows.",
+  "Walk the shelf; every non-zero item is copied to slot `w`, then `w` grows. `nums` arrives by value, so it is your own copy (the copy costs n once): overwrite it in place and `return nums;`, which hands it back without another copy.",
   "Afterwards fill the slots from `w` to the end with zeros.",
 ]
 reference = '''
-fn move_zeroes(nums: vec<int>) -> vec<int> {
-    let out = nums;
-    let w = 0;
-    for i in range(len(out)) {
-        if out[i] != 0 {
-            out[w] = out[i];
-            w += 1;
+std::vector<int> moveZeroes(std::vector<int> nums) {
+    const int n = static_cast<int>(nums.size());
+    int w = 0;
+    for (int i = 0; i < n; ++i) {
+        if (nums[i] != 0) {
+            nums[w] = nums[i];
+            ++w;
         }
     }
-    for i in range(w, len(out)) {
-        out[i] = 0;
+    for (int i = w; i < n; ++i) {
+        nums[i] = 0;
     }
-    return out;
+    return nums;
 }
 '''
 
@@ -35,24 +45,24 @@ fn move_zeroes(nums: vec<int>) -> vec<int> {
 large_steps = 3000000
 
 [medals]
-size = [55, 43, 34]
-speed = [159, 85, 59]
+size = [82, 64, 51]
+speed = [226, 121, 84]
 
 [[examples]]
-args = ["[0, 1, 0, 3, 12]"]
-expect = "[1, 3, 12, 0, 0]"
+args = ["{0, 1, 0, 3, 12}"]
+expect = "{1, 3, 12, 0, 0}"
 
 [[examples]]
-args = ["[0]"]
-expect = "[0]"
+args = ["{0}"]
+expect = "{0}"
 
 [[examples]]
-args = ["[]"]
-expect = "[]"
+args = ["{}"]
+expect = "{}"
 
 [[tests]]
-args = ["[1, 2, 3]"]
-expect = "[1, 2, 3]"
+args = ["{1, 2, 3}"]
+expect = "{1, 2, 3}"
 
 [[generate]]
 seed = 501

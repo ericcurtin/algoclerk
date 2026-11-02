@@ -2,34 +2,38 @@ title = "Double Filed"
 order = 2
 story = "Somebody filed the same invoice twice. Before the audit, find out whether any invoice number shows up more than once."
 statement = "Return true if some value appears at least twice in nums."
-signature = "fn has_duplicate(nums: vec<int>) -> bool"
-constraints = ["0 <= len(nums) <= 20000"]
+prelude = '''
+#include <vector>
+'''
+signature = "bool hasDuplicate(const std::vector<int>& nums)"
+constraints = ["0 <= nums.size() <= 20000"]
 technique = "Hash set membership"
 big_o = "O(n) time, O(n) space"
-types = ["set", "vec"]
-builtins = ["add", "contains", "len"]
+unlocked = ["<unordered_set>"]
 hints = [
   "Remember every number you have already seen.",
-  "A `set<int>` answers `contains` in one step.",
-  "If the current number is in the set, return true; otherwise add it.",
+  "A `std::unordered_set<int>` answers `seen.count(x)` in one step (1 if present, 0 if not). `nums` is a `const std::vector<int>&`, so reading it never copies it.",
+  "If the current number is already in the set, return true; otherwise `seen.insert(x);` and carry on. `insert` even tells you whether the value was new: `seen.insert(x).second`.",
 ]
 reference = '''
-fn has_duplicate(nums: vec<int>) -> bool {
-    let seen = set<int>();
-    for x in nums {
-        if seen.contains(x) {
+#include <unordered_set>
+
+bool hasDuplicate(const std::vector<int>& nums) {
+    std::unordered_set<int> seen;
+    for (int x : nums) {
+        if (!seen.insert(x).second) {
             return true;
         }
-        seen.add(x);
     }
     return false;
 }
 '''
 naive = '''
-fn has_duplicate(nums: vec<int>) -> bool {
-    for i in range(len(nums)) {
-        for j in range(i + 1, len(nums)) {
-            if nums[i] == nums[j] {
+bool hasDuplicate(const std::vector<int>& nums) {
+    const int n = static_cast<int>(nums.size());
+    for (int i = 0; i < n; ++i) {
+        for (int j = i + 1; j < n; ++j) {
+            if (nums[i] == nums[j]) {
                 return true;
             }
         }
@@ -43,26 +47,26 @@ large_steps = 2500000
 
 [medals]
 size = [26, 20, 16]
-speed = [57, 30, 22]
+speed = [63, 34, 24]
 
 [[examples]]
-args = ["[1, 2, 3, 1]"]
+args = ["{1, 2, 3, 1}"]
 expect = "true"
 
 [[examples]]
-args = ["[1, 2, 3]"]
+args = ["{1, 2, 3}"]
 expect = "false"
 
 [[examples]]
-args = ["[]"]
+args = ["{}"]
 expect = "false"
 
 [[tests]]
-args = ["[7, 7]"]
+args = ["{7, 7}"]
 expect = "true"
 
 [[tests]]
-args = ["[0]"]
+args = ["{0}"]
 expect = "false"
 
 [[generate]]

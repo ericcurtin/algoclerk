@@ -2,55 +2,67 @@ title = "Most Requested Files"
 order = 5
 story = "The archive counts how often every file number is requested. The manager wants the k most requested numbers for the lobby board."
 statement = "Return the k values that occur most often in nums, ordered from most to least frequent; values with the same count are ordered smaller first. If there are fewer than k different values, return all of them."
-signature = "fn top_k(nums: vec<int>, k: int) -> vec<int>"
-constraints = ["0 <= len(nums) <= 20000", "0 <= k"]
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<int> topK(const std::vector<int>& nums, int k)"
+constraints = ["0 <= nums.size() <= 20000", "0 <= k"]
 technique = "Hash map counting plus sorting"
 big_o = "O(n log n) time, O(n) space"
-types = ["map", "tuple", "vec"]
-builtins = ["get", "items", "len", "min", "push", "sorted", "swap"]
+unlocked = ["<unordered_map>", "<map>", "<algorithm>", "<utility>"]
 hints = [
-  "First count every value with a map.",
-  "`counts.items()` gives (value, count) pairs. Make pairs `(-count, value)`: sorting them puts the most frequent first, ties by smaller value.",
-  "Take the first k entries of the sorted shelf (watch out when k is bigger than the shelf!).",
+  "First count every value with a map: `++counts[x];`.",
+  "Walk the map with `for (const auto& [value, count] : counts)` and make pairs `{-count, value}`: sorting `std::pair`s compares the first member, then the second, so the most frequent come first and ties go to the smaller value.",
+  "Sort the pairs with `std::sort(ranked.begin(), ranked.end())` and take the first k entries: `std::min(k, static_cast<int>(ranked.size()))` guards against a k bigger than the shelf.",
 ]
 reference = '''
-fn top_k(nums: vec<int>, k: int) -> vec<int> {
-    let counts = map<int, int>();
-    for x in nums {
-        counts[x] = counts.get(x, 0) + 1;
+#include <algorithm>
+#include <unordered_map>
+#include <utility>
+
+std::vector<int> topK(const std::vector<int>& nums, int k) {
+    std::unordered_map<int, int> counts;
+    for (int x : nums) {
+        ++counts[x];
     }
-    let ranked: vec<(int, int)> = [];
-    for (v, c) in counts.items() {
-        ranked.push((-c, v));
+    std::vector<std::pair<int, int>> ranked;
+    for (const auto& [value, count] : counts) {
+        ranked.push_back({-count, value});
     }
-    let order = sorted(ranked);
-    let out: vec<int> = [];
-    for i in range(min(k, len(order))) {
-        out.push(order[i].1);
+    std::sort(ranked.begin(), ranked.end());
+    std::vector<int> out;
+    const int take = std::min(k, static_cast<int>(ranked.size()));
+    for (int i = 0; i < take; ++i) {
+        out.push_back(ranked[i].second);
     }
     return out;
 }
 '''
 naive = '''
-fn top_k(nums: vec<int>, k: int) -> vec<int> {
-    let counts = map<int, int>();
-    for x in nums {
-        counts[x] = counts.get(x, 0) + 1;
+#include <algorithm>
+#include <unordered_map>
+#include <utility>
+
+std::vector<int> topK(const std::vector<int>& nums, int k) {
+    std::unordered_map<int, int> counts;
+    for (int x : nums) {
+        ++counts[x];
     }
-    let ranked: vec<(int, int)> = [];
-    for (v, c) in counts.items() {
-        ranked.push((-c, v));
+    std::vector<std::pair<int, int>> ranked;
+    for (const auto& [value, count] : counts) {
+        ranked.push_back({-count, value});
     }
-    let out: vec<int> = [];
-    for round in range(min(k, len(ranked))) {
-        let best = round;
-        for i in range(round + 1, len(ranked)) {
-            if ranked[i] < ranked[best] {
+    const int n = static_cast<int>(ranked.size());
+    std::vector<int> out;
+    for (int round = 0; round < std::min(k, n); ++round) {
+        int best = round;
+        for (int i = round + 1; i < n; ++i) {
+            if (ranked[i] < ranked[best]) {
                 best = i;
             }
         }
-        ranked.swap(round, best);
-        out.push(ranked[round].1);
+        std::swap(ranked[round], ranked[best]);
+        out.push_back(ranked[round].second);
     }
     return out;
 }
@@ -60,29 +72,29 @@ fn top_k(nums: vec<int>, k: int) -> vec<int> {
 large_steps = 3000000
 
 [medals]
-size = [72, 57, 45]
-speed = [258, 138, 96]
+size = [93, 73, 58]
+speed = [290, 155, 108]
 
 [[examples]]
-args = ["[1, 1, 1, 2, 2, 3]", "2"]
-expect = "[1, 2]"
+args = ["{1, 1, 1, 2, 2, 3}", "2"]
+expect = "{1, 2}"
 
 [[examples]]
-args = ["[4]", "1"]
-expect = "[4]"
+args = ["{4}", "1"]
+expect = "{4}"
 
 [[examples]]
-args = ["[1, 2]", "5"]
-expect = "[1, 2]"
+args = ["{1, 2}", "5"]
+expect = "{1, 2}"
 note = "Fewer values than k: return them all."
 
 [[tests]]
-args = ["[]", "3"]
-expect = "[]"
+args = ["{}", "3"]
+expect = "{}"
 
 [[tests]]
-args = ["[3, 3, 2, 2, 1]", "2"]
-expect = "[2, 3]"
+args = ["{3, 3, 2, 2, 1}", "2"]
+expect = "{2, 3}"
 
 [[generate]]
 seed = 241

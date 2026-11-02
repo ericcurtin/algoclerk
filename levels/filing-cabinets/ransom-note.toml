@@ -2,42 +2,45 @@ title = "Cut-Out Letters"
 order = 9
 story = "A prankster builds a note by cutting letters out of a magazine. Can the magazine supply every letter of the note?"
 statement = "Return true if note can be written using letters cut from magazine, each magazine letter used at most once."
-signature = "fn can_build(note: string, magazine: string) -> bool"
-constraints = ["0 <= len(note), len(magazine) <= 20000"]
+prelude = '''
+#include <string>
+'''
+signature = "bool canBuild(const std::string& note, const std::string& magazine)"
+constraints = ["0 <= note.size(), magazine.size() <= 20000"]
 technique = "Hash map counting"
 big_o = "O(n) time, O(k) space"
-types = ["char", "map", "string", "vec"]
-builtins = ["chars", "get", "index_of", "remove"]
+unlocked = ["<unordered_map>"]
 hints = [
-  "Count how many of each letter the magazine has.",
-  "Walk the note and use up one count for each letter.",
-  "If a count is already zero, the note cannot be built.",
+  "Count how many of each letter the magazine has: a `std::unordered_map<char, int>` from letter to count, filled with `++stock[c];`.",
+  "Walk the note and use up one count for each letter. Both strings are `const std::string&`, so reading them never copies them.",
+  "If the count of a letter is already zero, the note cannot be built: `if (stock[c] == 0) { return false; }`, otherwise `--stock[c];`.",
 ]
 reference = '''
-fn can_build(note: string, magazine: string) -> bool {
-    let stock = map<char, int>();
-    for c in magazine {
-        stock[c] = stock.get(c, 0) + 1;
+#include <unordered_map>
+
+bool canBuild(const std::string& note, const std::string& magazine) {
+    std::unordered_map<char, int> stock;
+    for (char c : magazine) {
+        ++stock[c];
     }
-    for c in note {
-        let left = stock.get(c, 0);
-        if left == 0 {
+    for (char c : note) {
+        if (stock[c] == 0) {
             return false;
         }
-        stock[c] = left - 1;
+        --stock[c];
     }
     return true;
 }
 '''
 naive = '''
-fn can_build(note: string, magazine: string) -> bool {
-    let rest = magazine.chars();
-    for c in note {
-        let i = rest.index_of(c);
-        if i < 0 {
+bool canBuild(const std::string& note, const std::string& magazine) {
+    std::string rest = magazine;
+    for (char c : note) {
+        const std::size_t i = rest.find(c);
+        if (i == std::string::npos) {
             return false;
         }
-        rest.remove(i);
+        rest.erase(i, 1);
     }
     return true;
 }
@@ -47,8 +50,8 @@ fn can_build(note: string, magazine: string) -> bool {
 large_steps = 2500000
 
 [medals]
-size = [58, 45, 36]
-speed = [95, 51, 36]
+size = [45, 35, 28]
+speed = [86, 46, 33]
 
 [[examples]]
 args = ["\"a\"", "\"b\""]
