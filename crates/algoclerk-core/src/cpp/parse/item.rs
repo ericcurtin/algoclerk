@@ -64,10 +64,9 @@ impl Parser<'_> {
             Tok::Kw("using") => self.parse_using(),
             Tok::Kw("typedef") => self.parse_typedef(),
             Tok::Kw("struct") => self.parse_struct(),
-            Tok::Kw(k) if unsupported_item_kw(k).is_some() => Err(self.unsupported(
-                span,
-                unsupported_item_kw(k).unwrap_or("that"),
-            )),
+            Tok::Kw(k) if unsupported_item_kw(k).is_some() => {
+                Err(self.unsupported(span, unsupported_item_kw(k).unwrap_or("that")))
+            }
             Tok::Punct("{" | "}") => Err(self.expected("a declaration")),
             _ => self.parse_func_or_global(),
         }
@@ -170,7 +169,8 @@ impl Parser<'_> {
     /// `typedef Type Name;`
     fn parse_typedef(&mut self) -> PResult<ItemKind> {
         self.bump();
-        if self.at_kw("struct") || self.at_kw("enum") || self.at_kw("union") || self.at_kw("class") {
+        if self.at_kw("struct") || self.at_kw("enum") || self.at_kw("union") || self.at_kw("class")
+        {
             return Err(self.unsupported(
                 self.cur_span(),
                 "`typedef` of a type definition (declare the `struct` directly)",
@@ -249,7 +249,9 @@ impl Parser<'_> {
             return Ok(());
         }
         if self.at_kw("private") || self.at_kw("protected") {
-            return Err(self.unsupported(span, "`private` and `protected` (structs are all public)"));
+            return Err(
+                self.unsupported(span, "`private` and `protected` (structs are all public)")
+            );
         }
         if self.at_punct("~") {
             return Err(self.unsupported(span, "destructors"));

@@ -93,7 +93,7 @@ fn int_text(value: u64, suffix: IntSuffix, base: IntBase) -> String {
         IntBase::Dec => value.to_string(),
         IntBase::Hex => format!("0x{value:X}"),
         IntBase::Bin => format!("0b{value:b}"),
-        IntBase::Oct if value == 0 => "0".into(),
+        IntBase::Oct if value == 0 => "00".into(),
         IntBase::Oct => format!("0{value:o}"),
     };
     let suf = match suffix {
@@ -132,7 +132,11 @@ fn targs_text(a: &[TArg]) -> String {
 /// `e`, in parentheses when its operator binds looser than `min`.
 fn ex(e: &Expr, min: u8, ind: usize) -> String {
     let s = expr_raw(e, ind);
-    if prec_of(e) < min { format!("({s})") } else { s }
+    if prec_of(e) < min {
+        format!("({s})")
+    } else {
+        s
+    }
 }
 
 fn args_text(args: &[Expr], ind: usize) -> String {
@@ -152,7 +156,16 @@ fn expr_raw(e: &Expr, ind: usize) -> String {
         ExprKind::Bool(b) => b.to_string(),
         ExprKind::Char(c) => format!("'{}'", quote_char(*c, b'\'')),
         ExprKind::Str(s) => {
-            let body: String = s.bytes().map(|c| quote_char(c, b'"')).collect();
+            let b = s.as_bytes();
+            let mut body = String::new();
+            for (i, &c) in b.iter().enumerate() {
+                // `\0` followed by a digit would read as a longer octal escape
+                if c == 0 && b.get(i + 1).is_some_and(|d| (b'0'..=b'7').contains(d)) {
+                    body.push_str("\\000");
+                } else {
+                    body.push_str(&quote_char(c, b'"'));
+                }
+            }
             format!("\"{body}\"")
         }
         ExprKind::NullPtr => "nullptr".into(),
@@ -183,9 +196,13 @@ fn expr_raw(e: &Expr, ind: usize) -> String {
             }
         }
         ExprKind::Binary(op, a, b) => format!(
-            "{} {} {}",
+            "{}{} {}",
             ex(a, op.prec(), ind),
-            op.text(),
+            if *op == BinOp::Comma {
+                ",".to_string()
+            } else {
+                format!(" {}", op.text())
+            },
             ex(b, op.prec() + 1, ind)
         ),
         ExprKind::Assign { op, lhs, rhs } => format!(
@@ -204,12 +221,15 @@ fn expr_raw(e: &Expr, ind: usize) -> String {
         ExprKind::Call { callee, args } => {
             format!("{}({})", ex(callee, POSTFIX, ind), args_text(args, ind))
         }
-        ExprKind::Member { obj, name, arrow } => format!(
-            "{}{}{}",
-            ex(obj, POSTFIX, ind),
-            if *arrow { "->" } else { "." },
-            name
-        ),
+        ExprKind::Member { obj, name, arrow } => {
+            // `1.x` would be read as a decimal number
+            let o = if matches!(obj.kind, ExprKind::Int { .. }) {
+                format!("({})", expr_raw(obj, ind))
+            } else {
+                ex(obj, POSTFIX, ind)
+            };
+            format!("{o}{}{name}", if *arrow { "->" } else { "." })
+        }
         ExprKind::Cast { style, ty, e } => match style {
             CastStyle::Static => {
                 format!("static_cast<{}>({})", print_type(ty), ex(e, 1, ind))
@@ -255,6 +275,7 @@ fn lambda_text(l: &Lambda, ind: usize) -> String {
 }
 
 /// `{ return a < b; }` on one line when the block is one short simple statement, else a normal block.
+/// Every statement is printed once, however deeply lambdas nest.
 fn inline_block(b: &Block, ind: usize) -> String {
     if b.stmts.is_empty() && b.tail_comments.is_empty() {
         return "{}".into();
@@ -263,11 +284,12 @@ fn inline_block(b: &Block, ind: usize) -> String {
         && b.tail_comments.is_empty()
         && s.comments.is_empty()
         && s.trailing.is_none()
-        && let Some(t) = simple_text(s, ind)
-        && !t.contains('\n')
-        && t.len() <= 60
+        && let Some(t) = simple_text(s, ind + 1)
     {
-        return format!("{{ {t} }}");
+        if !t.contains('\n') && t.len() <= 60 {
+            return format!("{{ {t} }}");
+        }
+        return format!("{{\n{}{t}\n{}}}", pad(ind + 1), pad(ind));
     }
     let mut out = String::from("{\n");
     write_block_inner(&mut out, b, ind + 1);
@@ -335,7 +357,15 @@ fn simple_text(s: &Stmt, ind: usize) -> Option<String> {
             names.join(", "),
             ex(init, ASSIGN, ind)
         ),
-        StmtKind::Expr(e) => format!("{};", ex(e, 1, ind)),
+        StmtKind::Expr(e) => {
+            let t = ex(e, 1, ind);
+            // a statement cannot start with `{`: that is a block
+            if t.starts_with('{') {
+                format!("({t});")
+            } else {
+                format!("{t};")
+            }
+        }
         StmtKind::Return(None) => "return;".into(),
         StmtKind::Return(Some(e)) => format!("return {};", ex(e, 1, ind)),
         StmtKind::Break => "break;".into(),
@@ -579,7 +609,9 @@ fn write_stmt(out: &mut String, s: &Stmt, ind: usize) {
             incr,
             body,
         } => {
-            let init_t = init.as_ref().map_or(";".to_string(), |i| header_stmt(i, ind));
+            let init_t = init
+                .as_ref()
+                .map_or(";".to_string(), |i| header_stmt(i, ind));
             let mut head = init_t;
             match (cond, incr) {
                 (Some(c), _) => head.push_str(&format!(" {};", ex(c, 1, ind))),
@@ -939,5 +971,190 @@ pub fn normalize(p: &mut Program) {
             ItemKind::Global { vars, .. } => norm_vars(vars),
             ItemKind::Include { .. } | ItemKind::UsingNamespaceStd | ItemKind::Alias { .. } => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cpp::parse::{ParseOpts, parse, parse_expr_str};
+
+    fn show(src: &str) -> String {
+        print_expr(&parse_expr_str(src).expect("parses"))
+    }
+
+    fn same_tree(src: &str) {
+        let printed = show(src);
+        let (mut a, mut b) = (wrap(src), wrap(&printed));
+        normalize(&mut a);
+        normalize(&mut b);
+        assert_eq!(a, b, "{src} printed as {printed}");
+    }
+
+    fn wrap(e: &str) -> Program {
+        parse(&format!("int f() {{ return {e}; }}"), &ParseOpts::default()).expect("parses")
+    }
+
+    #[test]
+    fn minimal_parentheses() {
+        let cases = [
+            ("a+b*c", "a + b * c"),
+            ("(a+b)*c", "(a + b) * c"),
+            ("(a*b)+c", "a * b + c"),
+            ("a-(b-c)", "a - (b - c)"),
+            ("(a-b)-c", "a - b - c"),
+            ("a/(b*c)", "a / (b * c)"),
+            ("(a/b)*c", "a / b * c"),
+            ("a<b==c<d", "a < b == c < d"),
+            ("(a==b)==c", "a == b == c"),
+            ("a==(b==c)", "a == (b == c)"),
+            ("(a&&b)||c", "a && b || c"),
+            ("a&&(b||c)", "a && (b || c)"),
+            ("!(a&&b)", "!(a && b)"),
+            ("!a&&b", "!a && b"),
+            ("-(-x)", "-(-x)"),
+            ("-(--x)", "-(--x)"),
+            ("- - -x", "-(-(-x))"),
+            ("&(&x)", "&(&x)"),
+            ("a- -b", "a - -b"),
+            ("a-(-b)", "a - -b"),
+            ("*p++", "*p++"),
+            ("(*p)++", "(*p)++"),
+            ("*(p+1)", "*(p + 1)"),
+            ("(a+b)[0]", "(a + b)[0]"),
+            ("a[(b,c)]", "a[b, c]"),
+            ("f((a,b),c)", "f((a, b), c)"),
+            ("a=b=c", "a = b = c"),
+            ("(a=b)=c", "(a = b) = c"),
+            ("a=b?c:d", "a = b ? c : d"),
+            ("a?b:c?d:e", "a ? b : c ? d : e"),
+            ("(a?b:c)?d:e", "(a ? b : c) ? d : e"),
+            ("a?(b,c):d", "a ? b, c : d"),
+            ("(a,b),c", "a, b, c"),
+            ("a,(b,c)", "a, (b, c)"),
+            ("(int)-x", "(int)-x"),
+            ("(int)(a+b)", "(int)(a + b)"),
+            ("(int)a+b", "(int)a + b"),
+            (
+                "static_cast<long long>(a)*b",
+                "static_cast<long long>(a) * b",
+            ),
+            ("(new int(1))[0]", "(new int(1))[0]"),
+            ("(1).x", "(1).x"),
+            ("a<<b+c", "a << b + c"),
+            ("(a<<b)+c", "(a << b) + c"),
+            ("a?b:c", "a ? b : c"),
+            ("x+=y-=z", "x += y -= z"),
+            ("'\\n'+'\\''", "'\\n' + '\\''"),
+            ("\"a\\\"b\\\\\"", "\"a\\\"b\\\\\""),
+            ("0xFFu|0b101|010|5ull", "0xFFu | 0b101 | 010 | 5ULL"),
+        ];
+        for (src, want) in cases {
+            assert_eq!(show(src), want, "{src}");
+            same_tree(src);
+        }
+    }
+
+    #[test]
+    fn types_honour_spelling() {
+        let p = parse(
+            "using namespace std;\nvoid f(const vector<int>& a, const std::vector<int>& b, ListNode* c, unsigned int d, size_t e, int* const g) {}",
+            &ParseOpts {
+                first_id: 0,
+                known_types: vec!["ListNode".into()],
+            },
+        )
+        .unwrap();
+        let ItemKind::Func(f) = &p.items[1].kind else {
+            panic!()
+        };
+        let got: Vec<String> = f.params.iter().map(print_param).collect();
+        assert_eq!(
+            got,
+            [
+                "const vector<int>& a",
+                "const std::vector<int>& b",
+                "ListNode* c",
+                "unsigned int d",
+                "size_t e",
+                "int* const g"
+            ]
+        );
+    }
+
+    #[test]
+    fn program_layout() {
+        let src = "#include <vector>\n#include <string>\nusing namespace std;\nconst int N = 3;\nstruct S { int a; S(int x) : a(x) {} };\nint g(int);\nint h(int);\nint g(int x) { if (x) { return 1; } else if (x > 2) return 2; else { return 3; } }\nint h(int x) { for (;;) { break; } return x; }";
+        let p = parse(src, &ParseOpts::default()).unwrap();
+        let want = "#include <vector>\n#include <string>\n\nusing namespace std;\nconst int N = 3;\n\nstruct S {\n    int a;\n\n    S(int x) : a(x) {}\n};\n\nint g(int);\nint h(int);\n\nint g(int x) {\n    if (x) {\n        return 1;\n    } else if (x > 2)\n        return 2;\n    else {\n        return 3;\n    }\n}\n\nint h(int x) {\n    for (;;) {\n        break;\n    }\n    return x;\n}\n";
+        assert_eq!(print_program(&p, false), want);
+        let mut p2 = p.clone();
+        p2.prelude_items = 5;
+        let player = print_program(&p2, true);
+        assert!(player.starts_with("int g(int);"), "{player}");
+        assert!(!player.contains("#include"));
+    }
+
+    #[test]
+    fn dangling_else_is_protected() {
+        // `if (a) { if (b) x; } else y;` printed from an AST whose inner `if` lost its braces
+        let p = parse(
+            "void f() { if (a) { if (b) x(); } else y(); }",
+            &ParseOpts::default(),
+        )
+        .unwrap();
+        let text = print_program(&p, false);
+        assert!(text.contains("if (a) {"), "{text}");
+        let again = parse(&text, &ParseOpts::default()).unwrap();
+        let (mut a, mut b) = (p, again);
+        normalize(&mut a);
+        normalize(&mut b);
+        assert_eq!(a, b);
+        // an AST built by hand: the then-branch is an unbraced if-without-else
+        let mut hand = parse("void f() { if (a) x(); else y(); }", &ParseOpts::default()).unwrap();
+        let ItemKind::Func(f) = &mut hand.items[0].kind else {
+            panic!()
+        };
+        let body = f.body.as_mut().unwrap();
+        let StmtKind::If { then, .. } = &mut body.stmts[0].kind else {
+            panic!()
+        };
+        let inner = Stmt::new(
+            0,
+            StmtKind::If {
+                init: None,
+                cond: Expr {
+                    id: 0,
+                    kind: ExprKind::Var("b".into()),
+                },
+                then: then.clone(),
+                els: None,
+            },
+        );
+        **then = inner;
+        let text = print_program(&hand, false);
+        let re = parse(&text, &ParseOpts::default()).unwrap();
+        let ItemKind::Func(f2) = &re.items[0].kind else {
+            panic!()
+        };
+        let StmtKind::If { els, .. } = &f2.body.as_ref().unwrap().stmts[0].kind else {
+            panic!()
+        };
+        assert!(els.is_some(), "the else must stay on the outer if:\n{text}");
+    }
+
+    #[test]
+    fn deep_programs_print_without_overflowing_the_stack() {
+        let src = format!(
+            "int f() {{ {}return {}1{};{} }}",
+            "if (x) { ".repeat(80),
+            "(".repeat(80),
+            ")".repeat(80),
+            " }".repeat(80)
+        );
+        let p = parse(&src, &ParseOpts::default()).unwrap();
+        let text = print_program(&p, false);
+        assert!(text.len() > 1000);
+        let _ = parse(&text, &ParseOpts::default()).unwrap();
     }
 }

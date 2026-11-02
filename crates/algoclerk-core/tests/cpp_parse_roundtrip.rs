@@ -21,7 +21,10 @@ fn corpus() -> Vec<(String, String)> {
         .into_iter()
         .map(|p| {
             let name = p.file_name().unwrap().to_string_lossy().to_string();
-            (name, std::fs::read_to_string(&p).expect("readable corpus file"))
+            (
+                name,
+                std::fs::read_to_string(&p).expect("readable corpus file"),
+            )
         })
         .collect()
 }
@@ -68,7 +71,10 @@ fn scratch_dir(tag: &str) -> PathBuf {
 
 #[test]
 fn corpus_is_big_enough() {
-    assert!(corpus().len() >= 60, "the corpus should hold about 60 solutions");
+    assert!(
+        corpus().len() >= 60,
+        "the corpus should hold about 60 solutions"
+    );
 }
 
 #[test]
@@ -80,7 +86,10 @@ fn corpus_files_parse() {
                 assert_eq!(p.prelude_items, 0, "{name}");
                 assert!(!p.items.is_empty(), "{name}");
             }
-            Err(d) => failures.push(format!("{name}: {} [{}] at {:?}", d[0].msg, d[0].code, d[0].span)),
+            Err(d) => failures.push(format!(
+                "{name}: {} [{}] at {:?}",
+                d[0].msg, d[0].code, d[0].span
+            )),
         }
     }
     assert!(failures.is_empty(), "{failures:#?}");
@@ -99,7 +108,11 @@ fn roundtrip_text_ast_text_ast() {
         normalize(&mut b);
         assert_eq!(a, b, "{name}: AST changed by the round trip\n{text1}");
         // known types are the same either way
-        assert_eq!(known_types(&p1), known_types(&parse_ok(&name, &text1)), "{name}");
+        assert_eq!(
+            known_types(&p1),
+            known_types(&parse_ok(&name, &text1)),
+            "{name}"
+        );
     }
 }
 
@@ -148,7 +161,9 @@ fn every_node_has_a_span() {
                         c.params.iter().for_each(|x| check(x.id, "param"));
                     }
                 }
-                ItemKind::Global { vars, .. } => vars.iter().for_each(|v| check(v.id, "declarator")),
+                ItemKind::Global { vars, .. } => {
+                    vars.iter().for_each(|v| check(v.id, "declarator"))
+                }
                 _ => {}
             }
         }
@@ -203,7 +218,10 @@ fn printed_corpus_compiles_with_gxx() {
     }
     let failures = run_parallel(&names, |f| syntax_check("g++", &dir.join(f)));
     let _ = std::fs::remove_dir_all(&dir);
-    assert!(failures.is_empty(), "g++ rejects printed text: {failures:#?}");
+    assert!(
+        failures.is_empty(),
+        "g++ rejects printed text: {failures:#?}"
+    );
 }
 
 /// Run `f` for every name on four threads; the names with their error output that failed.

@@ -84,7 +84,29 @@ fn normalise_type_text(s: &str) -> String {
     let word = |c: char| c.is_ascii_alphanumeric() || c == '_';
     let mut out = String::new();
     let mut pending = false;
-    for c in s.chars() {
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        // comments inside the type text count as blanks
+        if c == '/' && chars.peek() == Some(&'*') {
+            let mut prev = ' ';
+            for d in chars.by_ref() {
+                if prev == '*' && d == '/' {
+                    break;
+                }
+                prev = d;
+            }
+            pending = true;
+            continue;
+        }
+        if c == '/' && chars.peek() == Some(&'/') {
+            for d in chars.by_ref() {
+                if d == '\n' {
+                    break;
+                }
+            }
+            pending = true;
+            continue;
+        }
         if c.is_whitespace() {
             pending = true;
             continue;

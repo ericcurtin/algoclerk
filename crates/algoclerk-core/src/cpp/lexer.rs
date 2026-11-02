@@ -34,15 +34,90 @@ pub enum HlKind {
 /// (The alternative operator spellings `and`, `or`, `not`... are keywords here too but [`lex`] turns them
 /// into the matching punctuation token.)
 const KEYWORDS: &[&str] = &[
-    "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor", "bool", "break", "case",
-    "catch", "char", "char16_t", "char32_t", "class", "compl", "const", "const_cast", "constexpr",
-    "continue", "decltype", "default", "delete", "do", "double", "dynamic_cast", "else", "enum",
-    "explicit", "export", "extern", "false", "float", "for", "friend", "goto", "if", "inline", "int",
-    "long", "mutable", "namespace", "new", "noexcept", "not", "not_eq", "nullptr", "operator", "or",
-    "or_eq", "private", "protected", "public", "register", "reinterpret_cast", "return", "short",
-    "signed", "sizeof", "static", "static_assert", "static_cast", "struct", "switch", "template",
-    "this", "thread_local", "throw", "true", "try", "typedef", "typeid", "typename", "union",
-    "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq",
+    "alignas",
+    "alignof",
+    "and",
+    "and_eq",
+    "asm",
+    "auto",
+    "bitand",
+    "bitor",
+    "bool",
+    "break",
+    "case",
+    "catch",
+    "char",
+    "char16_t",
+    "char32_t",
+    "class",
+    "compl",
+    "const",
+    "const_cast",
+    "constexpr",
+    "continue",
+    "decltype",
+    "default",
+    "delete",
+    "do",
+    "double",
+    "dynamic_cast",
+    "else",
+    "enum",
+    "explicit",
+    "export",
+    "extern",
+    "false",
+    "float",
+    "for",
+    "friend",
+    "goto",
+    "if",
+    "inline",
+    "int",
+    "long",
+    "mutable",
+    "namespace",
+    "new",
+    "noexcept",
+    "not",
+    "not_eq",
+    "nullptr",
+    "operator",
+    "or",
+    "or_eq",
+    "private",
+    "protected",
+    "public",
+    "register",
+    "reinterpret_cast",
+    "return",
+    "short",
+    "signed",
+    "sizeof",
+    "static",
+    "static_assert",
+    "static_cast",
+    "struct",
+    "switch",
+    "template",
+    "this",
+    "thread_local",
+    "throw",
+    "true",
+    "try",
+    "typedef",
+    "typeid",
+    "typename",
+    "union",
+    "unsigned",
+    "using",
+    "virtual",
+    "void",
+    "volatile",
+    "wchar_t",
+    "while",
+    "xor",
+    "xor_eq",
 ];
 
 /// Keywords that name a builtin type (coloured as types by [`highlight`]).
@@ -53,24 +128,118 @@ const BUILTIN_TYPES: &[&str] = &[
 
 /// Library type names (after `std::`, or unqualified under `using namespace std`).
 const STD_TYPES: &[&str] = &[
-    "string", "string_view", "vector", "array", "pair", "tuple", "optional", "unordered_map", "map",
-    "unordered_set", "set", "multiset", "multimap", "stack", "queue", "deque", "list",
-    "priority_queue", "function", "size_t", "ptrdiff_t", "greater", "less", "numeric_limits",
-    "bitset", "int8_t", "int16_t", "int32_t", "int64_t", "uint8_t", "uint16_t", "uint32_t",
+    "string",
+    "string_view",
+    "vector",
+    "array",
+    "pair",
+    "tuple",
+    "optional",
+    "unordered_map",
+    "map",
+    "unordered_set",
+    "set",
+    "multiset",
+    "multimap",
+    "stack",
+    "queue",
+    "deque",
+    "list",
+    "priority_queue",
+    "function",
+    "size_t",
+    "ptrdiff_t",
+    "greater",
+    "less",
+    "numeric_limits",
+    "bitset",
+    "int8_t",
+    "int16_t",
+    "int32_t",
+    "int64_t",
+    "uint8_t",
+    "uint16_t",
+    "uint32_t",
     "uint64_t",
 ];
 
 /// Well-known library functions and objects, coloured as std names under `using namespace std`.
 const STD_NAMES: &[&str] = &[
-    "sort", "stable_sort", "reverse", "min", "max", "swap", "abs", "accumulate", "iota", "to_string",
-    "stoi", "stoll", "stoul", "stoull", "find", "find_if", "count", "count_if", "lower_bound",
-    "upper_bound", "binary_search", "make_pair", "make_tuple", "get", "tie", "next_permutation",
-    "prev_permutation", "unique", "fill", "max_element", "min_element", "nullopt", "isdigit",
-    "isalpha", "isalnum", "islower", "isupper", "isspace", "tolower", "toupper", "move", "gcd", "lcm",
-    "cout", "cin", "cerr", "endl", "sqrt", "pow", "any_of", "all_of", "none_of", "begin", "end",
-    "size", "empty", "rotate", "swap_ranges", "copy", "remove", "remove_if", "partial_sum",
-    "minmax", "clamp", "make_optional", "nth_element", "partition", "merge", "adjacent_find",
-    "equal", "mismatch", "transform", "for_each", "inner_product", "exchange",
+    "sort",
+    "stable_sort",
+    "reverse",
+    "min",
+    "max",
+    "swap",
+    "abs",
+    "accumulate",
+    "iota",
+    "to_string",
+    "stoi",
+    "stoll",
+    "stoul",
+    "stoull",
+    "find",
+    "find_if",
+    "count",
+    "count_if",
+    "lower_bound",
+    "upper_bound",
+    "binary_search",
+    "make_pair",
+    "make_tuple",
+    "get",
+    "tie",
+    "next_permutation",
+    "prev_permutation",
+    "unique",
+    "fill",
+    "max_element",
+    "min_element",
+    "nullopt",
+    "isdigit",
+    "isalpha",
+    "isalnum",
+    "islower",
+    "isupper",
+    "isspace",
+    "tolower",
+    "toupper",
+    "move",
+    "gcd",
+    "lcm",
+    "cout",
+    "cin",
+    "cerr",
+    "endl",
+    "sqrt",
+    "pow",
+    "any_of",
+    "all_of",
+    "none_of",
+    "begin",
+    "end",
+    "size",
+    "empty",
+    "rotate",
+    "swap_ranges",
+    "copy",
+    "remove",
+    "remove_if",
+    "partial_sum",
+    "minmax",
+    "clamp",
+    "make_optional",
+    "nth_element",
+    "partition",
+    "merge",
+    "adjacent_find",
+    "equal",
+    "mismatch",
+    "transform",
+    "for_each",
+    "inner_product",
+    "exchange",
 ];
 
 /// Multi-character operators, longest first. Everything else is a single character.
@@ -80,8 +249,8 @@ const PUNCT2: &[&str] = &[
     "%=", "&=", "|=", "^=",
 ];
 const PUNCT1: &[&str] = &[
-    "{", "}", "(", ")", "[", "]", ";", ":", ",", ".", "?", "+", "-", "*", "/", "%", "&", "|", "^", "~",
-    "!", "=", "<", ">",
+    "{", "}", "(", ")", "[", "]", ";", ":", ",", ".", "?", "+", "-", "*", "/", "%", "&", "|", "^",
+    "~", "!", "=", "<", ">",
 ];
 
 /// The punctuation token starting at byte `i`, longest match.
@@ -257,7 +426,11 @@ fn lex_number(src: &str, start: usize) -> Result<(Tok, usize), Diag> {
             return Err(lex_err(start, i, "this number has a prefix but no digits"));
         }
         if !hex && i < b.len() && b[i].is_ascii_digit() {
-            return Err(lex_err(start, i + 1, "a binary number only has the digits 0 and 1"));
+            return Err(lex_err(
+                start,
+                i + 1,
+                "a binary number only has the digits 0 and 1",
+            ));
         }
     } else {
         i = scan_digits(b, i, 10, &mut digits);
@@ -298,7 +471,11 @@ fn lex_number(src: &str, start: usize) -> Result<(Tok, usize), Diag> {
             base = IntBase::Oct;
             radix = 8;
             if digits.iter().any(|&c| c >= b'8') {
-                return Err(lex_err(start, i, "an octal number (starting with 0) only has the digits 0 to 7"));
+                return Err(lex_err(
+                    start,
+                    i,
+                    "an octal number (starting with 0) only has the digits 0 to 7",
+                ));
             }
         }
     }
@@ -317,14 +494,14 @@ fn lex_number(src: &str, start: usize) -> Result<(Tok, usize), Diag> {
                 start,
                 i,
                 "this office does not stock `long`: use `long long` (suffix `ll`) instead",
-            ))
+            ));
         }
         s => {
             return Err(lex_err(
                 sfx_start,
                 i,
                 format!("`{s}` is not a number suffix I know (use u, ll or ull)"),
-            ))
+            ));
         }
     };
     let mut value: u64 = 0;
@@ -335,7 +512,14 @@ fn lex_number(src: &str, start: usize) -> Result<(Tok, usize), Diag> {
             .and_then(|v| v.checked_add(d))
             .ok_or_else(|| lex_err(start, i, "this number is too big"))?;
     }
-    Ok((Tok::Int { value, suffix, base }, i))
+    Ok((
+        Tok::Int {
+            value,
+            suffix,
+            base,
+        },
+        i,
+    ))
 }
 
 /// Parse an escape sequence; `i` is on the backslash. Returns the byte and the index after it.
@@ -373,7 +557,9 @@ fn lex_escape(src: &str, i: usize) -> Result<(u8, usize), Diag> {
             let mut j = i + 2;
             let mut v: u32 = 0;
             while j < b.len() && b[j].is_ascii_hexdigit() {
-                v = v.saturating_mul(16).saturating_add(digit_val(b[j]).unwrap_or(0));
+                v = v
+                    .saturating_mul(16)
+                    .saturating_add(digit_val(b[j]).unwrap_or(0));
                 j += 1;
             }
             if j == i + 2 {
@@ -389,7 +575,11 @@ fn lex_escape(src: &str, i: usize) -> Result<(u8, usize), Diag> {
             i + 2,
             "this office only handles ASCII text: unicode escapes are not stocked",
         )),
-        _ => Err(lex_err(i, char_end(src, i + 1), "I do not know this escape sequence")),
+        _ => Err(lex_err(
+            i,
+            char_end(src, i + 1),
+            "I do not know this escape sequence",
+        )),
     }
 }
 
@@ -398,7 +588,7 @@ fn lex_char(src: &str, start: usize) -> Result<(Tok, usize), Diag> {
     let mut i = start + 1;
     let v = match b.get(i) {
         None | Some(b'\n') | Some(b'\r') => {
-            return Err(lex_err(start, i, "this character literal is not closed"))
+            return Err(lex_err(start, i, "this character literal is not closed"));
         }
         Some(b'\'') => return Err(lex_err(start, i + 1, "this character literal is empty")),
         Some(b'\\') => {
@@ -437,7 +627,7 @@ fn lex_string(src: &str, start: usize) -> Result<(Tok, usize), Diag> {
     loop {
         match b.get(i) {
             None | Some(b'\n') | Some(b'\r') => {
-                return Err(lex_err(start, i, "this string literal is not closed"))
+                return Err(lex_err(start, i, "this string literal is not closed"));
             }
             Some(b'"') => return Ok((Tok::Str(out), i + 1)),
             Some(b'\\') => {
@@ -509,7 +699,10 @@ fn scan_preproc(src: &str, start: usize) -> (String, usize) {
 /// (`parse.lex`, or `parse.unsupported` for valid C++ the subset does not stock). Never panics.
 pub fn lex(src: &str) -> Result<Vec<Token>, Diag> {
     if src.len() >= u32::MAX as usize {
-        return Err(Diag::plain("parse.lex", "this text is far too long for the office"));
+        return Err(Diag::plain(
+            "parse.lex",
+            "this text is far too long for the office",
+        ));
     }
     let b = src.as_bytes();
     let mut toks: Vec<Token> = Vec::new();
@@ -546,7 +739,11 @@ pub fn lex(src: &str) -> Result<Vec<Token>, Diag> {
             let mut j = i + 2;
             loop {
                 if j + 1 >= b.len() {
-                    return Err(lex_err(start, start + 2, "this comment is never closed (I expected `*/`)"));
+                    return Err(lex_err(
+                        start,
+                        start + 2,
+                        "this comment is never closed (I expected `*/`)",
+                    ));
                 }
                 if b[j] == b'*' && b[j + 1] == b'/' {
                     break;
@@ -560,7 +757,11 @@ pub fn lex(src: &str) -> Result<Vec<Token>, Diag> {
             i = j + 2;
         } else if c == b'#' {
             if !line_start {
-                return Err(lex_err(start, start + 1, "a `#` only starts a directive at the beginning of a line"));
+                return Err(lex_err(
+                    start,
+                    start + 1,
+                    "a `#` only starts a directive at the beginning of a line",
+                ));
             }
             let (text, end) = scan_preproc(src, i);
             kind = Tok::Preproc(text);
@@ -572,7 +773,10 @@ pub fn lex(src: &str) -> Result<Vec<Token>, Diag> {
             }
             let word = &src[i..j];
             if matches!(b.get(j), Some(b'"') | Some(b'\''))
-                && matches!(word, "L" | "u" | "U" | "u8" | "R" | "LR" | "uR" | "UR" | "u8R")
+                && matches!(
+                    word,
+                    "L" | "u" | "U" | "u8" | "R" | "LR" | "uR" | "UR" | "u8R"
+                )
             {
                 return Err(unsupported(
                     start,
@@ -588,7 +792,8 @@ pub fn lex(src: &str) -> Result<Vec<Token>, Diag> {
                 None => Tok::Ident(word.to_string()),
             };
             i = j;
-        } else if c.is_ascii_digit() || (c == b'.' && b.get(i + 1).is_some_and(u8::is_ascii_digit)) {
+        } else if c.is_ascii_digit() || (c == b'.' && b.get(i + 1).is_some_and(u8::is_ascii_digit))
+        {
             let (k, j) = lex_number(src, i)?;
             kind = k;
             i = j;
@@ -606,7 +811,11 @@ pub fn lex(src: &str) -> Result<Vec<Token>, Diag> {
         } else {
             let e = char_end(src, i);
             let ch = &src[i..e];
-            return Err(lex_err(i, e, format!("I do not recognise the character `{ch}`")));
+            return Err(lex_err(
+                i,
+                e,
+                format!("I do not recognise the character `{ch}`"),
+            ));
         }
         let block_comment = matches!(&kind, Tok::Comment { block: true, .. });
         toks.push(Token {
@@ -681,22 +890,21 @@ pub fn highlight(src: &str) -> Vec<(Span, HlKind)> {
                 Some(_) => HlKind::Keyword,
                 None => HlKind::Ident,
             };
-        } else if c.is_ascii_digit() || (c == b'.' && b.get(i + 1).is_some_and(u8::is_ascii_digit)) {
+        } else if c.is_ascii_digit() || (c == b'.' && b.get(i + 1).is_some_and(u8::is_ascii_digit))
+        {
             let hex = c == b'0' && matches!(b.get(i + 1), Some(b'x') | Some(b'X'));
             i += 1;
             while i < b.len() {
                 let d = b[i];
-                if is_ident_char(d) || d == b'.' {
-                    i += 1;
-                } else if d == b'\'' && b.get(i + 1).is_some_and(|n| n.is_ascii_alphanumeric()) {
-                    i += 1;
-                } else if matches!(d, b'+' | b'-')
+                let digit_sep =
+                    d == b'\'' && b.get(i + 1).is_some_and(|n| n.is_ascii_alphanumeric());
+                let exp_sign = matches!(d, b'+' | b'-')
                     && if hex {
                         matches!(b[i - 1], b'p' | b'P')
                     } else {
                         matches!(b[i - 1], b'e' | b'E')
-                    }
-                {
+                    };
+                if is_ident_char(d) || d == b'.' || digit_sep || exp_sign {
                     i += 1;
                 } else {
                     break;
@@ -781,11 +989,12 @@ fn classify_idents(src: &str, out: &mut [(Span, HlKind)]) {
             } else {
                 HlKind::StdName
             }
-        } else if name == "ListNode" || name == "TreeNode" || user_types.contains(&name) {
-            HlKind::Type
-        } else if name == "size_t" {
-            HlKind::Type
-        } else if using_std && STD_TYPES.contains(&name) {
+        } else if name == "ListNode"
+            || name == "TreeNode"
+            || user_types.contains(&name)
+            || name == "size_t"
+            || (using_std && STD_TYPES.contains(&name))
+        {
             HlKind::Type
         } else if using_std && STD_NAMES.contains(&name) {
             HlKind::StdName
@@ -803,7 +1012,11 @@ mod tests {
         lex(src).unwrap().into_iter().map(|t| t.kind).collect()
     }
     fn int(value: u64, suffix: IntSuffix, base: IntBase) -> Tok {
-        Tok::Int { value, suffix, base }
+        Tok::Int {
+            value,
+            suffix,
+            base,
+        }
     }
     fn err(src: &str) -> Diag {
         lex(src).unwrap_err()
@@ -840,11 +1053,11 @@ mod tests {
         assert_eq!(kinds("42"), vec![int(42, None, Dec)]);
         assert_eq!(kinds("7u 7U"), vec![int(7, U, Dec), int(7, U, Dec)]);
         assert_eq!(kinds("7ll 7LL"), vec![int(7, LL, Dec), int(7, LL, Dec)]);
+        assert_eq!(kinds("7ull 7ULL 7llu 7uLL"), vec![int(7, ULL, Dec); 4]);
         assert_eq!(
-            kinds("7ull 7ULL 7llu 7uLL"),
-            vec![int(7, ULL, Dec); 4]
+            kinds("0x2A 0XffU"),
+            vec![int(42, None, Hex), int(255, U, Hex)]
         );
-        assert_eq!(kinds("0x2A 0XffU"), vec![int(42, None, Hex), int(255, U, Hex)]);
         assert_eq!(kinds("0b1010"), vec![int(10, None, Bin)]);
         assert_eq!(kinds("052"), vec![int(42, None, Oct)]);
         assert_eq!(kinds("1'000'000"), vec![int(1_000_000, None, Dec)]);
@@ -898,7 +1111,9 @@ mod tests {
         });
         assert_eq!(kinds(r#"'"'"#), vec![Tok::Char(b'"')]);
         assert_eq!(kinds(r"'\xff'"), vec![Tok::Char(255)]);
-        for bad in ["''", "'ab'", "'a", "'\\q'", "'\\x'", "'\\x1ff'", "'é'", "'\n'"] {
+        for bad in [
+            "''", "'ab'", "'a", "'\\q'", "'\\x'", "'\\x1ff'", "'é'", "'\n'",
+        ] {
             assert!(lex(bad).is_err(), "{bad:?}");
         }
         assert_eq!(err("'é'").code, "parse.unsupported");
@@ -929,31 +1144,82 @@ mod tests {
     #[test]
     fn punctuation_longest_match() {
         let p = |s: &str| kinds(s);
-        assert_eq!(p("a::b->c"), vec![
-            Tok::Ident("a".into()), Tok::Punct("::"), Tok::Ident("b".into()), Tok::Punct("->"),
-            Tok::Ident("c".into()),
-        ]);
-        assert_eq!(p("<<= >>= << >> <= >= == !="), vec![
-            Tok::Punct("<<="), Tok::Punct(">>="), Tok::Punct("<<"), Tok::Punct(">>"),
-            Tok::Punct("<="), Tok::Punct(">="), Tok::Punct("=="), Tok::Punct("!="),
-        ]);
-        assert_eq!(p("a+++b"), vec![
-            Tok::Ident("a".into()), Tok::Punct("++"), Tok::Punct("+"), Tok::Ident("b".into()),
-        ]);
-        assert_eq!(p("&& || += -= *= /= %= &= |= ^= ... ~ ? :"), vec![
-            Tok::Punct("&&"), Tok::Punct("||"), Tok::Punct("+="), Tok::Punct("-="),
-            Tok::Punct("*="), Tok::Punct("/="), Tok::Punct("%="), Tok::Punct("&="),
-            Tok::Punct("|="), Tok::Punct("^="), Tok::Punct("..."), Tok::Punct("~"),
-            Tok::Punct("?"), Tok::Punct(":"),
-        ]);
-        assert_eq!(p("vector<vector<int>>"), vec![
-            Tok::Ident("vector".into()), Tok::Punct("<"), Tok::Ident("vector".into()),
-            Tok::Punct("<"), Tok::Kw("int"), Tok::Punct(">>"),
-        ]);
-        assert_eq!(p("{}()[];,."), vec![
-            Tok::Punct("{"), Tok::Punct("}"), Tok::Punct("("), Tok::Punct(")"), Tok::Punct("["),
-            Tok::Punct("]"), Tok::Punct(";"), Tok::Punct(","), Tok::Punct("."),
-        ]);
+        assert_eq!(
+            p("a::b->c"),
+            vec![
+                Tok::Ident("a".into()),
+                Tok::Punct("::"),
+                Tok::Ident("b".into()),
+                Tok::Punct("->"),
+                Tok::Ident("c".into()),
+            ]
+        );
+        assert_eq!(
+            p("<<= >>= << >> <= >= == !="),
+            vec![
+                Tok::Punct("<<="),
+                Tok::Punct(">>="),
+                Tok::Punct("<<"),
+                Tok::Punct(">>"),
+                Tok::Punct("<="),
+                Tok::Punct(">="),
+                Tok::Punct("=="),
+                Tok::Punct("!="),
+            ]
+        );
+        assert_eq!(
+            p("a+++b"),
+            vec![
+                Tok::Ident("a".into()),
+                Tok::Punct("++"),
+                Tok::Punct("+"),
+                Tok::Ident("b".into()),
+            ]
+        );
+        assert_eq!(
+            p("&& || += -= *= /= %= &= |= ^= ... ~ ? :"),
+            vec![
+                Tok::Punct("&&"),
+                Tok::Punct("||"),
+                Tok::Punct("+="),
+                Tok::Punct("-="),
+                Tok::Punct("*="),
+                Tok::Punct("/="),
+                Tok::Punct("%="),
+                Tok::Punct("&="),
+                Tok::Punct("|="),
+                Tok::Punct("^="),
+                Tok::Punct("..."),
+                Tok::Punct("~"),
+                Tok::Punct("?"),
+                Tok::Punct(":"),
+            ]
+        );
+        assert_eq!(
+            p("vector<vector<int>>"),
+            vec![
+                Tok::Ident("vector".into()),
+                Tok::Punct("<"),
+                Tok::Ident("vector".into()),
+                Tok::Punct("<"),
+                Tok::Kw("int"),
+                Tok::Punct(">>"),
+            ]
+        );
+        assert_eq!(
+            p("{}()[];,."),
+            vec![
+                Tok::Punct("{"),
+                Tok::Punct("}"),
+                Tok::Punct("("),
+                Tok::Punct(")"),
+                Tok::Punct("["),
+                Tok::Punct("]"),
+                Tok::Punct(";"),
+                Tok::Punct(","),
+                Tok::Punct("."),
+            ]
+        );
     }
 
     #[test]
@@ -994,9 +1260,18 @@ mod tests {
                 Tok::Kw("int"),
                 Tok::Ident("x".into()),
                 Tok::Punct(";"),
-                Tok::Comment { text: " trailing".into(), block: false },
-                Tok::Comment { text: " own line".into(), block: false },
-                Tok::Comment { text: " block\nmore ".into(), block: true },
+                Tok::Comment {
+                    text: " trailing".into(),
+                    block: false
+                },
+                Tok::Comment {
+                    text: " own line".into(),
+                    block: false
+                },
+                Tok::Comment {
+                    text: " block\nmore ".into(),
+                    block: true
+                },
                 Tok::Ident("y".into()),
             ]
         );
@@ -1014,7 +1289,13 @@ mod tests {
         // CRLF
         assert_eq!(
             kinds("// hi\r\nx"),
-            vec![Tok::Comment { text: " hi".into(), block: false }, Tok::Ident("x".into())]
+            vec![
+                Tok::Comment {
+                    text: " hi".into(),
+                    block: false
+                },
+                Tok::Ident("x".into())
+            ]
         );
         // `/` then `*` split by nothing is a comment, `/ *` is not
         assert_eq!(kinds("a / *b").len(), 4);
@@ -1027,13 +1308,19 @@ mod tests {
             vec![
                 Tok::Preproc("#include <vector>".into()),
                 Tok::Preproc("#  include \"a//b.h\"".into()),
-                Tok::Comment { text: " c".into(), block: false },
+                Tok::Comment {
+                    text: " c".into(),
+                    block: false
+                },
                 Tok::Kw("int"),
             ]
         );
         assert_eq!(
             kinds("#define X \\\n  1\nx"),
-            vec![Tok::Preproc("#define X    1".into()), Tok::Ident("x".into())]
+            vec![
+                Tok::Preproc("#define X    1".into()),
+                Tok::Ident("x".into())
+            ]
         );
         assert_eq!(
             kinds("#include <bits/stdc++.h>"),
@@ -1053,8 +1340,15 @@ mod tests {
             let text = &src[t.span.start as usize..t.span.end as usize];
             assert!(!text.is_empty() && text.trim() == text);
         }
-        assert_eq!(&src[toks[1].span.start as usize..toks[1].span.end as usize], "main");
-        let nls: Vec<_> = toks.iter().filter(|t| t.nl_before).map(|t| t.span.start).collect();
+        assert_eq!(
+            &src[toks[1].span.start as usize..toks[1].span.end as usize],
+            "main"
+        );
+        let nls: Vec<_> = toks
+            .iter()
+            .filter(|t| t.nl_before)
+            .map(|t| t.span.start)
+            .collect();
         assert_eq!(nls, vec![0, 15, 25]);
         assert!(lex("").unwrap().is_empty());
         assert!(lex("  \n\t ").unwrap().is_empty());
@@ -1063,8 +1357,30 @@ mod tests {
     #[test]
     fn lex_never_panics_on_junk() {
         let junk = [
-            "'", "\"", "\\", "/*", "/", "0x", "0b", ".", "..", "1.", "1e", "'\\", "\"\\x", "#", "é", "'é",
-            "\"é", "0'1", "1'", "'\\777'", "9999999999999999999999", "0x'1", "\u{1F600}", "a\u{0}b",
+            "'",
+            "\"",
+            "\\",
+            "/*",
+            "/",
+            "0x",
+            "0b",
+            ".",
+            "..",
+            "1.",
+            "1e",
+            "'\\",
+            "\"\\x",
+            "#",
+            "é",
+            "'é",
+            "\"é",
+            "0'1",
+            "1'",
+            "'\\777'",
+            "9999999999999999999999",
+            "0x'1",
+            "\u{1F600}",
+            "a\u{0}b",
         ];
         for j in junk {
             let _ = lex(j);
@@ -1099,8 +1415,14 @@ mod tests {
         assert_eq!(
             hl("for (;;) return nullptr;"),
             vec![
-                ("for", Keyword), ("(", Punct), (";", Punct), (";", Punct), (")", Punct),
-                ("return", Keyword), ("nullptr", Keyword), (";", Punct),
+                ("for", Keyword),
+                ("(", Punct),
+                (";", Punct),
+                (";", Punct),
+                (")", Punct),
+                ("return", Keyword),
+                ("nullptr", Keyword),
+                (";", Punct),
             ]
         );
     }
@@ -1111,17 +1433,25 @@ mod tests {
         assert_eq!(
             hl(r#"c = 'a' + '\'' + "s\"x" + 0x1F + 1'000 + 3ull + 1.5e-3"#),
             vec![
-                ("c", Ident), ("=", Punct), ("'a'", Char), ("+", Punct), (r"'\''", Char),
-                ("+", Punct), (r#""s\"x""#, Str), ("+", Punct), ("0x1F", Number), ("+", Punct),
-                ("1'000", Number), ("+", Punct), ("3ull", Number), ("+", Punct),
+                ("c", Ident),
+                ("=", Punct),
+                ("'a'", Char),
+                ("+", Punct),
+                (r"'\''", Char),
+                ("+", Punct),
+                (r#""s\"x""#, Str),
+                ("+", Punct),
+                ("0x1F", Number),
+                ("+", Punct),
+                ("1'000", Number),
+                ("+", Punct),
+                ("3ull", Number),
+                ("+", Punct),
                 ("1.5e-3", Number),
             ]
         );
         // a - b is not an exponent sign
-        assert_eq!(
-            hl("1-2"),
-            vec![("1", Number), ("-", Punct), ("2", Number)]
-        );
+        assert_eq!(hl("1-2"), vec![("1", Number), ("-", Punct), ("2", Number)]);
         assert_eq!(hl("0x1e-2")[0], ("0x1e", Number));
     }
 
@@ -1145,7 +1475,11 @@ mod tests {
         use HlKind::*;
         assert_eq!(
             hl("#include <vector> // c\nint"),
-            vec![("#include <vector>", Preproc), ("// c", Comment), ("int", Type)]
+            vec![
+                ("#include <vector>", Preproc),
+                ("// c", Comment),
+                ("int", Type)
+            ]
         );
         assert_eq!(
             hl("  #define A \\\n  2\nx"),
@@ -1160,9 +1494,18 @@ mod tests {
         assert_eq!(
             hl("std::sort(std::vector<int> v)"),
             vec![
-                ("std", Ident), ("::", Punct), ("sort", StdName), ("(", Punct), ("std", Ident),
-                ("::", Punct), ("vector", Type), ("<", Punct), ("int", Type), (">", Punct),
-                ("v", Ident), (")", Punct),
+                ("std", Ident),
+                ("::", Punct),
+                ("sort", StdName),
+                ("(", Punct),
+                ("std", Ident),
+                ("::", Punct),
+                ("vector", Type),
+                ("<", Punct),
+                ("int", Type),
+                (">", Punct),
+                ("v", Ident),
+                (")", Punct),
             ]
         );
         // unqualified names are plain without `using namespace std`
@@ -1205,7 +1548,8 @@ mod tests {
 
     #[test]
     fn highlight_spans_are_ordered_disjoint_on_boundaries() {
-        let src = "#include <a>\nint é(\"x\" 'y' /* c */ 0x1) { auto s = std::string(\"é\"); } // é\n@";
+        let src =
+            "#include <a>\nint é(\"x\" 'y' /* c */ 0x1) { auto s = std::string(\"é\"); } // é\n@";
         let h = highlight(src);
         let mut last = 0u32;
         for (s, _) in &h {

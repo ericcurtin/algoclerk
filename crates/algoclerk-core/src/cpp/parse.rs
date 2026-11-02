@@ -22,6 +22,8 @@ mod expr;
 mod item;
 mod stmt;
 #[cfg(test)]
+mod stmt_tests;
+#[cfg(test)]
 mod tests;
 mod types;
 

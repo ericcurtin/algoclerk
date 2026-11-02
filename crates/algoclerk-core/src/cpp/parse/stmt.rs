@@ -78,7 +78,11 @@ impl Parser<'_> {
 
     /// Drop every comment that starts before byte `pos`.
     pub(crate) fn skip_comments_before(&mut self, pos: u32) {
-        while self.comments.get(self.cidx).is_some_and(|c| c.span.start < pos) {
+        while self
+            .comments
+            .get(self.cidx)
+            .is_some_and(|c| c.span.start < pos)
+        {
             self.cidx += 1;
         }
     }
@@ -103,14 +107,14 @@ impl Parser<'_> {
 
     // ---- blocks and statements ----------------------------------------------------------------
 
-    /// Parse `{ ... }`. The comment after the `{` is left in `block_open` for the owner statement.
+    /// Parse `{ ... }`. The comment after the `{` is left in `block_open` for the owner statement. The
+    /// nesting limit is counted by the statements inside (every block holds statements).
     pub(crate) fn parse_block(&mut self) -> PResult<Block> {
         if !self.at_punct("{") {
             return Err(self.expected("a '{'"));
         }
         let open_span = self.cur_span();
         self.bump();
-        self.enter()?;
         let open = self.take_trailing();
         let mut stmts = Vec::new();
         while !self.at_punct("}") {
@@ -125,7 +129,6 @@ impl Parser<'_> {
         }
         let tail_comments = self.take_comments_before(self.cur_start());
         self.bump();
-        self.leave();
         self.block_open = open;
         Ok(Block {
             stmts,
@@ -165,11 +168,7 @@ impl Parser<'_> {
                 | StmtKind::DoWhile { .. }
                 | StmtKind::Block(_)
         );
-        let trailing = if compound {
-            open
-        } else {
-            self.take_trailing()
-        };
+        let trailing = if compound { open } else { self.take_trailing() };
         let id = self.new_id(self.span_from(start));
         Ok(Stmt {
             id,
@@ -322,7 +321,17 @@ impl Parser<'_> {
                 let (kind, _) = r?;
                 els = Some(Box::new(self.mk_stmt(start, kind)));
             } else {
-                els = Some(Box::new(self.parse_body()?.0));
+                let (mut body, open) = self.parse_body()?;
+                if let Some(c) = open {
+                    // `else { // note`: the note moves to the first line inside
+                    if let StmtKind::Block(b) = &mut body.kind {
+                        match b.stmts.first_mut() {
+                            Some(first) => first.comments.insert(0, c),
+                            None => b.tail_comments.insert(0, c),
+                        }
+                    }
+                }
+                els = Some(Box::new(body));
             }
         }
         Ok((
@@ -494,7 +503,11 @@ impl Parser<'_> {
                 break;
             }
         }
-        if self.eat_punct("]") { Some(names) } else { None }
+        if self.eat_punct("]") {
+            Some(names)
+        } else {
+            None
+        }
     }
 
     // ---- declarations -------------------------------------------------------------------------
@@ -639,7 +652,9 @@ impl Parser<'_> {
                 return Err(Diag::at(
                     at,
                     "parse.vexing",
-                    format!("`... {name}();` declares a function in C++; write `... {name};` instead"),
+                    format!(
+                        "`... {name}();` declares a function in C++; write `... {name};` instead"
+                    ),
                 ));
             }
             Init::Direct(args)
