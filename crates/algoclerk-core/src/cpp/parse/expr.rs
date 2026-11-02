@@ -686,7 +686,10 @@ impl Parser<'_> {
         if !self.at_punct("{") {
             return Err(self.expected("the '{' of the lambda body"));
         }
-        let body = self.parse_block()?;
+        let saved = std::mem::take(&mut self.switch_depth);
+        let body = self.parse_block();
+        self.switch_depth = saved;
+        let body = body?;
         let lambda = Lambda {
             captures: Captures { default, items },
             params,

@@ -7,12 +7,11 @@
 //! * `types`: type specifiers (builtin types, `std::` templates with `>>` splitting, aliases, structs,
 //!   `const`, `&`, `*`) and parameters;
 //! * `expr`: the complete expression grammar (precedence climbing, assignment, ternary, casts, postfix
-//!   operators, `new` / `delete`, lambdas, brace lists, constructor calls and template-id calls).
+//!   operators, `new` / `delete`, lambdas, brace lists, constructor calls and template-id calls);
+//! * `stmt`: declarations, structured bindings, control flow, blocks, comment attachment;
+//! * `item`: includes, `using`, `typedef`, free functions, structs, global constants.
 //!
 //! Errors are [`Diag`]s worded as a clerk would say them; the parser stops at the first one.
-
-// The statement and item half of the parser uses the rest of this API.
-#![allow(dead_code)]
 
 use super::ast::*;
 use super::diag::Diag;
@@ -20,6 +19,8 @@ use super::lexer::{Tok, Token, lex, split_comments};
 use std::collections::{HashMap, HashSet};
 
 mod expr;
+mod item;
+mod stmt;
 #[cfg(test)]
 mod tests;
 mod types;
@@ -45,6 +46,8 @@ pub(crate) struct Mark {
     pos: usize,
     splits: usize,
     depth: u32,
+    cidx: usize,
+    switch_depth: u32,
 }
 
 /// Parser state.
@@ -74,6 +77,13 @@ pub(crate) struct Parser<'a> {
     pub(crate) consts: HashMap<String, i64>,
     /// `using namespace std;` was seen: unqualified std names are types and functions.
     pub(crate) using_std: bool,
+    /// Index of the first comment not yet attached to a statement or item.
+    pub(crate) cidx: usize,
+    /// How many `switch` bodies enclose the statement being parsed (`case` needs one).
+    pub(crate) switch_depth: u32,
+    /// The comment found right after the `{` of the block parsed last (it becomes the `trailing`
+    /// comment of the statement that owns the block).
+    pub(crate) block_open: Option<String>,
     /// Tokens `>>` that were cut in two (index, original) so that [`Parser::restore`] can undo it.
     splits: Vec<(usize, Token)>,
 }
@@ -96,6 +106,9 @@ impl<'a> Parser<'a> {
             aliases: HashMap::new(),
             consts: HashMap::new(),
             using_std: false,
+            cidx: 0,
+            switch_depth: 0,
+            block_open: None,
             splits: Vec::new(),
         })
     }
@@ -186,11 +199,6 @@ impl<'a> Parser<'a> {
     /// Is the current token the keyword `k`?
     pub(crate) fn at_kw(&self, k: &str) -> bool {
         self.tok().is_some_and(|t| t.is_kw(k))
-    }
-
-    /// Is the token `n` places ahead the keyword `k`?
-    pub(crate) fn at_kw_at(&self, n: usize, k: &str) -> bool {
-        self.tok_at(n).is_some_and(|t| t.is_kw(k))
     }
 
     /// The identifier at the current token.
@@ -307,6 +315,8 @@ impl<'a> Parser<'a> {
             pos: self.pos,
             splits: self.splits.len(),
             depth: self.depth,
+            cidx: self.cidx,
+            switch_depth: self.switch_depth,
         }
     }
 
@@ -319,6 +329,8 @@ impl<'a> Parser<'a> {
         }
         self.pos = m.pos;
         self.depth = m.depth;
+        self.cidx = m.cidx;
+        self.switch_depth = m.switch_depth;
         self.last_end = if m.pos > 0 {
             self.toks[m.pos - 1].span.end
         } else {
@@ -350,53 +362,15 @@ impl<'a> Parser<'a> {
         }
         Err(self.expected("a '>'"))
     }
-
-    // ---- statements (STUB, replaced by the statement half of the parser) ----------------------
-
-    /// Parse `{ ... }`. STUB: only `return`, expression statements and `;`.
-    pub(crate) fn parse_block(&mut self) -> PResult<Block> {
-        self.expect_punct("{")?;
-        self.enter()?;
-        let mut stmts = Vec::new();
-        while !self.at_punct("}") {
-            if self.at_eof() {
-                return Err(self.expected("a '}'"));
-            }
-            let start = self.cur_start();
-            let kind = if self.eat_kw("return") {
-                let e = if self.at_punct(";") {
-                    None
-                } else {
-                    Some(self.parse_expr()?)
-                };
-                self.expect_punct(";")?;
-                StmtKind::Return(e)
-            } else if self.eat_punct(";") {
-                StmtKind::Empty
-            } else {
-                let e = self.parse_expr()?;
-                self.expect_punct(";")?;
-                StmtKind::Expr(e)
-            };
-            let span = self.span_from(start);
-            let id = self.new_id(span);
-            stmts.push(Stmt::new(id, kind));
-        }
-        self.bump();
-        self.leave();
-        Ok(Block {
-            stmts,
-            tail_comments: Vec::new(),
-        })
-    }
-    // @@APPEND@@
 }
 
+#[cfg(test)]
 /// Parse a single expression (the whole text) with no `using namespace std` and no known types.
 pub(crate) fn parse_expr_str(src: &str) -> Result<Expr, Vec<Diag>> {
     parse_expr_str_with(src, &ParseOpts::default(), false)
 }
 
+#[cfg(test)]
 /// Parse a single expression with the given known types and `using namespace std` state.
 pub(crate) fn parse_expr_str_with(
     src: &str,
@@ -419,9 +393,21 @@ pub(crate) fn parse_expr_str_with(
     run().map_err(|d| vec![d])
 }
 
-/// Parse a source text.
-pub fn parse(_src: &str, _opts: &ParseOpts) -> Result<Program, Vec<Diag>> {
-    Err(vec![Diag::plain("parse.stub", "parser not written yet")])
+/// Parse a source text: includes, `using`, aliases, structs, global constants and functions. The
+/// result has `prelude_items = 0` and a span for every node. The first problem found is returned as a
+/// single friendly diagnostic.
+pub fn parse(src: &str, opts: &ParseOpts) -> Result<Program, Vec<Diag>> {
+    let run = || -> PResult<Program> {
+        let mut p = Parser::new(src, opts)?;
+        let items = p.parse_items()?;
+        Ok(Program {
+            items,
+            prelude_items: 0,
+            next_id: p.next_id,
+            spans: p.spans,
+        })
+    };
+    run().map_err(|d| vec![d])
 }
 
 /// Names of the structs and aliases a program defines.
