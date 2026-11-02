@@ -60,9 +60,7 @@ representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement at the contact
-address published in the repository's GOVERNANCE.md (the maintainers must fill
-this in when the project is published; until then use the private "Report a
-vulnerability / contact maintainers" feature of the hosting platform).
+contact described in the repository's GOVERNANCE.md (GitHub private security advisories).
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the

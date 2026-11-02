@@ -38,5 +38,5 @@ Keep a Changelog.
 
 ## Contact
 
-The maintainers must list a contact address for conduct and security reports here when the
-repository is published:  `GitHub private security advisories at https://github.com/ericcurtin/algoclerk/security/advisories/new`.
+Conduct and security reports go through GitHub private security advisories:
+https://github.com/ericcurtin/algoclerk/security/advisories/new

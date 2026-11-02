@@ -7,8 +7,7 @@ Only the latest release (and `main`) receives security fixes while the project i
 ## Reporting a vulnerability
 
 Please **do not open a public issue**. Report privately through the hosting platform's
-"Report a vulnerability" (private security advisory) feature. The maintainers must publish a
-backup contact address here when the project is published.
+"Report a vulnerability" (private security advisory) feature. 
 
 You can expect an acknowledgement within a week and a fix or a mitigation plan within 30 days for
 confirmed problems.
