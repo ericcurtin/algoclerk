@@ -4,6 +4,7 @@
 
 pub mod ast;
 pub mod diag;
+pub mod value;
 
 pub use ast::{Program, Ty};
 pub use diag::Diag;
