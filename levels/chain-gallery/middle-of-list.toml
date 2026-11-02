@@ -1,0 +1,65 @@
+title = "Halfway Down the Chain"
+order = 4
+story = "The inspector wants to start in the middle of the chain of tags, but nobody counted how long it is."
+statement = "Return the middle node of the list (the second of the two middle nodes when the length is even). The result is shown as the rest of the list from that node."
+signature = "fn middle(head: lnode) -> lnode"
+constraints = ["0 <= length <= 20000"]
+technique = "Fast and slow pointers"
+big_o = "O(n) time, O(1) space"
+types = ["lnode"]
+builtins = []
+hints = [
+  "Counting first and then walking half the length works.",
+  "Or move a slow pointer one step while a fast pointer moves two.",
+  "When the fast pointer reaches the end, the slow one is in the middle.",
+]
+reference = '''
+fn middle(head: lnode) -> lnode {
+    let slow = head;
+    let fast = head;
+    while fast != null and fast.next != null {
+        slow = slow.next;
+        fast = fast.next.next;
+    }
+    return slow;
+}
+'''
+
+[budgets]
+large_steps = 2000000
+
+[medals]
+size = [39, 30, 24]
+speed = [75, 40, 29]
+
+[[examples]]
+args = ["[1, 2, 3, 4, 5]"]
+expect = "[3, 4, 5]"
+
+[[examples]]
+args = ["[1, 2, 3, 4]"]
+expect = "[3, 4]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[tests]]
+args = ["[7]"]
+expect = "[7]"
+
+[[generate]]
+seed = 731
+count = 10
+args = [
+  { kind = "list", len = [0, 9], range = [0, 9] },
+]
+
+[[generate]]
+seed = 732
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "list", len = "n", range = [0, 9] },
+]

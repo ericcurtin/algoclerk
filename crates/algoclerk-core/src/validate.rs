@@ -96,7 +96,7 @@ pub fn validate_level(level: &Level) -> Vec<String> {
                 p(format!("measured space {} is worse than the declared {}", c.space, sp));
             }
         }
-        (None, _) if scalar_only => {}
+        (None, _) if scalar_only || level.budgets.sweep_n0 <= 0 => {}
         (None, _) => p("no complexity sweep result".into()),
         (_, None) => p(format!("cannot parse the Big-O note '{}'", level.big_o)),
     }

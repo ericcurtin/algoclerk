@@ -1,0 +1,80 @@
+title = "Floor by Floor"
+order = 10
+story = "The building directory lists employees by org-chart level: the boss first, then their reports, then their reports' reports."
+statement = "Return the values of the tree level by level, left to right, as a shelf of shelves (one inner shelf per level). An empty tree gives an empty shelf."
+signature = "fn level_order(root: tnode) -> vec<vec<int>>"
+constraints = ["0 <= nodes <= 20000"]
+technique = "Breadth-first search with a queue"
+big_o = "O(n) time, O(n) space"
+types = ["queue", "tnode", "vec"]
+builtins = ["is_empty", "len", "pop", "push"]
+hints = [
+  "A queue holds the nodes of the level you are about to read.",
+  "For each level, take exactly `len(q)` nodes from the queue (measure the size first).",
+  "Push each node's children as you go; they form the next level.",
+]
+reference = '''
+fn level_order(root: tnode) -> vec<vec<int>> {
+    let out: vec<vec<int>> = [];
+    if root == null {
+        return out;
+    }
+    let q = queue<tnode>();
+    q.push(root);
+    while !q.is_empty() {
+        let size = len(q);
+        let level: vec<int> = [];
+        for i in range(size) {
+            let node = q.pop();
+            level.push(node.val);
+            if node.left != null {
+                q.push(node.left);
+            }
+            if node.right != null {
+                q.push(node.right);
+            }
+        }
+        out.push(level);
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [95, 74, 59]
+speed = [266, 142, 99]
+
+[[examples]]
+args = ["[3, 9, 20, null, null, 15, 7]"]
+expect = "[[3], [9, 20], [15, 7]]"
+
+[[examples]]
+args = ["[1]"]
+expect = "[[1]]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[tests]]
+args = ["[1, 2, null, 3]"]
+expect = "[[1], [2], [3]]"
+
+[[generate]]
+seed = 791
+count = 10
+args = [
+  { kind = "tree", nodes = [0, 10], range = [0, 9] },
+]
+
+[[generate]]
+seed = 792
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "tree", nodes = "n", range = [0, 9] },
+]

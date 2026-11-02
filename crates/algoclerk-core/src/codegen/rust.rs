@@ -17,6 +17,8 @@ struct Gen<'a> {
     f: usize,
     out: String,
     ind: usize,
+    pending: Vec<String>,
+    tmp: usize,
 }
 
 fn rprec(op: BinOp) -> u8 {
@@ -151,6 +153,11 @@ impl<'a> Gen<'a> {
         self.info.ty(e.id).clone()
     }
     fn line(&mut self, s: &str) {
+        for p in std::mem::take(&mut self.pending) {
+            self.out.push_str(&pad(self.ind));
+            self.out.push_str(&p);
+            self.out.push('\n');
+        }
         self.out.push_str(&pad(self.ind));
         self.out.push_str(s);
         self.out.push('\n');
@@ -618,7 +625,14 @@ impl<'a> Gen<'a> {
                     }
                     _ => {
                         let base = self.place(a, false);
-                        let ix = self.idx(i);
+                        let mut ix = self.idx(i);
+                        if !matches!(i.kind, ExprKind::Var(_) | ExprKind::Int(_)) {
+                            // `v[v.len() - 1][0] = x` trips Rust's borrow checker: compute the index first
+                            self.tmp += 1;
+                            let name = format!("at{}", self.tmp);
+                            self.pending.push(format!("let {name} = {ix};"));
+                            ix = name;
+                        }
                         format!("{base}[{ix}]")
                     }
                 }
@@ -850,7 +864,7 @@ impl<'a> Gen<'a> {
 
 /// Translate to Rust.
 pub fn generate(prog: &Program, info: &TypeInfo, entry: &str) -> Generated {
-    let mut g = Gen { prog, info, entry: entry.to_string(), f: 0, out: String::new(), ind: 0 };
+    let mut g = Gen { prog, info, entry: entry.to_string(), f: 0, out: String::new(), ind: 0, pending: Vec::new(), tmp: 0 };
     let used = used_types(prog, info);
     let (list, tree) = (used.contains(&Ty::LNode), used.contains(&Ty::TNode));
     let mut code = String::new();

@@ -308,7 +308,10 @@ impl Judge {
 
     /// Run the solution at n0, 2 n0, 4 n0, 8 n0 using the first large generator and classify.
     pub fn complexity(&self, sol: &Compiled) -> Option<Complexity> {
-        let spec = self.level.generate.iter().find(|g| g.large)?;
+        let spec = self.level.sweep.as_ref().or_else(|| self.level.generate.iter().find(|g| g.large))?;
+        if self.level.budgets.sweep_n0 <= 0 {
+            return None;
+        }
         let n0 = self.level.budgets.sweep_n0.max(8);
         let mut samples = Vec::new();
         let name = &self.level.signature.name;

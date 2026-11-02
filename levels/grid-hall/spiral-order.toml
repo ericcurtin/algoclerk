@@ -1,0 +1,94 @@
+title = "Spiral Delivery"
+order = 2
+story = "The delivery drone starts at the top-left of a building's floor plan and spirals inward, clockwise, dropping a parcel at every room."
+statement = "Return the numbers of grid in spiral order: along the top row left to right, down the right column, back along the bottom row, up the left column, then inward."
+signature = "fn spiral(grid: vec<vec<int>>) -> vec<int>"
+constraints = ["1 <= rows, cols", "rows * cols <= 40000"]
+technique = "Shrinking boundaries"
+big_o = "O(n) time, O(n) space"
+types = ["vec"]
+builtins = ["len", "push"]
+hints = [
+  "Keep four boundaries: top, bottom, left, right.",
+  "Walk one side at a time and shrink the matching boundary after each side.",
+  "After the top and right sides, check that rows and columns remain before walking the bottom and left sides.",
+]
+reference = '''
+fn spiral(grid: vec<vec<int>>) -> vec<int> {
+    let out: vec<int> = [];
+    let top = 0;
+    let bottom = len(grid) - 1;
+    let left = 0;
+    let right = len(grid[0]) - 1;
+    while top <= bottom and left <= right {
+        for c in range(left, right + 1) {
+            out.push(grid[top][c]);
+        }
+        top += 1;
+        for r in range(top, bottom + 1) {
+            out.push(grid[r][right]);
+        }
+        right -= 1;
+        if top <= bottom {
+            for c in range(right, left - 1, -1) {
+                out.push(grid[bottom][c]);
+            }
+            bottom -= 1;
+        }
+        if left <= right {
+            for r in range(bottom, top - 1, -1) {
+                out.push(grid[r][left]);
+            }
+            left += 1;
+        }
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [164, 128, 102]
+speed = [247, 132, 92]
+
+[[examples]]
+args = ["[[1, 2, 3], [4, 5, 6], [7, 8, 9]]"]
+expect = "[1, 2, 3, 6, 9, 8, 7, 4, 5]"
+
+[[examples]]
+args = ["[[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]"]
+expect = "[1, 2, 3, 4, 8, 12, 11, 10, 9, 5, 6, 7]"
+
+[[examples]]
+args = ["[[5]]"]
+expect = "[5]"
+
+[[tests]]
+args = ["[[1, 2], [3, 4]]"]
+expect = "[1, 2, 4, 3]"
+
+[[tests]]
+args = ["[[1], [2], [3]]"]
+expect = "[1, 2, 3]"
+
+[[tests]]
+args = ["[[1, 2, 3]]"]
+expect = "[1, 2, 3]"
+
+[[generate]]
+seed = 611
+count = 12
+args = [
+  { kind = "grid_int", rows = [1, 5], cols = [1, 5], range = [0, 9] },
+]
+
+[[generate]]
+seed = 612
+count = 1
+large = true
+n = 40000
+args = [
+  { kind = "grid_int", rows = "sqrt(n)", cols = "sqrt(n)", range = [0, 9] },
+]

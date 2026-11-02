@@ -156,6 +156,8 @@ struct RawLevel {
     tests: Vec<RawCase>,
     #[serde(default)]
     generate: Vec<GenSpec>,
+    #[serde(default)]
+    sweep: Option<GenSpec>,
 }
 
 #[derive(Deserialize)]
@@ -239,6 +241,8 @@ pub struct Level {
     pub tests: Vec<RawCase>,
     /// Seeded generators.
     pub generate: Vec<GenSpec>,
+    /// Optional generator for the complexity sweep (defaults to the first large generator).
+    pub sweep: Option<GenSpec>,
 }
 
 impl Level {
@@ -278,6 +282,7 @@ impl Level {
             examples: r.examples,
             tests: r.tests,
             generate: r.generate,
+            sweep: r.sweep,
         })
     }
 

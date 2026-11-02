@@ -1,0 +1,62 @@
+title = "Turn the Blueprint"
+order = 3
+story = "The blueprint is pinned the wrong way round. Rotate the square plan a quarter turn clockwise."
+statement = "Return the square matrix grid rotated 90 degrees clockwise."
+signature = "fn rotate_image(grid: vec<vec<int>>) -> vec<vec<int>>"
+constraints = ["1 <= n, grid is n x n", "n * n <= 40000"]
+technique = "Index mapping"
+big_o = "O(n) time, O(n) space"
+types = ["vec"]
+builtins = ["len"]
+hints = [
+  "The item at row i, column j ends up in row j, column n - 1 - i.",
+  "Start from a fresh n x n matrix: `[[0; n]; n]`.",
+  "Two nested loops copy every item to its new place.",
+]
+reference = '''
+fn rotate_image(grid: vec<vec<int>>) -> vec<vec<int>> {
+    let n = len(grid);
+    let out = [[0; n]; n];
+    for i in range(n) {
+        for j in range(n) {
+            out[j][n - 1 - i] = grid[i][j];
+        }
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [48, 38, 30]
+speed = [314, 168, 116]
+
+[[examples]]
+args = ["[[1, 2], [3, 4]]"]
+expect = "[[3, 1], [4, 2]]"
+
+[[examples]]
+args = ["[[1, 2, 3], [4, 5, 6], [7, 8, 9]]"]
+expect = "[[7, 4, 1], [8, 5, 2], [9, 6, 3]]"
+
+[[examples]]
+args = ["[[1]]"]
+expect = "[[1]]"
+
+[[generate]]
+seed = 621
+count = 10
+args = [
+  { kind = "grid_int", rows = [1, 5], square = true, range = [0, 9] },
+]
+
+[[generate]]
+seed = 622
+count = 1
+large = true
+n = 40000
+args = [
+  { kind = "grid_int", rows = "sqrt(n)", square = true, range = [0, 9] },
+]

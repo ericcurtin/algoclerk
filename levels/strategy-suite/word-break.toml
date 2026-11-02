@@ -1,0 +1,96 @@
+title = "Can It Be Spelled?"
+order = 8
+story = "A telegram arrives with all the spaces missing. The dictionary clerk wants to know whether it can be cut into dictionary words."
+statement = "Return true if s can be split into a sequence of one or more words from the shelf words (a word may be used many times)."
+signature = "fn word_break(s: string, words: vec<string>) -> bool"
+constraints = ["1 <= len(s) <= 300", "1 <= len(words) <= 10", "1 <= len(words[i]) <= 10"]
+technique = "Dynamic programming over positions"
+big_o = "O(n) time, O(n) space"
+types = ["set", "string", "vec"]
+builtins = ["add", "contains", "len", "max", "starts_with"]
+hints = [
+  "ok[i] says whether the first i letters can be split. ok[0] is true.",
+  "ok[i] is true if some j < i has ok[j] and s[j..i] is a word.",
+  "Put the words in a set so a lookup costs one step, and never look at pieces longer than the longest word.",
+]
+reference = '''
+fn word_break(s: string, words: vec<string>) -> bool {
+    let dict = set<string>();
+    let longest = 0;
+    for w in words {
+        dict.add(w);
+        longest = max(longest, len(w));
+    }
+    let ok = [false; len(s) + 1];
+    ok[0] = true;
+    for i in range(1, len(s) + 1) {
+        for j in range(max(0, i - longest), i) {
+            if ok[j] and dict.contains(s[j..i]) {
+                ok[i] = true;
+                break;
+            }
+        }
+    }
+    return ok[len(s)];
+}
+'''
+naive = '''
+fn word_break(s: string, words: vec<string>) -> bool {
+    if len(s) == 0 {
+        return true;
+    }
+    for w in words {
+        if s.starts_with(w) and len(w) > 0 {
+            if word_break(s[len(w)..], words) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+'''
+
+[unlock]
+helpers = false
+recursion = true
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [101, 79, 63]
+speed = [365, 195, 135]
+
+[[examples]]
+args = ["\"leetcode\"", "[\"leet\", \"code\"]"]
+expect = "true"
+
+[[examples]]
+args = ["\"catsandog\"", "[\"cats\", \"dog\", \"sand\", \"and\", \"cat\"]"]
+expect = "false"
+
+[[examples]]
+args = ["\"aaaa\"", "[\"a\", \"aa\"]"]
+expect = "true"
+
+[[tests]]
+args = ["\"ab\"", "[\"a\"]"]
+expect = "false"
+
+[[generate]]
+seed = 871
+count = 12
+args = [
+  { kind = "string", len = [1, 10], alphabet = "ab" },
+  { kind = "vec_string", len = [1, 4], item_len = [1, 3], alphabet = "ab" },
+]
+
+[[generate]]
+seed = 872
+count = 1
+large = true
+n = 40
+args = [
+  { kind = "string", len = "n", alphabet = "a", suffix = "b" },
+  { kind = "vec_string", len = [3, 3], item_len = [1, 3], alphabet = "a" },
+]

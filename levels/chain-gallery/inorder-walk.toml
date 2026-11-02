@@ -1,0 +1,71 @@
+title = "Reading the Tree in Order"
+order = 7
+story = "The records are stored in a tree, and the archivist reads them left subtree, node, right subtree. She does not trust recursion on long chains, so a stack it is."
+statement = "Return the values of the binary tree in in-order (left, node, right). Try it without recursion, using a stack of nodes."
+signature = "fn inorder(root: tnode) -> vec<int>"
+constraints = ["0 <= nodes <= 20000"]
+technique = "Iterative traversal with a stack"
+big_o = "O(n) time, O(n) space"
+types = ["stack", "tnode", "vec"]
+builtins = ["is_empty", "pop", "push"]
+hints = [
+  "Go left as far as you can, remembering the nodes on a stack.",
+  "Then pop a node, record its value and move to its right child.",
+  "Stop when the current node is null and the stack is empty.",
+]
+reference = '''
+fn inorder(root: tnode) -> vec<int> {
+    let out: vec<int> = [];
+    let todo = stack<tnode>();
+    let cur = root;
+    while cur != null or !todo.is_empty() {
+        while cur != null {
+            todo.push(cur);
+            cur = cur.left;
+        }
+        cur = todo.pop();
+        out.push(cur.val);
+        cur = cur.right;
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [66, 52, 41]
+speed = [197, 105, 73]
+
+[[examples]]
+args = ["[1, null, 2, 3]"]
+expect = "[1, 3, 2]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[examples]]
+args = ["[2, 1, 3]"]
+expect = "[1, 2, 3]"
+
+[[tests]]
+args = ["[1]"]
+expect = "[1]"
+
+[[generate]]
+seed = 761
+count = 10
+args = [
+  { kind = "tree", nodes = [0, 10], range = [0, 9] },
+]
+
+[[generate]]
+seed = 762
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "tree", nodes = "n", range = [0, 9] },
+]

@@ -1,0 +1,67 @@
+title = "Turn the Chain Around"
+order = 1
+story = "A chain of name tags hangs along the corridor, each tag pointing at the next. The boss wants the chain hung in the opposite direction."
+statement = "Reverse the linked list and return the new head. A list node has `val` and `next`; `null` marks the end. Change the `next` links instead of building a new list."
+signature = "fn reverse_list(head: lnode) -> lnode"
+constraints = ["0 <= length <= 20000"]
+technique = "Pointer reversal"
+big_o = "O(n) time, O(1) space"
+types = ["lnode"]
+builtins = []
+hints = [
+  "Walk the chain with a `cur` node, keeping a `prev` node (start with null).",
+  "Before changing `cur.next`, save the old next node.",
+  "Point `cur.next` at `prev`, then move both forward.",
+]
+reference = '''
+fn reverse_list(head: lnode) -> lnode {
+    let prev: lnode = null;
+    let cur = head;
+    while cur != null {
+        let nx = cur.next;
+        cur.next = prev;
+        prev = cur;
+        cur = nx;
+    }
+    return prev;
+}
+'''
+
+[budgets]
+large_steps = 2000000
+
+[medals]
+size = [37, 29, 23]
+speed = [101, 54, 38]
+
+[[examples]]
+args = ["[1, 2, 3]"]
+expect = "[3, 2, 1]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[examples]]
+args = ["[5]"]
+expect = "[5]"
+
+[[tests]]
+args = ["[1, 2]"]
+expect = "[2, 1]"
+
+[[generate]]
+seed = 701
+count = 10
+args = [
+  { kind = "list", len = [0, 8], range = [0, 9] },
+]
+
+[[generate]]
+seed = 702
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "list", len = "n", range = [0, 9] },
+]

@@ -1,0 +1,87 @@
+title = "Stairs of the Skyscraper"
+order = 1
+story = "The skyscraper's staircase can be climbed one or two steps at a time. How many different ways are there to reach the top?"
+statement = "Return the number of distinct ways to climb n steps taking 1 or 2 steps at a time, modulo 1000000007."
+signature = "fn climb(n: int) -> int"
+constraints = ["0 <= n <= 100000"]
+technique = "Dynamic programming (Fibonacci)"
+big_o = "O(n) time, O(1) space"
+types = []
+builtins = []
+hints = [
+  "The ways to reach step n are the ways to reach n-1 plus the ways to reach n-2.",
+  "A naive recursion repeats the same sub-problems and explodes for n around 40.",
+  "Keep just the last two answers in two variables and loop; take `% 1000000007` as you go.",
+]
+reference = '''
+fn climb(n: int) -> int {
+    let a = 1;
+    let b = 1;
+    for i in range(n) {
+        let next = (a + b) % 1000000007;
+        a = b;
+        b = next;
+    }
+    return a;
+}
+'''
+naive = '''
+fn climb(n: int) -> int {
+    if n <= 1 {
+        return 1;
+    }
+    return (climb(n - 1) + climb(n - 2)) % 1000000007;
+}
+'''
+
+[unlock]
+helpers = false
+recursion = true
+
+[budgets]
+steps = 5000000
+large_steps = 3000000
+
+[medals]
+size = [32, 25, 20]
+speed = [147, 79, 55]
+
+[[examples]]
+args = ["2"]
+expect = "2"
+
+[[examples]]
+args = ["3"]
+expect = "3"
+
+[[examples]]
+args = ["0"]
+expect = "1"
+
+[[examples]]
+args = ["10"]
+expect = "89"
+
+[[tests]]
+args = ["1"]
+expect = "1"
+
+[[tests]]
+args = ["22"]
+expect = "28657"
+
+[[generate]]
+seed = 801
+count = 8
+args = [
+  { kind = "int", range = [0, 20] },
+]
+
+[[generate]]
+seed = 802
+count = 1
+large = true
+n = 30
+args = [
+  { kind = "int", range = ["n", "n"] },
+]

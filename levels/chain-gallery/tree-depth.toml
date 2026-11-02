@@ -1,0 +1,66 @@
+title = "How Tall Is the Org Chart?"
+order = 6
+story = "The company org chart is a tree: every manager has at most a left and a right report. How many levels does it have?"
+statement = "Return the maximum depth of the binary tree: the number of nodes on the longest path from the root down to a leaf. An empty tree has depth 0. A tree node has `val`, `left` and `right`."
+signature = "fn max_depth(root: tnode) -> int"
+constraints = ["0 <= nodes <= 20000", "the depth is below 150"]
+technique = "Recursion on a tree"
+big_o = "O(n) time, O(n) space"
+types = ["tnode"]
+builtins = ["max"]
+hints = [
+  "The depth of a tree is 1 plus the larger depth of its two subtrees.",
+  "The depth of an empty tree (null) is 0.",
+  "A function may call itself here: recursion is unlocked.",
+]
+reference = '''
+fn max_depth(root: tnode) -> int {
+    if root == null {
+        return 0;
+    }
+    return 1 + max(max_depth(root.left), max_depth(root.right));
+}
+'''
+
+[unlock]
+helpers = false
+recursion = true
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [26, 20, 16]
+speed = [156, 83, 59]
+
+[[examples]]
+args = ["[3, 9, 20, null, null, 15, 7]"]
+expect = "3"
+
+[[examples]]
+args = ["[1, null, 2]"]
+expect = "2"
+
+[[examples]]
+args = ["[]"]
+expect = "0"
+
+[[tests]]
+args = ["[1]"]
+expect = "1"
+
+[[generate]]
+seed = 751
+count = 10
+args = [
+  { kind = "tree", nodes = [0, 10], range = [0, 9] },
+]
+
+[[generate]]
+seed = 752
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "tree", nodes = "n", range = [0, 9] },
+]

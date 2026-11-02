@@ -1,0 +1,3 @@
+title = "Basement Bits"
+blurb = "Bit tricks from the boiler room: xor, shifts and masks."
+order = 9

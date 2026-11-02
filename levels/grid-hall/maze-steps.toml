@@ -1,0 +1,87 @@
+title = "Through the Maze"
+order = 5
+story = "The night guard walks from the top-left door to the bottom-right door through a maze of corridors. How many steps is the shortest way?"
+statement = "'.' is a free cell and '#' is a wall. Starting at the top-left and moving up, down, left or right through free cells, return the fewest steps to reach the bottom-right cell, or -1 if there is no way (or either end is a wall)."
+signature = "fn maze_steps(grid: vec<vec<char>>) -> int"
+constraints = ["1 <= rows, cols", "rows * cols <= 6400"]
+technique = "Breadth-first search on a grid"
+big_o = "O(n) time, O(n) space"
+types = ["char", "queue", "tuple", "vec"]
+builtins = ["is_empty", "len", "pop", "push"]
+hints = [
+  "Breadth-first search finds shortest paths when every step costs the same.",
+  "Keep a `dist` grid filled with -1 and a queue of cells to expand.",
+  "Stop as soon as you pop the bottom-right cell.",
+]
+reference = '''
+fn maze_steps(grid: vec<vec<char>>) -> int {
+    let rows = len(grid);
+    let cols = len(grid[0]);
+    if grid[0][0] == '#' or grid[rows - 1][cols - 1] == '#' {
+        return -1;
+    }
+    let dist = [[-1; cols]; rows];
+    dist[0][0] = 0;
+    let q = queue<(int, int)>();
+    q.push((0, 0));
+    while !q.is_empty() {
+        let (y, x) = q.pop();
+        if y == rows - 1 and x == cols - 1 {
+            return dist[y][x];
+        }
+        for (dy, dx) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let ny = y + dy;
+            let nx = x + dx;
+            if ny >= 0 and ny < rows and nx >= 0 and nx < cols and grid[ny][nx] == '.' and dist[ny][nx] < 0 {
+                dist[ny][nx] = dist[y][x] + 1;
+                q.push((ny, nx));
+            }
+        }
+    }
+    return -1;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [242, 189, 151]
+speed = [1551, 827, 570]
+
+[[examples]]
+args = ["[['.', '.', '#'], ['#', '.', '.'], ['#', '#', '.']]"]
+expect = "4"
+
+[[examples]]
+args = ["[['.']]"]
+expect = "0"
+
+[[examples]]
+args = ["[['.', '#'], ['#', '.']]"]
+expect = "-1"
+
+[[tests]]
+args = ["[['#', '.']]"]
+expect = "-1"
+
+[[generate]]
+seed = 641
+count = 14
+args = [
+  { kind = "grid_char", rows = [1, 6], cols = [1, 6], alphabet = "....#" },
+]
+
+[[generate]]
+seed = 642
+count = 1
+large = true
+n = 6400
+args = [
+  { kind = "grid_char", rows = "sqrt(n)", cols = "sqrt(n)", alphabet = "......#" },
+]
+
+[sweep]
+args = [
+  { kind = "grid_char", rows = "sqrt(n)", cols = "sqrt(n)", alphabet = "." },
+]

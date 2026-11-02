@@ -1,0 +1,3 @@
+title = "Strategy Suite"
+blurb = "Dynamic programming: remember sub-answers instead of recomputing them."
+order = 8

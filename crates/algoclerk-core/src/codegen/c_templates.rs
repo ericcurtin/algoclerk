@@ -46,6 +46,7 @@ static inline TreeNode *tnode_clone(TreeNode *a) { return a; }
 "#;
 
 pub const VEC: &str = r#"
+typedef $E $S_elem;
 typedef struct { $E *data; size_t len, cap; } $S;
 static inline $S $S_new(void) { $S v = {NULL, 0, 0}; return v; }
 static inline void $S_push($S *v, $E x) {
@@ -54,7 +55,7 @@ static inline void $S_push($S *v, $E x) {
 }
 static inline $E $S_pop($S *v) { return v->data[--v->len]; }
 static inline $E $S_peek($S v) { return v.data[v.len - 1]; }
-static inline $S $S_from(const $E *items, size_t n) { $S v = $S_new(); for (size_t i = 0; i < n; i++) $S_push(&v, items[i]); return v; }
+static inline $S $S_from(const $S_elem *items, size_t n) { $S v = $S_new(); for (size_t i = 0; i < n; i++) $S_push(&v, items[i]); return v; }
 static inline $S $S_repeat($E x, long long n) { $S v = $S_new(); for (long long i = 0; i < n; i++) $S_push(&v, $P_clone(x)); return v; }
 static inline void $S_insert($S *v, long long i, $E x) {
     $S_push(v, x);
@@ -93,7 +94,7 @@ static inline int $S_cmp($S a, $S b) {
 }
 static inline $S $S_min($S a, $S b) { return $S_cmp(a, b) <= 0 ? a : b; }
 static inline $S $S_max($S a, $S b) { return $S_cmp(a, b) >= 0 ? a : b; }
-static int $S_qcmp(const void *a, const void *b) { return $P_cmp(*(const $E *)a, *(const $E *)b); }
+static int $S_qcmp(const void *a, const void *b) { return $P_cmp(*(const $S_elem *)a, *(const $S_elem *)b); }
 static inline void $S_sort($S *v) { if (v->len > 1) qsort(v->data, v->len, sizeof($E), $S_qcmp); }
 static inline $S $S_sorted($S v) { $S c = $S_clone(v); $S_sort(&c); return c; }
 static inline $E $S_vmin($S v) { $E m = v.data[0]; for (size_t i = 1; i < v.len; i++) if ($P_cmp(v.data[i], m) < 0) m = v.data[i]; return m; }

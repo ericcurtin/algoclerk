@@ -256,7 +256,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             } else {
                 rand_string(rng, num(t, "len", (0, 8), n, rng)?, alphabet)
             };
-            let s = format!("{}{s}", text_of(t, "prefix", ""));
+            let s = format!("{}{s}{}", text_of(t, "prefix", ""), text_of(t, "suffix", ""));
             let ints = s.bytes().map(i64::from).collect();
             Ok(Arg { text: quote(&s), ints })
         }
@@ -393,14 +393,14 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
         }
         "grid_int" => {
             let rows = num(t, "rows", (1, 4), n, rng)?;
-            let cols = num(t, "cols", (1, 4), n, rng)?;
+            let cols = if flag(t, "square") { rows } else { num(t, "cols", (1, 4), n, rng)? };
             let rows_v: Vec<String> =
                 (0..rows).map(|_| ints_text(&(0..cols).map(|_| rng.range(range.0, range.1)).collect::<Vec<_>>())).collect();
             Ok(Arg { text: format!("[{}]", rows_v.join(", ")), ints: vec![rows, cols] })
         }
         "grid_char" => {
             let rows = num(t, "rows", (1, 4), n, rng)?;
-            let cols = num(t, "cols", (1, 4), n, rng)?;
+            let cols = if flag(t, "square") { rows } else { num(t, "cols", (1, 4), n, rng)? };
             let rows_v: Vec<String> = (0..rows)
                 .map(|_| format!("[{}]", (0..cols).map(|_| format!("'{}'", alphabet[rng.range(0, alphabet.len() as i64 - 1) as usize] as char)).collect::<Vec<_>>().join(", ")))
                 .collect();
@@ -435,6 +435,12 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             let mut perm: Vec<i64> = (0..nodes).collect();
             if dag {
                 rng.shuffle(&mut perm);
+            }
+            if flag(t, "chain") {
+                for v in 1..nodes {
+                    seen.insert((v - 1, v));
+                    es.push(format!("[{}, {v}]", v - 1));
+                }
             }
             if flag(t, "connected") {
                 for v in 1..nodes {
@@ -485,6 +491,11 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             } else {
                 (0..count).map(|_| rng.range(range.0, range.1)).collect()
             };
+            let mut vals = vals;
+            if vals.len() > 1 && rng.chance(num(t, "swap_pct", (0, 0), n, rng)?) {
+                let (a, b) = (rng.range(0, vals.len() as i64 - 1) as usize, rng.range(0, vals.len() as i64 - 1) as usize);
+                vals.swap(a, b);
+            }
             // structure: arrays of left/right child indices
             let cn = vals.len();
             let mut left = vec![usize::MAX; cn];

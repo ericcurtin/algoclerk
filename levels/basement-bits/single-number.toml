@@ -1,0 +1,73 @@
+title = "The Odd One Out"
+order = 1
+story = "Every badge in the box was scanned twice, except one that was scanned once. Which badge is the loner?"
+statement = "Every value in nums appears exactly twice except one value that appears once. Return that value."
+signature = "fn single_number(nums: vec<int>) -> int"
+constraints = ["1 <= len(nums) <= 20001, odd length"]
+technique = "XOR cancellation"
+big_o = "O(n) time, O(1) space"
+types = ["vec"]
+builtins = ["count"]
+hints = [
+  "A number xor itself is 0, and xor with 0 changes nothing.",
+  "The order of xors does not matter.",
+  "xor all numbers together with `^`: the pairs cancel and the loner remains.",
+]
+reference = '''
+fn single_number(nums: vec<int>) -> int {
+    let acc = 0;
+    for x in nums {
+        acc ^= x;
+    }
+    return acc;
+}
+'''
+naive = '''
+fn single_number(nums: vec<int>) -> int {
+    for x in nums {
+        if nums.count(x) == 1 {
+            return x;
+        }
+    }
+    return 0;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [15, 12, 9]
+speed = [54, 29, 21]
+
+[[examples]]
+args = ["[2, 2, 1]"]
+expect = "1"
+
+[[examples]]
+args = ["[4, 1, 2, 1, 2]"]
+expect = "4"
+
+[[examples]]
+args = ["[7]"]
+expect = "7"
+
+[[tests]]
+args = ["[-3, 5, 5]"]
+expect = "-3"
+
+[[generate]]
+seed = 901
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 5], range = [-30, 30], single_out = true },
+]
+
+[[generate]]
+seed = 902
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n/2", range = [-100000, 100000], single_out = true },
+]

@@ -1,0 +1,117 @@
+title = "Boss: Eight Chess Queens"
+order = 3
+story = "The CEO collects chess queens and wants to know in how many ways n of them can sit on an n by n board without any two attacking each other."
+statement = "Return the number of ways to place n queens on an n x n board so that no two share a row, column or diagonal."
+signature = "fn count_queens(n: int) -> int"
+constraints = ["0 <= n <= 8"]
+technique = "Backtracking"
+big_o = "O(n) time, O(n) space"
+types = ["set", "vec"]
+builtins = ["abs", "add", "contains", "push", "remove"]
+hints = [
+  "Place queens one row at a time.",
+  "Keep three sets: used columns, used diagonals (row - col) and anti-diagonals (row + col).",
+  "A helper with `&mut` parameters, like `fn place(row: int, n: int, cols: &mut set<int>, d1: &mut set<int>, d2: &mut set<int>) -> int`, lets the recursion share the sets: add before the recursive call, remove after.",
+]
+reference = '''
+fn place(row: int, n: int, cols: &mut set<int>, d1: &mut set<int>, d2: &mut set<int>) -> int {
+    if row == n {
+        return 1;
+    }
+    let total = 0;
+    for c in range(n) {
+        if cols.contains(c) or d1.contains(row - c) or d2.contains(row + c) {
+            continue;
+        }
+        cols.add(c);
+        d1.add(row - c);
+        d2.add(row + c);
+        total += place(row + 1, n, cols, d1, d2);
+        cols.remove(c);
+        d1.remove(row - c);
+        d2.remove(row + c);
+    }
+    return total;
+}
+
+fn count_queens(n: int) -> int {
+    let cols = set<int>();
+    let d1 = set<int>();
+    let d2 = set<int>();
+    return place(0, n, cols, d1, d2);
+}
+'''
+naive = '''
+fn count_queens(n: int) -> int {
+    let total = 0;
+    let limit = 1;
+    for i in range(n) {
+        limit *= n;
+    }
+    for code in range(limit) {
+        let cols: vec<int> = [];
+        let x = code;
+        for r in range(n) {
+            cols.push(x % n);
+            x = x / n;
+        }
+        let ok = true;
+        for a in range(n) {
+            for b in range(a + 1, n) {
+                if cols[a] == cols[b] or abs(cols[a] - cols[b]) == b - a {
+                    ok = false;
+                }
+            }
+        }
+        if ok {
+            total += 1;
+        }
+    }
+    return total;
+}
+'''
+
+[unlock]
+helpers = true
+recursion = true
+
+[budgets]
+steps = 30000000
+large_steps = 3000000
+sweep_n0 = 0
+
+[medals]
+size = [135, 105, 84]
+speed = [8194, 4370, 3006]
+
+[[examples]]
+args = ["4"]
+expect = "2"
+
+[[examples]]
+args = ["1"]
+expect = "1"
+
+[[examples]]
+args = ["0"]
+expect = "1"
+
+[[tests]]
+args = ["6"]
+expect = "4"
+
+[[generate]]
+seed = 1021
+count = 6
+args = [
+  { kind = "int", range = [0, 6] },
+]
+
+[[generate]]
+seed = 1022
+count = 1
+large = true
+n = 7
+args = [
+  { kind = "int", range = ["n", "n"] },
+]

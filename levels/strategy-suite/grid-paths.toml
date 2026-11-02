@@ -1,0 +1,85 @@
+title = "Corridors to the Corner"
+order = 7
+story = "A robot vacuum starts in the top-left room of a grid of rooms and may only move right or down. How many different routes lead to the bottom-right room?"
+statement = "Return the number of paths from the top-left to the bottom-right cell of a rows x cols grid moving only right or down, modulo 1000000007."
+signature = "fn unique_paths(rows: int, cols: int) -> int"
+constraints = ["1 <= rows, cols <= 300"]
+technique = "Dynamic programming over a grid"
+big_o = "O(n^2) time, O(n) space"
+types = ["vec"]
+builtins = []
+hints = [
+  "Every room in the first row or column can be reached in exactly one way.",
+  "Any other room is reached from above or from the left: add the two counts.",
+  "You only need one row of the table at a time.",
+]
+reference = '''
+fn unique_paths(rows: int, cols: int) -> int {
+    let row = [1; cols];
+    for r in range(1, rows) {
+        for c in range(1, cols) {
+            row[c] = (row[c] + row[c - 1]) % 1000000007;
+        }
+    }
+    return row[cols - 1];
+}
+'''
+naive = '''
+fn unique_paths(rows: int, cols: int) -> int {
+    if rows == 1 or cols == 1 {
+        return 1;
+    }
+    return (unique_paths(rows - 1, cols) + unique_paths(rows, cols - 1)) % 1000000007;
+}
+'''
+
+[unlock]
+helpers = false
+recursion = true
+
+[budgets]
+steps = 30000000
+large_steps = 3000000
+sweep_n0 = 16
+
+[medals]
+size = [50, 39, 31]
+speed = [387, 207, 143]
+
+[[examples]]
+args = ["3", "7"]
+expect = "28"
+
+[[examples]]
+args = ["3", "2"]
+expect = "3"
+
+[[examples]]
+args = ["1", "1"]
+expect = "1"
+
+[[tests]]
+args = ["1", "5"]
+expect = "1"
+
+[[tests]]
+args = ["10", "10"]
+expect = "48620"
+
+[[generate]]
+seed = 861
+count = 8
+args = [
+  { kind = "int", range = [1, 8] },
+  { kind = "int", range = [1, 8] },
+]
+
+[[generate]]
+seed = 862
+count = 1
+large = true
+n = 13
+args = [
+  { kind = "int", range = ["n", "n"] },
+  { kind = "int", range = ["n", "n"] },
+]

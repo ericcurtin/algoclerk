@@ -1,0 +1,90 @@
+title = "What Two Notes Share"
+order = 6
+story = "Two clerks wrote down the same dictated message from memory. How long is the longest run of letters, in order but not necessarily adjacent, that appears in both notes?"
+statement = "Return the length of the longest common subsequence of a and b."
+signature = "fn lcs(a: string, b: string) -> int"
+constraints = ["0 <= len(a), len(b) <= 300"]
+technique = "Dynamic programming on a grid"
+big_o = "O(n^2) time, O(n^2) space"
+types = ["char", "string", "vec"]
+builtins = ["len", "max"]
+hints = [
+  "dp[i][j] = longest common subsequence of the first i letters of a and the first j of b.",
+  "If a[i-1] == b[j-1], it is dp[i-1][j-1] + 1.",
+  "Otherwise it is the larger of dp[i-1][j] and dp[i][j-1].",
+]
+reference = '''
+fn lcs(a: string, b: string) -> int {
+    let n = len(a);
+    let m = len(b);
+    let dp = [[0; m + 1]; n + 1];
+    for i in range(1, n + 1) {
+        for j in range(1, m + 1) {
+            if a[i - 1] == b[j - 1] {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1]);
+            }
+        }
+    }
+    return dp[n][m];
+}
+'''
+naive = '''
+fn lcs(a: string, b: string) -> int {
+    if len(a) == 0 or len(b) == 0 {
+        return 0;
+    }
+    if a[0] == b[0] {
+        return 1 + lcs(a[1..], b[1..]);
+    }
+    return max(lcs(a[1..], b), lcs(a, b[1..]));
+}
+'''
+
+[unlock]
+helpers = false
+recursion = true
+
+[budgets]
+steps = 30000000
+large_steps = 3000000
+sweep_n0 = 16
+
+[medals]
+size = [132, 103, 82]
+speed = [787, 420, 290]
+
+[[examples]]
+args = ["\"abcde\"", "\"ace\""]
+expect = "3"
+
+[[examples]]
+args = ["\"abc\"", "\"def\""]
+expect = "0"
+
+[[examples]]
+args = ["\"\"", "\"x\""]
+expect = "0"
+
+[[tests]]
+args = ["\"abc\"", "\"abc\""]
+expect = "3"
+
+[[generate]]
+seed = 851
+count = 10
+args = [
+  { kind = "string", len = [0, 9], alphabet = "abc" },
+  { kind = "string", len = [0, 9], alphabet = "abc" },
+]
+
+[[generate]]
+seed = 852
+count = 1
+large = true
+n = 20
+args = [
+  { kind = "string", len = "n", alphabet = "abcd" },
+  { kind = "string", len = "n", alphabet = "abcd" },
+]

@@ -1,0 +1,87 @@
+title = "The Careful Burglar"
+order = 5
+story = "A row of houses each hold some cash, but neighbouring houses share an alarm: robbing two adjacent houses calls the police. (Please do not do this. It is an exercise.)"
+statement = "Return the maximum total of nums you can pick when no two picked items are next to each other."
+signature = "fn rob(nums: vec<int>) -> int"
+constraints = ["0 <= len(nums) <= 20000", "0 <= nums[i] <= 1000"]
+technique = "Dynamic programming with two variables"
+big_o = "O(n) time, O(1) space"
+types = ["vec"]
+builtins = ["len", "max"]
+hints = [
+  "At each house you either take it (plus the best up to two houses ago) or skip it.",
+  "So the best up to house i is `max(best two ago + nums[i], best one ago)`.",
+  "Two variables are enough: no table needed.",
+]
+reference = '''
+fn rob(nums: vec<int>) -> int {
+    let take = 0;
+    let skip = 0;
+    for x in nums {
+        let next = max(skip + x, take);
+        skip = take;
+        take = next;
+    }
+    return take;
+}
+'''
+naive = '''
+fn best_from(nums: vec<int>, i: int) -> int {
+    if i >= len(nums) {
+        return 0;
+    }
+    return max(nums[i] + best_from(nums, i + 2), best_from(nums, i + 1));
+}
+
+fn rob(nums: vec<int>) -> int {
+    return best_from(nums, 0);
+}
+'''
+
+[unlock]
+helpers = true
+recursion = true
+
+[budgets]
+steps = 30000000
+large_steps = 3000000
+
+[medals]
+size = [32, 25, 20]
+speed = [87, 47, 33]
+
+[[examples]]
+args = ["[1, 2, 3, 1]"]
+expect = "4"
+
+[[examples]]
+args = ["[2, 7, 9, 3, 1]"]
+expect = "12"
+
+[[examples]]
+args = ["[]"]
+expect = "0"
+
+[[tests]]
+args = ["[5]"]
+expect = "5"
+
+[[tests]]
+args = ["[2, 1, 1, 2]"]
+expect = "4"
+
+[[generate]]
+seed = 841
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 10], range = [0, 20] },
+]
+
+[[generate]]
+seed = 842
+count = 1
+large = true
+n = 34
+args = [
+  { kind = "vec_int", len = "n", range = [1, 100] },
+]

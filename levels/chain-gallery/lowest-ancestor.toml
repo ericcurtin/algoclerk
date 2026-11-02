@@ -1,0 +1,85 @@
+title = "Closest Common Boss"
+order = 9
+story = "Two employees need a joint meeting, so they must be called by the lowest manager who is above both of them."
+statement = "The tree has different values. p and q both occur in it (they may be equal). Return the value of the lowest node that has both p and q in its subtree (a node counts as being in its own subtree)."
+signature = "fn lca(root: tnode, p: int, q: int) -> int"
+constraints = ["1 <= nodes <= 20000", "values are different", "p and q are in the tree"]
+technique = "Recursive search on both subtrees"
+big_o = "O(n) time, O(n) space"
+types = ["tnode"]
+builtins = []
+hints = [
+  "If the current node is p or q, it is the answer for this part of the tree.",
+  "Look for p and q in the left and right subtrees.",
+  "If both sides found something, the current node is the lowest common ancestor; otherwise pass up whichever side found one.",
+]
+reference = '''
+fn find(node: tnode, p: int, q: int) -> tnode {
+    if node == null {
+        return null;
+    }
+    if node.val == p or node.val == q {
+        return node;
+    }
+    let l = find(node.left, p, q);
+    let r = find(node.right, p, q);
+    if l != null and r != null {
+        return node;
+    }
+    if l != null {
+        return l;
+    }
+    return r;
+}
+
+fn lca(root: tnode, p: int, q: int) -> int {
+    return find(root, p, q).val;
+}
+'''
+
+[unlock]
+helpers = true
+recursion = true
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [87, 68, 54]
+speed = [180, 96, 67]
+
+[[examples]]
+args = ["[3, 5, 1, 6, 2, 0, 8, null, null, 7, 4]", "5", "1"]
+expect = "3"
+
+[[examples]]
+args = ["[3, 5, 1, 6, 2, 0, 8, null, null, 7, 4]", "5", "4"]
+expect = "5"
+
+[[examples]]
+args = ["[1, 2]", "1", "2"]
+expect = "1"
+
+[[tests]]
+args = ["[7]", "7", "7"]
+expect = "7"
+
+[[generate]]
+seed = 781
+count = 12
+args = [
+  { kind = "tree", nodes = [1, 10], range = [0, 40], distinct = true },
+  { kind = "int", pick_from = 0 },
+  { kind = "int", pick_from = 0 },
+]
+
+[[generate]]
+seed = 782
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "tree", nodes = "n", range = [0, 100000], distinct = true },
+  { kind = "int", pick_from = 0 },
+  { kind = "int", pick_from = 0 },
+]

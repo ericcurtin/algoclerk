@@ -1,0 +1,86 @@
+title = "Going in Circles"
+order = 2
+story = "Somebody tied the end of the chain back onto one of its tags. Anyone following it will walk forever. Is the chain a loop?"
+statement = "Return true if following `next` from head ever revisits a node (the list has a cycle), false if it ends at null. Aim for O(1) extra space."
+signature = "fn has_cycle(head: lnode) -> bool"
+constraints = ["0 <= length <= 20000"]
+technique = "Fast and slow pointers"
+big_o = "O(n) time, O(1) space"
+types = ["lnode", "vec"]
+builtins = ["contains", "push"]
+hints = [
+  "Remembering every visited node works but is slow with long lists.",
+  "Move one pointer one step at a time and another two steps at a time.",
+  "If there is a cycle the fast pointer eventually catches the slow one.",
+]
+reference = '''
+fn has_cycle(head: lnode) -> bool {
+    let slow = head;
+    let fast = head;
+    while fast != null and fast.next != null {
+        slow = slow.next;
+        fast = fast.next.next;
+        if slow == fast {
+            return true;
+        }
+    }
+    return false;
+}
+'''
+naive = '''
+fn has_cycle(head: lnode) -> bool {
+    let seen: vec<lnode> = [];
+    let cur = head;
+    while cur != null {
+        if seen.contains(cur) {
+            return true;
+        }
+        seen.push(cur);
+        cur = cur.next;
+    }
+    return false;
+}
+'''
+
+[budgets]
+large_steps = 2000000
+
+[medals]
+size = [48, 38, 30]
+speed = [93, 50, 36]
+
+[[examples]]
+args = ["[3, 2, 0, -4] @1"]
+expect = "true"
+
+[[examples]]
+args = ["[1, 2]"]
+expect = "false"
+
+[[examples]]
+args = ["[]"]
+expect = "false"
+
+[[examples]]
+args = ["[1] @0"]
+expect = "true"
+
+[[tests]]
+args = ["[1, 2, 3] @0"]
+expect = "true"
+
+[[generate]]
+seed = 711
+count = 14
+args = [
+  { kind = "list", len = [0, 8], range = [0, 9], cycle_pct = 50 },
+]
+
+[[generate]]
+seed = 712
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "list", len = "n", range = [0, 9], cycle_pct = 0 },
+]

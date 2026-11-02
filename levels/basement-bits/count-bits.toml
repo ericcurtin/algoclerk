@@ -1,0 +1,57 @@
+title = "Counting the Switches"
+order = 2
+story = "The old control panel stores a number as a row of on/off switches. The engineer asks how many switches are on."
+statement = "Return the number of 1 bits in the binary form of n (n is never negative)."
+signature = "fn count_bits(n: int) -> int"
+constraints = ["0 <= n <= 1000000000000"]
+technique = "Clearing the lowest set bit"
+big_o = "O(1) time, O(1) space"
+types = []
+builtins = []
+hints = [
+  "Checking each of the 40 positions with shifts works.",
+  "`n & (n - 1)` switches off the lowest 1 bit.",
+  "Repeat until n is 0 and count how many times you did it.",
+]
+reference = '''
+fn count_bits(n: int) -> int {
+    let count = 0;
+    let x = n;
+    while x != 0 {
+        x = x & (x - 1);
+        count += 1;
+    }
+    return count;
+}
+'''
+
+[medals]
+size = [32, 25, 20]
+speed = [334, 178, 124]
+
+[[examples]]
+args = ["11"]
+expect = "3"
+
+[[examples]]
+args = ["128"]
+expect = "1"
+
+[[examples]]
+args = ["0"]
+expect = "0"
+
+[[tests]]
+args = ["1000000000000"]
+expect = "13"
+
+[[tests]]
+args = ["255"]
+expect = "8"
+
+[[generate]]
+seed = 911
+count = 14
+args = [
+  { kind = "int", range = [0, 1000000000000] },
+]

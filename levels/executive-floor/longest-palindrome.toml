@@ -1,0 +1,108 @@
+title = "Boss: The Longest Mirror"
+order = 2
+story = "The sign painter wants the longest stretch of a street name that reads the same backwards, to paint on the banner."
+statement = "Return the longest palindromic substring of s. If several have the same length, return the one that starts earliest. The empty string gives the empty string."
+signature = "fn longest_palindrome(s: string) -> string"
+constraints = ["0 <= len(s) <= 1000"]
+technique = "Expand around the centre"
+big_o = "O(n^2) time, O(1) space"
+types = ["char", "string"]
+builtins = ["len"]
+hints = [
+  "Checking every substring takes O(n cubed).",
+  "Every palindrome has a centre: a letter (odd length) or the gap between two letters (even length).",
+  "From each centre, grow outwards while both ends match, and remember the longest.",
+]
+reference = '''
+fn longest_palindrome(s: string) -> string {
+    let best_start = 0;
+    let best_len = 0;
+    for center in range(len(s)) {
+        for width in range(2) {
+            let lo = center;
+            let hi = center + width;
+            while lo >= 0 and hi < len(s) and s[lo] == s[hi] {
+                lo -= 1;
+                hi += 1;
+            }
+            let length = hi - lo - 1;
+            if length > best_len {
+                best_len = length;
+                best_start = lo + 1;
+            }
+        }
+    }
+    return s[best_start..best_start + best_len];
+}
+'''
+naive = '''
+fn longest_palindrome(s: string) -> string {
+    let best = "";
+    for i in range(len(s)) {
+        for j in range(i, len(s)) {
+            let ok = true;
+            let a = i;
+            let b = j;
+            while a < b {
+                if s[a] != s[b] {
+                    ok = false;
+                    break;
+                }
+                a += 1;
+                b -= 1;
+            }
+            if ok and j - i + 1 > len(best) {
+                best = s[i..j + 1];
+            }
+        }
+    }
+    return best;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [101, 79, 63]
+speed = [743, 396, 274]
+
+[[examples]]
+args = ["\"babad\""]
+expect = "\"bab\""
+
+[[examples]]
+args = ["\"cbbd\""]
+expect = "\"bb\""
+
+[[examples]]
+args = ["\"\""]
+expect = "\"\""
+
+[[examples]]
+args = ["\"a\""]
+expect = "\"a\""
+
+[[tests]]
+args = ["\"abcd\""]
+expect = "\"a\""
+
+[[tests]]
+args = ["\"aaaa\""]
+expect = "\"aaaa\""
+
+[[generate]]
+seed = 1011
+count = 12
+args = [
+  { kind = "string", len = [0, 12], alphabet = "ab" },
+]
+
+[[generate]]
+seed = 1012
+count = 1
+large = true
+n = 1000
+args = [
+  { kind = "string", len = "n", alphabet = "ab" },
+]

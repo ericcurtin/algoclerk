@@ -1,0 +1,83 @@
+title = "Counting Islands"
+order = 4
+story = "The harbour map marks land with 1 and water with 0. The ferry company wants to know how many separate islands there are."
+statement = "Count the groups of '1' cells that are connected horizontally or vertically."
+signature = "fn count_islands(grid: vec<vec<char>>) -> int"
+constraints = ["1 <= rows, cols", "rows * cols <= 10000", "cells are '0' or '1'"]
+technique = "Breadth-first flood fill"
+big_o = "O(n) time, O(n) space"
+types = ["char", "queue", "set", "tuple", "vec"]
+builtins = ["add", "contains", "is_empty", "len", "pop", "push"]
+hints = [
+  "Scan every cell. A land cell you have not visited starts a new island.",
+  "From it, flood outwards with a queue and mark everything reached as seen.",
+  "A `set<(int, int)>` of visited cells works; neighbours are (y+1, x), (y-1, x), (y, x+1), (y, x-1).",
+]
+reference = '''
+fn count_islands(grid: vec<vec<char>>) -> int {
+    let rows = len(grid);
+    let seen = set<(int, int)>();
+    let count = 0;
+    for r in range(rows) {
+        for c in range(len(grid[r])) {
+            if grid[r][c] == '1' and !seen.contains((r, c)) {
+                count += 1;
+                let q = queue<(int, int)>();
+                q.push((r, c));
+                seen.add((r, c));
+                while !q.is_empty() {
+                    let (y, x) = q.pop();
+                    for (dy, dx) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                        let ny = y + dy;
+                        let nx = x + dx;
+                        if ny >= 0 and ny < rows and nx >= 0 and nx < len(grid[ny]) and grid[ny][nx] == '1' and !seen.contains((ny, nx)) {
+                            seen.add((ny, nx));
+                            q.push((ny, nx));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return count;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [197, 154, 123]
+speed = [1788, 954, 657]
+
+[[examples]]
+args = ["[['1', '1', '0'], ['0', '1', '0'], ['0', '0', '1']]"]
+expect = "2"
+
+[[examples]]
+args = ["[['0']]"]
+expect = "0"
+
+[[examples]]
+args = ["[['1', '0', '1']]"]
+expect = "2"
+
+[[tests]]
+args = ["[['1', '1'], ['1', '1']]"]
+expect = "1"
+
+[[generate]]
+seed = 631
+count = 12
+args = [
+  { kind = "grid_char", rows = [1, 5], cols = [1, 5], alphabet = "01" },
+]
+
+[[generate]]
+seed = 632
+count = 1
+large = true
+n = 10000
+args = [
+  { kind = "grid_char", rows = "sqrt(n)", cols = "sqrt(n)", alphabet = "01" },
+]

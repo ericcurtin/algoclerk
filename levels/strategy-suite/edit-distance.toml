@@ -1,0 +1,103 @@
+title = "Fewest Corrections"
+order = 4
+story = "The spell-checker wants to know how many single-letter edits (insert, delete, replace) turn a misspelled word into the right one."
+statement = "Return the minimum number of insertions, deletions and replacements of one character that turn a into b."
+signature = "fn edit_distance(a: string, b: string) -> int"
+constraints = ["0 <= len(a), len(b) <= 300"]
+technique = "Dynamic programming on a grid"
+big_o = "O(n^2) time, O(n^2) space"
+types = ["char", "string", "vec"]
+builtins = ["len", "min"]
+hints = [
+  "Let dp[i][j] be the edit distance between the first i letters of a and the first j letters of b.",
+  "The first row and column are just i and j: turning a prefix into nothing.",
+  "If the letters match, copy dp[i-1][j-1]; otherwise take 1 + the smallest of the three neighbours.",
+]
+reference = '''
+fn edit_distance(a: string, b: string) -> int {
+    let n = len(a);
+    let m = len(b);
+    let dp = [[0; m + 1]; n + 1];
+    for i in range(n + 1) {
+        dp[i][0] = i;
+    }
+    for j in range(m + 1) {
+        dp[0][j] = j;
+    }
+    for i in range(1, n + 1) {
+        for j in range(1, m + 1) {
+            if a[i - 1] == b[j - 1] {
+                dp[i][j] = dp[i - 1][j - 1];
+            } else {
+                dp[i][j] = 1 + min(dp[i - 1][j - 1], min(dp[i - 1][j], dp[i][j - 1]));
+            }
+        }
+    }
+    return dp[n][m];
+}
+'''
+naive = '''
+fn edit_distance(a: string, b: string) -> int {
+    if len(a) == 0 {
+        return len(b);
+    }
+    if len(b) == 0 {
+        return len(a);
+    }
+    if a[0] == b[0] {
+        return edit_distance(a[1..], b[1..]);
+    }
+    return 1 + min(edit_distance(a[1..], b[1..]), min(edit_distance(a[1..], b), edit_distance(a, b[1..])));
+}
+'''
+
+[unlock]
+helpers = false
+recursion = true
+
+[budgets]
+steps = 30000000
+large_steps = 3000000
+sweep_n0 = 16
+
+[medals]
+size = [183, 143, 114]
+speed = [1818, 970, 668]
+
+[[examples]]
+args = ["\"horse\"", "\"ros\""]
+expect = "3"
+
+[[examples]]
+args = ["\"intention\"", "\"execution\""]
+expect = "5"
+
+[[examples]]
+args = ["\"\"", "\"abc\""]
+expect = "3"
+
+[[examples]]
+args = ["\"same\"", "\"same\""]
+expect = "0"
+
+[[tests]]
+args = ["\"a\"", "\"b\""]
+expect = "1"
+
+[[generate]]
+seed = 831
+count = 10
+args = [
+  { kind = "string", len = [0, 8], alphabet = "abc" },
+  { kind = "string", len = [0, 8], alphabet = "abc" },
+]
+
+[[generate]]
+seed = 832
+count = 1
+large = true
+n = 14
+args = [
+  { kind = "string", len = "n", alphabet = "ab" },
+  { kind = "string", len = "n", alphabet = "ab" },
+]
