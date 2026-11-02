@@ -1,0 +1,35 @@
+# AlgoClerk English strings. Keys are grouped by tables; placeholders look like {name}.
+# To translate: copy this file to <code>.toml (for example de.toml), translate the values and
+# keep the keys and {placeholders} unchanged. Missing keys fall back to English.
+
+[parse]
+unknown_instruction = "Line {line}: the clerk does not know an instruction called \"{text}\"."
+missing_operand = "Line {line}: {op} needs something to work on (a tile number or a label)."
+unexpected_operand = "Line {line}: {op} does not take an operand."
+too_many_operands = "Line {line}: {op} takes only one operand."
+bad_address = "Line {line}: \"{text}\" is not a tile. Write a number like 3 or a pointer like [3]."
+bad_label = "Line {line}: \"{text}\" is not a valid label name (letters, digits and _, not starting with a digit)."
+bad_label_definition = "Line {line}: \"{text}\" is not a valid label name."
+
+[compile]
+duplicate_label = "Line {line}: the label \"{text}\" is defined more than once."
+unknown_label = "Line {line}: there is no label called \"{text}\"."
+
+[check]
+not_allowed = "Instruction {instr}: {op} is not available in this office."
+indirect_not_allowed = "Instruction {instr}: pointer tiles like [n] are not available in this office."
+no_such_tile = "Instruction {instr}: there is no tile {slot} on this floor."
+
+[run]
+empty_hand = "The clerk's hand is empty. Pick something up first (INBOX or COPYFROM)."
+empty_tile = "Tile {slot} is empty, so there is nothing to pick up there."
+no_such_tile = "There is no tile {slot} on this floor."
+overflow = "That number is too big for the clerk's paper (the limit is 999999)."
+divide_by_zero = "The clerk refuses to divide by zero."
+step_limit = "The clerk went in circles for {limit} steps and was sent home."
+
+[judge]
+solved = "All test cases passed."
+wrong_output = "Test {test}: the outbox was {got} but {expected} was expected."
+run_error = "Test {test}: {error}"
+rules = "This program breaks the office rules."

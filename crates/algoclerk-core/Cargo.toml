@@ -1,0 +1,27 @@
+[package]
+name = "algoclerk-core"
+description = "Toolkit-free core of AlgoClerk: ISA, assembler, VM, levels, judge and code generator"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[features]
+default = ["compile-tests"]
+# Compile the generated C, C++ and Rust code with the host compilers in tests.
+compile-tests = []
+
+[lints]
+workspace = true

@@ -1,0 +1,40 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/algoclerk-core",
+    "crates/algoclerk-levels",
+    "crates/algoclerk-cli",
+    "crates/algoclerk-app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+license = "Apache-2.0"
+authors = ["The AlgoClerk contributors"]
+repository = "https://github.com/algoclerk/algoclerk"
+homepage = "https://github.com/algoclerk/algoclerk"
+publish = false
+
+[workspace.dependencies]
+algoclerk-core = { path = "crates/algoclerk-core" }
+algoclerk-levels = { path = "crates/algoclerk-levels" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"
+proptest = "1"
+
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unimplemented = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = true

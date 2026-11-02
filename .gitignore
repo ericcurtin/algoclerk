@@ -1,0 +1,15 @@
+/target/
+**/target/
+*.log
+.DS_Store
+/dist/
+/screenshots/tmp/
+*.apk
+*.aab
+*.ipa
+*.xcarchive
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
+.env
