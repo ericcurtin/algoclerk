@@ -1,0 +1,83 @@
+id = "kadane"
+title = "Best Stretch"
+order = 3
+summary = "Find the best total of any run of consecutive numbers."
+story = "A shop recorded its daily profit or loss. The owner wants to know which stretch of consecutive days made the most money in total."
+statement = "The inbox holds a list of at least one non-zero number followed by a 0 marker. Output the largest possible sum of a non-empty run of neighbouring numbers."
+constraints = ["The list has between 1 and 9 numbers, each between -9 and 9 and not 0."]
+hints = [
+  "Track the best sum of a run that ends at the current number, and the best sum seen so far.",
+  "A run that ends here either extends the previous run or starts fresh. Extending only helps if the previous run has a positive total.",
+  "Update the overall best after every number.",
+]
+
+[[examples]]
+input = [-2, 1, -3, 4, -1, 2, 1, -5, 4, 0]
+output = [6]
+note = "The run 4, -1, 2, 1."
+
+[machine]
+floor = 3
+names = ["run", "best", "x"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "jump", "jumpz", "jumpn"]
+
+[tests]
+seed = 603
+[[tests.fixed]]
+input = [5, 0]
+output = [5]
+[[tests.fixed]]
+input = [-3, -1, -2, 0]
+output = [-1]
+[[tests.fixed]]
+input = [9, 9, 9, 9, 9, 9, 9, 9, 9, 0]
+output = [81]
+[[tests.fixed]]
+input = [1, -9, 1, -9, 1, 0]
+output = [1]
+[[tests.generators]]
+count = 11
+inbox = [{ kind = "list", len = [1, 9], range = [-9, 9], nonzero = true, terminator = 0 }]
+
+[targets]
+size_par = 23
+size_ace = 19
+speed_par = 86
+speed_ace = 57
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 0
+    COPYTO 1
+again:
+    INBOX
+    JUMPZ done
+    COPYTO 2
+    COPYFROM 0
+    JUMPN restart
+    ADD 2
+    JUMP update
+restart:
+    COPYFROM 2
+update:
+    COPYTO 0
+    SUB 1
+    JUMPN again
+    COPYFROM 0
+    COPYTO 1
+    JUMP again
+done:
+    COPYFROM 1
+    OUTBOX
+"""
+
+[code]
+function = "max_subarray_sum"
+doc = "Returns the largest sum of a non-empty contiguous run (the list is never empty)."
+params = [{ name = "values", kind = "terminated" }]
+returns = "scalar"
+
+[explain]
+algorithm = "Kadane's algorithm"
+text = "The best run ending at each position either extends the previous best run or restarts at the current number. One pass and two variables solve what looks like an O(n^2) search over all runs."

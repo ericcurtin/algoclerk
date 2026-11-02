@@ -1,0 +1,99 @@
+id = "rotate-list"
+title = "Carousel"
+order = 3
+summary = "Rotate a list to the left by k places."
+story = "The mail carousel turns by k positions before the clerk starts reading envelopes off it. After the last envelope comes the first again."
+statement = "The inbox holds a number k, followed by a list of non-zero numbers and a 0 marker. Output the list rotated left by k positions: the first k mod n numbers move to the end, where n is the length of the list. An empty list produces no output."
+constraints = ["0 <= k <= 12. The list has between 0 and 8 numbers, each between 1 and 9.", "Tiles 0 to 7 are free for the list; tiles 8 and 12 hold 0 at the start."]
+hints = [
+  "Store the list on tiles 0, 1, 2, ... using tile 8 as a pointer to the next free tile. When the list ends, tile 8 equals the length n.",
+  "The output starts at position k mod n and wraps around after position n - 1.",
+  "Guard against an empty list before using MOD: dividing by zero stops the clerk.",
+]
+
+[[examples]]
+input = [2, 1, 2, 3, 4, 5, 0]
+output = [3, 4, 5, 1, 2]
+
+[machine]
+floor = 13
+names = ["", "", "", "", "", "", "", "", "next_free", "k", "position", "remaining", "zero"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "mod", "bumpup", "bumpdn", "jump", "jumpz", "indirect"]
+[machine.prefill]
+8 = 0
+12 = 0
+
+[tests]
+seed = 703
+[[tests.fixed]]
+input = [5, 0]
+output = []
+[[tests.fixed]]
+input = [0, 4, 0]
+output = [4]
+[[tests.fixed]]
+input = [8, 1, 2, 3, 4, 5, 6, 7, 8, 0]
+output = [1, 2, 3, 4, 5, 6, 7, 8]
+[[tests.fixed]]
+input = [12, 1, 2, 3, 0]
+output = [1, 2, 3]
+[[tests.fixed]]
+input = [1, 9, 8, 7, 0]
+output = [8, 7, 9]
+[[tests.generators]]
+count = 10
+inbox = [
+  { kind = "int", range = [0, 12] },
+  { kind = "list", len = [0, 8], range = [1, 9], terminator = 0 },
+]
+
+[targets]
+size_par = 31
+size_ace = 25
+speed_par = 98
+speed_ace = 65
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 9
+read:
+    INBOX
+    JUMPZ rotate
+    COPYTO [8]
+    BUMPUP 8
+    JUMP read
+rotate:
+    COPYFROM 8
+    JUMPZ end
+    COPYFROM 9
+    MOD 8
+    COPYTO 10
+    COPYFROM 8
+    COPYTO 11
+emit:
+    COPYFROM [10]
+    OUTBOX
+    BUMPUP 10
+    SUB 8
+    JUMPZ wrap
+more:
+    BUMPDN 11
+    JUMPZ end
+    JUMP emit
+wrap:
+    COPYFROM 12
+    COPYTO 10
+    JUMP more
+end:
+"""
+
+[code]
+function = "rotate_left"
+doc = "Returns the list rotated left by k positions."
+params = [{ name = "k", kind = "scalar" }, { name = "values", kind = "terminated" }]
+returns = "list"
+
+[explain]
+algorithm = "Rotation by index arithmetic"
+text = "Rotating needs no shifting at all: start reading at position k mod n and wrap around with a comparison. The same index arithmetic underlies ring buffers."

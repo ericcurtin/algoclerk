@@ -1,0 +1,82 @@
+id = "climbing-stairs"
+title = "Stairway to Accounts"
+order = 1
+summary = "Count the ways to climb a staircase taking 1, 2 or 3 steps at a time."
+story = "The accounts department is on the top floor. A careless courier can climb the staircase one, two or three steps at a time, and the safety officer wants to know how many different ways there are to reach the top."
+statement = "The inbox holds the number of steps n. Output the number of different sequences of 1, 2 and 3 step jumps that add up to exactly n. For n = 0 there is exactly one way (do nothing)."
+constraints = ["0 <= n <= 12.", "Tiles 0, 1 and 2 hold 1, 1 and 2 at the start."]
+hints = [
+  "Let W(k) be the number of ways to reach step k. The last jump was 1, 2 or 3 steps, so W(k) = W(k-1) + W(k-2) + W(k-3).",
+  "Only the last three values matter. Keep them on three tiles and slide the window forward once per step.",
+  "Tiles 0, 1, 2 already hold W(0), W(1), W(2). After n slides, tile 0 holds W(n).",
+]
+
+[[examples]]
+input = [4]
+output = [7]
+
+[machine]
+floor = 5
+names = ["ways_a", "ways_b", "ways_c", "steps_left", "sum"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "bumpdn", "jump", "jumpz"]
+[machine.prefill]
+0 = 1
+1 = 1
+2 = 2
+
+[tests]
+seed = 601
+[[tests.fixed]]
+input = [0]
+output = [1]
+[[tests.fixed]]
+input = [1]
+output = [1]
+[[tests.fixed]]
+input = [3]
+output = [4]
+[[tests.fixed]]
+input = [12]
+output = [927]
+[[tests.generators]]
+count = 6
+inbox = [{ kind = "int", range = [0, 12] }]
+
+[targets]
+size_par = 21
+size_ace = 17
+speed_par = 113
+speed_ace = 75
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 3
+loop:
+    JUMPZ done
+    COPYFROM 0
+    ADD 1
+    ADD 2
+    COPYTO 4
+    COPYFROM 1
+    COPYTO 0
+    COPYFROM 2
+    COPYTO 1
+    COPYFROM 4
+    COPYTO 2
+    BUMPDN 3
+    JUMP loop
+done:
+    COPYFROM 0
+    OUTBOX
+"""
+
+[code]
+function = "count_climbs"
+doc = "Returns the number of ways to climb n steps taking 1, 2 or 3 steps at a time."
+params = [{ name = "n", kind = "scalar" }]
+returns = "scalar"
+
+[explain]
+algorithm = "Dynamic programming with a rolling window"
+text = "Each answer is built from the three answers before it. Remembering only the last three values keeps memory constant; the naive recursion would recompute the same subproblems exponentially often."

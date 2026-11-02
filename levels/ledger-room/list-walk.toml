@@ -1,0 +1,79 @@
+id = "list-walk"
+title = "Treasure Trail"
+order = 5
+summary = "Follow a chain of linked tiles and report each value."
+story = "The treasure map is laid out on the floor as a chain of pairs of tiles: the first tile of a pair holds a prize, the second holds the position of the next pair. The last pair points to -1. The inbox tells you where the chain starts."
+statement = "The inbox holds the head: the position of the first pair. A pair at position p has its value on tile p and the position of the next pair on tile p+1, or -1 if it is the last. Output the values in chain order."
+constraints = ["The chain has between 1 and 5 pairs stored in tiles 0 to 9, in any order. Values are between -9 and 9.", "Tile 11 holds 1 at the start. Tile 10 is free."]
+hints = [
+  "Keep the position of the current pair on tile 10. COPYFROM [10] reads its value.",
+  "BUMPUP 10 moves to the link tile, and COPYFROM [10] reads where the chain continues.",
+  "Add 1 to the link: if it becomes zero, the link was -1 and the trail ends.",
+]
+
+[[examples]]
+input = [4]
+floor = [{ at = 0, values = [7, 8, 0, 0, 5, 0, 0, 0, 9, -1] }]
+output = [5, 7, 9]
+note = "The chain starts at 4 (value 5), continues at 0 (value 7) and ends at 8 (value 9)."
+
+[machine]
+floor = 12
+names = ["", "", "", "", "", "", "", "", "", "", "here", "one"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "bumpup", "jump", "jumpz", "indirect"]
+[machine.prefill]
+11 = 1
+
+[tests]
+seed = 605
+[[tests.fixed]]
+input = [0]
+floor = [{ at = 0, values = [3, -1] }]
+output = [3]
+[[tests.fixed]]
+input = [2]
+floor = [{ at = 0, values = [1, -1, 5, 0] }]
+output = [5, 1]
+[[tests.fixed]]
+input = [0]
+floor = [{ at = 0, values = [1, 2, 2, 4, 4, 6, 6, 8, 8, -1] }]
+output = [1, 2, 4, 6, 8]
+[[tests.generators]]
+count = 10
+floor = [{ at = 0, seg = { kind = "linked", len = [1, 5], range = [-9, 9] } }]
+inbox = [{ kind = "aux", of = 0 }]
+
+[targets]
+size_par = 12
+size_ace = 10
+speed_par = 35
+speed_ace = 23
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 10
+loop:
+    COPYFROM [10]
+    OUTBOX
+    BUMPUP 10
+    COPYFROM [10]
+    COPYTO 10
+    ADD 11
+    JUMPZ done
+    JUMP loop
+done:
+"""
+
+[code]
+function = "walk_list"
+doc = "Follows the links starting at head and returns the values in chain order. nodes[p] is a value and nodes[p + 1] the position of the next pair, or -1."
+params = [
+  { name = "nodes", kind = "list", at = 0, cap = 10 },
+  { name = "head", kind = "scalar" },
+]
+returns = "list"
+
+[explain]
+algorithm = "Linked-list traversal"
+text = "Each node stores the index of its successor, so following the chain is a pointer-chasing loop that stops at the sentinel -1. Array indexes play the role of pointers."

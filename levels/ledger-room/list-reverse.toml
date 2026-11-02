@@ -1,0 +1,98 @@
+id = "list-reverse"
+title = "About Face"
+order = 6
+summary = "Reverse a chain of linked tiles in place, then read it out."
+story = "The treasure trail must be turned around so it can be followed from the other end, without moving any prize. Only the links may change."
+statement = "The tiles hold a chain as in Treasure Trail: pair p has its value on tile p and its link on tile p+1 (-1 ends the chain). The inbox holds the head. Reverse the chain by rewriting links, so that the old last pair becomes the head and every link points to the pair that used to come before it. Then output the values by following the new chain from its new head."
+constraints = ["The chain has between 1 and 5 pairs stored in tiles 0 to 9. Values are between -9 and 9.", "Tile 10 holds -1 and tile 14 holds 1 at the start. Tiles 11 to 13 are free."]
+hints = [
+  "Walk the chain with three variables: previous (starts at -1), current (starts at the head), and next (read before the link is overwritten).",
+  "For each pair: remember its next link, point its link at previous, then move previous and current forward.",
+  "When current becomes -1, previous is the new head. Then walk and output as before.",
+]
+
+[[examples]]
+input = [4]
+floor = [{ at = 0, values = [7, 8, 0, 0, 5, 0, 0, 0, 9, -1] }]
+output = [9, 7, 5]
+note = "The trail was 5, 7, 9; reversed it reads 9, 7, 5."
+
+[machine]
+floor = 15
+names = ["", "", "", "", "", "", "", "", "", "", "previous", "current", "next", "link", "one"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "bumpup", "jump", "jumpz", "indirect"]
+[machine.prefill]
+10 = -1
+14 = 1
+
+[tests]
+seed = 606
+[[tests.fixed]]
+input = [0]
+floor = [{ at = 0, values = [3, -1] }]
+output = [3]
+[[tests.fixed]]
+input = [2]
+floor = [{ at = 0, values = [1, -1, 5, 0] }]
+output = [1, 5]
+[[tests.fixed]]
+input = [0]
+floor = [{ at = 0, values = [1, 2, 2, 4, 4, 6, 6, 8, 8, -1] }]
+output = [8, 6, 4, 2, 1]
+[[tests.generators]]
+count = 10
+floor = [{ at = 0, seg = { kind = "linked", len = [1, 5], range = [-9, 9] } }]
+inbox = [{ kind = "aux", of = 0 }]
+
+[targets]
+size_par = 32
+size_ace = 26
+speed_par = 110
+speed_ace = 73
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 11
+rev:
+    COPYFROM 11
+    ADD 14
+    JUMPZ walk
+    COPYTO 13
+    COPYFROM [13]
+    COPYTO 12
+    COPYFROM 10
+    COPYTO [13]
+    COPYFROM 11
+    COPYTO 10
+    COPYFROM 12
+    COPYTO 11
+    JUMP rev
+walk:
+    COPYFROM 10
+    COPYTO 11
+show:
+    COPYFROM 11
+    ADD 14
+    JUMPZ end
+    COPYFROM [11]
+    OUTBOX
+    BUMPUP 11
+    COPYFROM [11]
+    COPYTO 11
+    JUMP show
+end:
+"""
+
+[code]
+function = "reverse_list_and_walk"
+doc = "Reverses the chain in place by rewriting links, then returns the values in the new order. nodes[p] is a value and nodes[p + 1] the position of the next pair, or -1."
+params = [
+  { name = "nodes", kind = "list", at = 0, cap = 10 },
+  { name = "head", kind = "scalar" },
+]
+returns = "list"
+
+[explain]
+algorithm = "In-place linked-list reversal"
+text = "Three pointers (previous, current, next) rewrite each link exactly once, so the reversal takes O(n) time and O(1) extra space. Saving next before overwriting the link is the step that is easy to forget."
