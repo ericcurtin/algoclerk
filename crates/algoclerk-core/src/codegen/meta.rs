@@ -24,7 +24,7 @@ pub fn split_args(
     floor: &[Option<i32>],
 ) -> Result<Vec<Arg>, String> {
     let mut pos = 0usize;
-    let mut args = Vec::new();
+    let mut args: Vec<Arg> = Vec::new();
     for p in &meta.params {
         if let Some(at) = p.at {
             match p.kind {
@@ -67,6 +67,18 @@ pub fn split_args(
                 args.push(Arg::List(inbox[pos.min(inbox.len())..].to_vec()));
                 pos = inbox.len();
             }
+            ParamKind::Length => {
+                let v = *inbox
+                    .get(pos)
+                    .ok_or_else(|| format!("parameter {}: the inbox ended too early", p.name))?;
+                pos += 1;
+                let want = list_len_of(meta, &args, p.of.as_deref())
+                    .ok_or_else(|| format!("parameter {}: `of` must name an earlier list parameter", p.name))?;
+                if i64::from(v) != want as i64 {
+                    return Err(format!("parameter {}: the inbox says {v} but the list has {want} values", p.name));
+                }
+                args.push(Arg::Scalar(v));
+            }
             ParamKind::Counted => {
                 let n = *inbox
                     .get(pos)
@@ -96,6 +108,19 @@ pub fn split_args(
     Ok(args)
 }
 
+/// Length of the earlier list argument called `name`.
+pub fn list_len_of(meta: &CodeMeta, args: &[Arg], name: Option<&str>) -> Option<usize> {
+    let name = name?;
+    meta.params
+        .iter()
+        .zip(args)
+        .find(|(p, _)| p.name == name)
+        .and_then(|(_, a)| match a {
+            Arg::List(v) => Some(v.len()),
+            Arg::Scalar(_) => None,
+        })
+}
+
 /// Rebuild the inbox and floor from arguments (what the generated prologue does).
 pub fn apply_args(
     meta: &CodeMeta,
@@ -104,7 +129,13 @@ pub fn apply_args(
 ) -> Result<(Vec<i32>, Vec<Option<i32>>), String> {
     let mut inbox = Vec::new();
     let mut floor = template.to_vec();
-    for (p, a) in meta.params.iter().zip(args) {
+    for (i, (p, a)) in meta.params.iter().zip(args).enumerate() {
+        if p.kind == ParamKind::Length {
+            let n = list_len_of(meta, &args[..i], p.of.as_deref())
+                .ok_or_else(|| format!("parameter {}: `of` must name an earlier list parameter", p.name))?;
+            inbox.push(n as i32);
+            continue;
+        }
         if let Some(at) = p.at {
             let vals: Vec<i32> = match a {
                 Arg::Scalar(v) => vec![*v],
@@ -162,6 +193,18 @@ pub fn check_layout(level: &Level, tests: &[TestCase]) -> Vec<String> {
         }
         if !seen.insert(p.name.clone()) {
             problems.push(format!("duplicate code parameter \"{}\"", p.name));
+        }
+    }
+    for (i, p) in meta.params.iter().enumerate() {
+        if p.kind == ParamKind::Length {
+            let ok = p.of.as_ref().is_some_and(|o| {
+                meta.params[..i]
+                    .iter()
+                    .any(|q| &q.name == o && matches!(q.kind, ParamKind::List | ParamKind::Counted | ParamKind::Terminated))
+            });
+            if !ok || p.at.is_some() {
+                problems.push(format!("length parameter \"{}\" needs `of` naming an earlier list parameter and no `at`", p.name));
+            }
         }
     }
     let inbox_params: Vec<_> = meta.params.iter().filter(|p| p.at.is_none()).collect();
@@ -225,6 +268,7 @@ mod tests {
             kind,
             terminator: 0,
             at,
+            of: None,
             cap: None,
         }
     }

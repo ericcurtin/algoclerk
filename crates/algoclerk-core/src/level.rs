@@ -161,6 +161,8 @@ pub enum ParamKind {
     Counted,
     /// The values followed by a terminator value (default 0).
     Terminated,
+    /// The length of the list parameter named by `of`, as one inbox value (not a function argument).
+    Length,
 }
 
 /// A parameter of the generated function.
@@ -177,6 +179,9 @@ pub struct ParamSpec {
     /// If set, the parameter is placed on the floor starting at this slot instead of the inbox.
     #[serde(default)]
     pub at: Option<usize>,
+    /// For `length`: the name of the (earlier) list parameter whose length is passed.
+    #[serde(default)]
+    pub of: Option<String>,
     /// For floor lists: number of slots reserved for the list (default: up to the next prefilled slot).
     #[serde(default)]
     pub cap: Option<usize>,

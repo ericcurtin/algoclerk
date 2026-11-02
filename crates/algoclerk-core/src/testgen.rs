@@ -76,6 +76,12 @@ pub enum SegKind {
     Majority,
     /// The auxiliary value of an earlier segment (for example the head of a linked list).
     Aux,
+    /// The values of an earlier segment again (for example to also put an inbox list on the floor).
+    Copy,
+    /// The length of an earlier segment as a single value.
+    Len,
+    /// A sum of two different elements of an earlier segment (with probability `chance`), else random.
+    PairSum,
 }
 
 /// Sort order of a list segment.
@@ -132,7 +138,7 @@ pub struct Seg {
     /// Value appended after the list.
     #[serde(default)]
     pub terminator: Option<i32>,
-    /// Index of an earlier segment (inbox segments first, then floor segments) for `pick` / `aux`.
+    /// Index of an earlier segment (`vars` first, then `floor`, then `inbox` segments) for `pick`, `aux`, `copy`, `len`, `pairsum`.
     #[serde(default)]
     pub of: usize,
     /// Probability in percent for `pick`, `balanced`, `palindrome`.
@@ -141,6 +147,9 @@ pub struct Seg {
     /// Number of elements to drop from a `perm`.
     #[serde(default)]
     pub drop: u32,
+    /// Number of bracket kinds for `balanced` (default 1: only `+1` / `-1`).
+    #[serde(default)]
+    pub kinds: u32,
     /// Slots per node for `linked` (value slot then next slot; default 2).
     #[serde(default)]
     pub stride: u32,
@@ -162,6 +171,7 @@ impl Default for Seg {
             of: 0,
             chance: default_chance(),
             drop: 0,
+            kinds: 0,
             stride: 0,
         }
     }
@@ -183,6 +193,9 @@ pub struct FloorSeg {
 pub struct Generator {
     /// How many cases to make.
     pub count: u32,
+    /// Hidden segments generated first (not emitted); later segments can refer to them with `of`.
+    #[serde(default)]
+    pub vars: Vec<Seg>,
     /// Inbox segments, concatenated.
     #[serde(default)]
     pub inbox: Vec<Seg>,
@@ -296,29 +309,33 @@ fn gen_seg(rng: &mut Rng, seg: &Seg, pool: &[SegOut]) -> Result<SegOut, String> 
             Ok(finish(seg, v, None))
         }
         SegKind::Balanced => {
+            let kinds = seg.kinds.max(1) as i32;
             let pairs = (pick_len(rng, seg.len) / 2).max(1);
-            let mut seq = Vec::with_capacity(pairs * 2);
-            if rng.chance(seg.chance) {
-                let (mut opens, mut depth) = (pairs, 0usize);
-                let mut closes = pairs;
-                while opens + closes > 0 {
-                    let open = opens > 0 && (depth == 0 || rng.chance(50));
-                    if open {
-                        seq.push(1);
-                        opens -= 1;
-                        depth += 1;
-                    } else {
-                        seq.push(-1);
-                        closes -= 1;
-                        depth -= 1;
-                    }
+            let mut seq: Vec<i32> = Vec::with_capacity(pairs * 2);
+            let mut stack: Vec<i32> = Vec::new();
+            let (mut opens, mut closes) = (pairs, pairs);
+            while opens + closes > 0 {
+                if opens > 0 && (stack.is_empty() || rng.chance(50)) {
+                    let k = rng.range(1, kinds);
+                    seq.push(k);
+                    stack.push(k);
+                    opens -= 1;
+                } else {
+                    seq.push(-stack.pop().unwrap_or(1));
+                    closes -= 1;
                 }
-            } else {
-                for _ in 0..pairs * 2 {
-                    seq.push(if rng.chance(50) { 1 } else { -1 });
-                }
-                if rng.chance(30) {
+            }
+            if !rng.chance(seg.chance) {
+                // Near miss: change one element, or drop the last one.
+                if rng.chance(25) {
                     seq.pop();
+                } else {
+                    let i = rng.below(seq.len() as u64) as usize;
+                    let mut v = rng.range(-kinds, kinds);
+                    if v == 0 || v == seq[i] {
+                        v = -seq[i];
+                    }
+                    seq[i] = v;
                 }
             }
             Ok(finish(seg, seq, None))
@@ -369,6 +386,34 @@ fn gen_seg(rng: &mut Rng, seg: &Seg, pool: &[SegOut]) -> Result<SegOut, String> 
                 aux: Some(head),
             })
         }
+        SegKind::Copy => {
+            let src = pool
+                .get(seg.of)
+                .ok_or_else(|| format!("copy refers to segment {} which does not exist yet", seg.of))?;
+            Ok(finish(&Seg { sort: None, ..seg.clone() }, src.raw.clone(), None))
+        }
+        SegKind::Len => {
+            let src = pool
+                .get(seg.of)
+                .ok_or_else(|| format!("len refers to segment {} which does not exist yet", seg.of))?;
+            Ok(finish(seg, vec![src.raw.len() as i32], None))
+        }
+        SegKind::PairSum => {
+            let src = pool
+                .get(seg.of)
+                .ok_or_else(|| format!("pairsum refers to segment {} which does not exist yet", seg.of))?;
+            let v = if src.raw.len() >= 2 && rng.chance(seg.chance) {
+                let i = rng.below(src.raw.len() as u64) as usize;
+                let mut j = rng.below(src.raw.len() as u64 - 1) as usize;
+                if j >= i {
+                    j += 1;
+                }
+                src.raw[i] + src.raw[j]
+            } else {
+                rng.range(seg.range[0], seg.range[1])
+            };
+            Ok(finish(seg, vec![v], None))
+        }
         SegKind::Aux => {
             let src = pool
                 .get(seg.of)
@@ -381,19 +426,23 @@ fn gen_seg(rng: &mut Rng, seg: &Seg, pool: &[SegOut]) -> Result<SegOut, String> 
     }
 }
 
-/// Generate the `index`-th input of a generator (each case advances the shared `rng`).
+/// Generate one input of a generator (each case advances the shared `rng`).
 pub fn generate_one(rng: &mut Rng, g: &Generator) -> Result<GeneratedInput, String> {
     let mut pool: Vec<SegOut> = Vec::new();
-    let mut inbox = Vec::new();
-    for seg in &g.inbox {
+    for seg in &g.vars {
         let out = gen_seg(rng, seg, &pool)?;
-        inbox.extend_from_slice(&out.emitted);
         pool.push(out);
     }
     let mut floor = Vec::new();
     for fs in &g.floor {
         let out = gen_seg(rng, &fs.seg, &pool)?;
         floor.push((fs.at, out.emitted.clone()));
+        pool.push(out);
+    }
+    let mut inbox = Vec::new();
+    for seg in &g.inbox {
+        let out = gen_seg(rng, seg, &pool)?;
+        inbox.extend_from_slice(&out.emitted);
         pool.push(out);
     }
     Ok(GeneratedInput { inbox, floor })
@@ -433,6 +482,7 @@ mod tests {
     fn list_options() {
         let g = Generator {
             count: 30,
+            vars: vec![],
             inbox: vec![Seg {
                 len: [3, 6],
                 range: [1, 20],
@@ -458,6 +508,7 @@ mod tests {
     fn perm_with_drop() {
         let g = Generator {
             count: 10,
+            vars: vec![],
             inbox: vec![Seg {
                 kind: SegKind::Perm,
                 len: [5, 5],
@@ -480,6 +531,7 @@ mod tests {
     fn linked_list_is_a_chain() {
         let g = Generator {
             count: 20,
+            vars: vec![],
             inbox: vec![],
             floor: vec![FloorSeg {
                 at: 0,
@@ -507,6 +559,7 @@ mod tests {
     fn pick_and_aux_need_earlier_segments() {
         let g = Generator {
             count: 1,
+            vars: vec![],
             inbox: vec![Seg {
                 kind: SegKind::Pick,
                 of: 3,
@@ -521,6 +574,7 @@ mod tests {
     fn balanced_shape() {
         let g = Generator {
             count: 40,
+            vars: vec![],
             inbox: vec![Seg {
                 kind: SegKind::Balanced,
                 len: [2, 10],
@@ -543,6 +597,7 @@ mod tests {
     fn palindrome_shape() {
         let g = Generator {
             count: 40,
+            vars: vec![],
             inbox: vec![Seg {
                 kind: SegKind::Palindrome,
                 len: [1, 9],

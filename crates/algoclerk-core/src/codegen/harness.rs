@@ -6,7 +6,7 @@
 
 use super::meta::{Arg, split_args};
 use super::{Generated, Lang, Shape};
-use crate::level::{CodeMeta, Level, ReturnKind};
+use crate::level::{CodeMeta, Level, ParamKind, ReturnKind};
 use std::fmt::Write as _;
 
 /// One input to run.
@@ -138,7 +138,9 @@ fn meta_call(lang: Lang, f: &str, meta: &CodeMeta, args: &[Arg]) -> String {
     let mut s = String::from("    { ");
     let mut call_args: Vec<String> = Vec::new();
     for (i, (p, a)) in meta.params.iter().zip(args).enumerate() {
-        let _ = p;
+        if p.kind == ParamKind::Length {
+            continue;
+        }
         match (a, lang) {
             (Arg::Scalar(v), _) => call_args.push(v.to_string()),
             (Arg::List(v), Lang::C) => {

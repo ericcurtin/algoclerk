@@ -1,0 +1,104 @@
+id = "selection-sort"
+title = "Pick the Smallest"
+order = 2
+summary = "Repeatedly pull out the smallest remaining number."
+story = "The prize committee reads out winners from lowest score to highest. It has no patience for shuffling: each round it scans the pile, announces the smallest score and crosses it off."
+statement = "The inbox holds a list of numbers between 1 and 9 followed by a 0 marker. Output the numbers in ascending order."
+constraints = ["The list has between 0 and 6 numbers, each between 1 and 9.", "Tile 5 holds 0, tile 6 holds 99 and tile 7 holds 7. Tiles 8 to 13 are free for the list."]
+hints = [
+  "Store the list on the shelf starting at tile 8. Tile 0 holds the address of its last element and tile 5 counts how many are left.",
+  "One round: scan all elements, remembering the smallest value and its address.",
+  "Output the smallest, then overwrite it with the large number 99 so that it never wins again.",
+]
+
+[[examples]]
+input = [3, 1, 2, 0]
+output = [1, 2, 3]
+
+[machine]
+floor = 14
+names = ["last", "x", "scan", "smallest", "smallest_at", "left", "big", "base"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "bumpup", "bumpdn", "jump", "jumpz", "jumpn", "indirect"]
+[machine.prefill]
+0 = 7
+5 = 0
+6 = 99
+7 = 7
+
+[tests]
+seed = 502
+[[tests.fixed]]
+input = [0]
+output = []
+[[tests.fixed]]
+input = [7, 0]
+output = [7]
+[[tests.fixed]]
+input = [6, 5, 4, 3, 2, 1, 0]
+output = [1, 2, 3, 4, 5, 6]
+[[tests.fixed]]
+input = [2, 2, 1, 1, 2, 1, 0]
+output = [1, 1, 1, 2, 2, 2]
+[[tests.generators]]
+count = 9
+inbox = [{ kind = "list", len = [0, 6], range = [1, 9], terminator = 0 }]
+
+[targets]
+size_par = 41
+size_ace = 33
+speed_par = 396
+speed_ace = 264
+
+[solution]
+asm = """
+store:
+    INBOX
+    JUMPZ begin
+    COPYTO 1
+    BUMPUP 0
+    COPYFROM 1
+    COPYTO [0]
+    BUMPUP 5
+    JUMP store
+begin:
+    COPYFROM 5
+select:
+    JUMPZ done
+    COPYFROM 6
+    COPYTO 3
+    COPYFROM 7
+    COPYTO 2
+scan:
+    COPYFROM 0
+    SUB 2
+    JUMPZ pick
+    BUMPUP 2
+    COPYFROM [2]
+    SUB 3
+    JUMPN newmin
+    JUMP scan
+newmin:
+    COPYFROM [2]
+    COPYTO 3
+    COPYFROM 2
+    COPYTO 4
+    JUMP scan
+pick:
+    COPYFROM 3
+    OUTBOX
+    COPYFROM 6
+    COPYTO [4]
+    BUMPDN 5
+    JUMP select
+done:
+"""
+
+[code]
+function = "selection_sort"
+doc = "Returns the values in ascending order."
+params = [{ name = "values", kind = "terminated" }]
+returns = "list"
+
+[explain]
+algorithm = "Selection sort"
+text = "Find the minimum, emit it, repeat. It always performs the same number of comparisons regardless of input order, but never moves an element more than once."

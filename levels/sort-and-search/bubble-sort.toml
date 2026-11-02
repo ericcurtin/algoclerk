@@ -1,0 +1,113 @@
+id = "bubble-sort"
+title = "Bubbles Rising"
+order = 3
+summary = "Sort a row of numbers on the floor by swapping neighbours."
+story = "The numbers are already laid out along the floor. Walk along the row, swap any neighbours that are the wrong way round, and repeat until the row is in order."
+statement = "The first n tiles of the floor hold n numbers (n is the first value in the inbox). Output the numbers in ascending order."
+constraints = ["The inbox holds n with 0 <= n <= 8. Tiles 0 to n-1 hold the numbers, each between -9 and 9.", "Tile 12 holds 0 and tile 14 holds 1 at the start."]
+hints = [
+  "One pass compares each neighbouring pair and swaps it if the left number is larger. After a pass the largest number has bubbled to the end.",
+  "The next pass can stop one place earlier. After n-1 passes the row is sorted.",
+  "Use pointer tiles for the pair: [9] is the left number, [10] the right one. A third tile holds a number during a swap.",
+]
+
+[[examples]]
+input = [3]
+floor = [{ at = 0, values = [3, 1, 2] }]
+output = [1, 2, 3]
+
+[machine]
+floor = 15
+names = ["", "", "", "", "", "", "", "", "passes", "left_at", "right_at", "swap", "zero", "n", "one"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "bumpup", "bumpdn", "jump", "jumpz", "jumpn", "indirect"]
+[machine.prefill]
+12 = 0
+14 = 1
+
+[tests]
+seed = 503
+[[tests.fixed]]
+input = [0]
+output = []
+[[tests.fixed]]
+input = [1]
+floor = [{ at = 0, values = [4] }]
+output = [4]
+[[tests.fixed]]
+input = [8]
+floor = [{ at = 0, values = [8, 7, 6, 5, 4, 3, 2, 1] }]
+output = [1, 2, 3, 4, 5, 6, 7, 8]
+[[tests.fixed]]
+input = [4]
+floor = [{ at = 0, values = [-1, -1, -1, -1] }]
+output = [-1, -1, -1, -1]
+[[tests.generators]]
+count = 9
+vars = [{ kind = "list", len = [0, 8], range = [-9, 9] }]
+floor = [{ at = 0, seg = { kind = "copy", of = 0 } }]
+inbox = [{ kind = "len", of = 0 }]
+
+[targets]
+size_par = 45
+size_ace = 36
+speed_par = 308
+speed_ace = 205
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 13
+    SUB 14
+    COPYTO 8
+outer:
+    COPYFROM 8
+    JUMPN print
+    JUMPZ print
+    COPYFROM 12
+    COPYTO 9
+inner:
+    COPYFROM 9
+    ADD 14
+    COPYTO 10
+    COPYFROM [9]
+    SUB [10]
+    JUMPN ok
+    JUMPZ ok
+    COPYFROM [9]
+    COPYTO 11
+    COPYFROM [10]
+    COPYTO [9]
+    COPYFROM 11
+    COPYTO [10]
+ok:
+    BUMPUP 9
+    SUB 8
+    JUMPN inner
+    BUMPDN 8
+    JUMP outer
+print:
+    COPYFROM 12
+    COPYTO 9
+show:
+    COPYFROM 9
+    SUB 13
+    JUMPZ end
+    COPYFROM [9]
+    OUTBOX
+    BUMPUP 9
+    JUMP show
+end:
+"""
+
+[code]
+function = "bubble_sort"
+doc = "Returns the values in ascending order."
+params = [
+  { name = "values", kind = "list", at = 0, cap = 8 },
+  { name = "n", kind = "length", of = "values" },
+]
+returns = "list"
+
+[explain]
+algorithm = "Bubble sort"
+text = "Swapping adjacent out-of-order neighbours moves the largest remaining value to the end of the row on every pass. It is easy to write and to reason about, and O(n^2) in the worst case."

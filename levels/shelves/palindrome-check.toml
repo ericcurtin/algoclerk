@@ -1,0 +1,105 @@
+id = "palindrome-check"
+title = "Mirror Words"
+order = 4
+summary = "Decide whether a word reads the same backwards."
+story = "The company slogan committee loves words that look the same in a mirror. Letters arrive as character codes ('a' is 97, 'b' is 98, ...)."
+statement = "The inbox holds a word as character codes followed by a 0 marker. Output 1 if the word is a palindrome (it reads the same forwards and backwards), otherwise output 0. The empty word is a palindrome."
+constraints = ["The word has between 0 and 8 letters, each a lowercase letter 'a' to 'z'.", "Tile 0 holds 3, tile 1 holds 4 and tile 3 holds 1 at the start. Tiles 4 to 11 are free for the word."]
+display = "char"
+hints = [
+  "Store the word on the floor first. Tile 0 is the address of the last letter, tile 1 the address of the first.",
+  "Compare the letters at both ends, then move both addresses towards each other.",
+  "When the addresses meet or cross, every pair matched and the answer is 1.",
+]
+[[examples]]
+input = "level\u0000"
+output = [1]
+note = "'level' reads the same both ways."
+
+[[examples]]
+input = "clerk\u0000"
+output = [0]
+
+[machine]
+floor = 12
+names = ["last", "first", "tmp", "one"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "bumpup", "bumpdn", "jump", "jumpz", "jumpn", "indirect"]
+
+[machine.prefill]
+0 = 3
+1 = 4
+3 = 1
+
+[tests]
+seed = 404
+[[tests.fixed]]
+input = [0]
+output = [1]
+[[tests.fixed]]
+input = "a\u0000"
+output = [1]
+[[tests.fixed]]
+input = "abba\u0000"
+output = [1]
+[[tests.fixed]]
+input = "abca\u0000"
+output = [0]
+[[tests.fixed]]
+input = "racecars\u0000"
+output = [0]
+[[tests.generators]]
+count = 6
+inbox = [{ kind = "palindrome", len = [0, 8], range = [97, 100], chance = 60, terminator = 0 }]
+[[tests.generators]]
+count = 4
+inbox = [{ kind = "list", len = [2, 8], range = [97, 99], terminator = 0 }]
+
+[targets]
+size_par = 30
+size_ace = 24
+speed_par = 72
+speed_ace = 48
+
+[solution]
+asm = """
+read:
+    INBOX
+    JUMPZ compare
+    COPYTO 2
+    BUMPUP 0
+    COPYFROM 2
+    COPYTO [0]
+    JUMP read
+compare:
+    COPYFROM 1
+    SUB 0
+    JUMPN check
+    COPYFROM 3
+    JUMP out
+check:
+    COPYFROM [1]
+    COPYTO 2
+    COPYFROM [0]
+    SUB 2
+    JUMPZ same
+    COPYFROM 2
+    SUB 2
+    JUMP out
+same:
+    BUMPUP 1
+    BUMPDN 0
+    JUMP compare
+out:
+    OUTBOX
+"""
+
+[code]
+function = "is_palindrome"
+doc = "Returns true if the word reads the same backwards."
+params = [{ name = "word", kind = "terminated" }]
+returns = "scalar"
+return_type = "bool"
+
+[explain]
+algorithm = "Two pointers from both ends"
+text = "Compare the outermost pair, then step both pointers inwards. Each element is looked at once, so the check is O(n) time."

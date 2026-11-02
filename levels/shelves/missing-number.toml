@@ -1,0 +1,75 @@
+id = "missing-number"
+title = "Gap in the Sequence"
+order = 6
+summary = "One ticket number is missing from a run of consecutive numbers."
+story = "Tickets numbered 1 to n+1 were printed, but one went missing on its way to the Shelves. The tickets that did arrive come in a random order."
+statement = "The inbox holds n different numbers followed by a 0 marker. They are the numbers 1 to n+1 with exactly one missing. Output the missing number."
+constraints = ["The list has between 1 and 8 numbers.", "Tiles 0 and 1 hold 0 at the start."]
+hints = [
+  "The sum of 1..(n+1) minus the sum of the numbers you got is the missing number.",
+  "You do not know n in advance. Count the tickets as they arrive and add the counter to a running difference while subtracting each ticket.",
+  "After the marker, the counter still needs to be advanced once more to cover n+1.",
+]
+
+[[examples]]
+input = [3, 1, 4, 0]
+output = [2]
+
+[machine]
+floor = 3
+names = ["counter", "difference", "ticket"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "bumpup", "jump", "jumpz"]
+[machine.prefill]
+0 = 0
+1 = 0
+
+[tests]
+seed = 406
+[[tests.fixed]]
+input = [2, 0]
+output = [1]
+[[tests.fixed]]
+input = [1, 0]
+output = [2]
+[[tests.fixed]]
+input = [1, 2, 3, 4, 5, 6, 7, 8, 0]
+output = [9]
+[[tests.fixed]]
+input = [9, 8, 7, 6, 5, 4, 3, 2, 0]
+output = [1]
+[[tests.generators]]
+count = 9
+inbox = [{ kind = "perm", len = [2, 9], range = [1, 1], drop = 1, terminator = 0 }]
+
+[targets]
+size_par = 13
+size_ace = 11
+speed_par = 68
+speed_ace = 45
+
+[solution]
+asm = """
+again:
+    INBOX
+    JUMPZ done
+    COPYTO 2
+    BUMPUP 0
+    ADD 1
+    SUB 2
+    COPYTO 1
+    JUMP again
+done:
+    BUMPUP 0
+    ADD 1
+    OUTBOX
+"""
+
+[code]
+function = "missing_number"
+doc = "Returns the missing number from 1..n+1."
+params = [{ name = "values", kind = "terminated" }]
+returns = "scalar"
+
+[explain]
+algorithm = "Sum difference"
+text = "The expected total of 1..(n+1) minus the actual total reveals the gap in a single pass and constant space. Cancelling both sums term by term, as the clerk does, also avoids ever needing the closed formula."

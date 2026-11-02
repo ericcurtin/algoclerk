@@ -455,21 +455,21 @@ fn used_direct_slots(p: &Program) -> Vec<usize> {
 
 fn c_param(p: &ParamSpec) -> String {
     match p.kind {
-        ParamKind::Scalar => format!("int {}", p.name),
+        ParamKind::Scalar | ParamKind::Length => format!("int {}", p.name),
         _ => format!("const int *{n}, size_t {n}_len", n = p.name),
     }
 }
 
 fn cpp_param(p: &ParamSpec) -> String {
     match p.kind {
-        ParamKind::Scalar => format!("int {}", p.name),
+        ParamKind::Scalar | ParamKind::Length => format!("int {}", p.name),
         _ => format!("const std::vector<int>& {}", p.name),
     }
 }
 
 fn rust_param(p: &ParamSpec) -> String {
     match p.kind {
-        ParamKind::Scalar => format!("{}: i32", p.name),
+        ParamKind::Scalar | ParamKind::Length => format!("{}: i32", p.name),
         _ => format!("{}: &[i32]", p.name),
     }
 }
@@ -569,9 +569,9 @@ pub(super) fn generate(program: &Program, lang: Lang, level: Option<&Level>, opt
         .unwrap_or_else(|| "Runs the clerk's program: reads the inbox, returns the outbox.".to_string());
     g.line(format!("// {doc}"));
     let params: Vec<String> = match (meta, lang) {
-        (Some(m), Lang::C) => m.params.iter().map(c_param).collect(),
-        (Some(m), Lang::Cpp) => m.params.iter().map(cpp_param).collect(),
-        (Some(m), Lang::Rust) => m.params.iter().map(rust_param).collect(),
+        (Some(m), Lang::C) => m.params.iter().filter(|p| p.kind != ParamKind::Length).map(c_param).collect(),
+        (Some(m), Lang::Cpp) => m.params.iter().filter(|p| p.kind != ParamKind::Length).map(cpp_param).collect(),
+        (Some(m), Lang::Rust) => m.params.iter().filter(|p| p.kind != ParamKind::Length).map(rust_param).collect(),
         (None, Lang::C) => {
             let mut v = vec!["const int *inbox".to_string(), "size_t inbox_len".to_string()];
             if floor_input {
@@ -724,7 +724,7 @@ fn prologue_inbox(g: &mut Gen<'_>, ps: &[&ParamSpec], single_list: bool) {
             let mut terms: Vec<String> = Vec::new();
             for p in ps {
                 match p.kind {
-                    ParamKind::Scalar => terms.push("1".into()),
+                    ParamKind::Scalar | ParamKind::Length => terms.push("1".into()),
                     ParamKind::List => terms.push(format!("{}_len", p.name)),
                     ParamKind::Counted | ParamKind::Terminated => terms.push(format!("{}_len + 1", p.name)),
                 }
@@ -739,6 +739,10 @@ fn prologue_inbox(g: &mut Gen<'_>, ps: &[&ParamSpec], single_list: bool) {
                 let n = &p.name;
                 match p.kind {
                     ParamKind::Scalar => g.line(format!("inbox[filled++] = {n};")),
+                    ParamKind::Length => {
+                        let of = p.of.clone().unwrap_or_default();
+                        g.line(format!("inbox[filled++] = (int){of}_len;"));
+                    }
                     ParamKind::Counted => {
                         g.line(format!("inbox[filled++] = (int){n}_len;"));
                         g.line(format!("for (size_t i = 0; i < {n}_len; i++) inbox[filled++] = {n}[i];"));
@@ -759,6 +763,10 @@ fn prologue_inbox(g: &mut Gen<'_>, ps: &[&ParamSpec], single_list: bool) {
                 let n = &p.name;
                 match p.kind {
                     ParamKind::Scalar => g.line(format!("inbox.push_back({n});")),
+                    ParamKind::Length => {
+                        let of = p.of.clone().unwrap_or_default();
+                        g.line(format!("inbox.push_back(static_cast<int>({of}.size()));"));
+                    }
                     ParamKind::Counted => {
                         g.line(format!("inbox.push_back(static_cast<int>({n}.size()));"));
                         g.line(format!("inbox.insert(inbox.end(), {n}.begin(), {n}.end());"));
@@ -777,6 +785,10 @@ fn prologue_inbox(g: &mut Gen<'_>, ps: &[&ParamSpec], single_list: bool) {
                 let n = &p.name;
                 match p.kind {
                     ParamKind::Scalar => g.line(format!("inbox.push({n});")),
+                    ParamKind::Length => {
+                        let of = p.of.clone().unwrap_or_default();
+                        g.line(format!("inbox.push({of}.len() as i32);"));
+                    }
                     ParamKind::Counted => {
                         g.line(format!("inbox.push({n}.len() as i32);"));
                         g.line(format!("inbox.extend_from_slice({n});"));
