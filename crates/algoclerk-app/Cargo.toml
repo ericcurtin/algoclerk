@@ -1,6 +1,45 @@
 [package]
 name = "algoclerk-app"
+description = "The AlgoClerk game: a thin egui front end over algoclerk-core"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
+authors.workspace = true
+repository.workspace = true
 publish.workspace = true
+
+[lib]
+name = "algoclerk_app"
+path = "src/lib.rs"
+# cdylib: Android (NativeActivity). staticlib: iOS. rlib: desktop binary and tests.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[[bin]]
+name = "algoclerk"
+path = "src/main.rs"
+
+[features]
+default = []
+# Sound effects through rodio (needs ALSA headers on Linux: libasound2-dev / alsa-lib-devel).
+audio = ["dep:rodio"]
+
+[dependencies]
+algoclerk-core = { workspace = true }
+algoclerk-levels.workspace = true
+serde_json.workspace = true
+eframe = { version = "=0.37.0", default-features = false, features = [
+    "wgpu",
+    "wayland",
+    "x11",
+    "clipboard",
+    "persistence",
+] }
+png = "0.18"
+rodio = { version = "0.23", default-features = false, features = ["playback"], optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+eframe = { version = "=0.37.0", default-features = false, features = ["android-native-activity"] }
+
+[lints]
+workspace = true
