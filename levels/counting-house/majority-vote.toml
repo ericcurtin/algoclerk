@@ -1,0 +1,83 @@
+id = "majority-vote"
+title = "Landslide"
+order = 7
+summary = "Find the number that more than half of the envelopes carry."
+story = "Every morning the staff vote on the lunch menu by posting a number. One option always wins an outright majority, and you have no room to keep a tally for each option. Cancel the votes against each other instead."
+statement = "The inbox holds a list of non-zero numbers followed by a 0 marker. One number occurs in more than half of the positions. Output that number. You only have three tiles, so counting every value separately is not possible."
+constraints = ["The list has between 1 and 9 numbers and a majority element always exists.", "Every number is between -4 and 4 and is not 0.", "Tile 1 holds 0 at the start."]
+hints = [
+  "Keep a candidate and a count. When the count is zero, adopt the next number as the candidate.",
+  "A number equal to the candidate raises the count; a different number lowers it.",
+  "The majority element can never be cancelled out completely, so the candidate at the end is the answer.",
+]
+
+[[examples]]
+input = [2, 1, 2, 3, 2, 0]
+output = [2]
+
+[machine]
+floor = 3
+names = ["candidate", "count", "x"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "bumpup", "bumpdn", "jump", "jumpz"]
+[machine.prefill]
+1 = 0
+
+[tests]
+seed = 207
+[[tests.fixed]]
+input = [7, 0]
+output = [7]
+[[tests.fixed]]
+input = [1, 2, 2, 0]
+output = [2]
+[[tests.fixed]]
+input = [-4, 3, -4, 3, -4, 0]
+output = [-4]
+[[tests.fixed]]
+input = [1, 1, 2, 2, 2, 0]
+output = [2]
+[[tests.generators]]
+count = 10
+inbox = [{ kind = "majority", len = [1, 9], range = [-4, 4], nonzero = true, terminator = 0 }]
+
+[targets]
+size_par = 22
+size_ace = 18
+speed_par = 65
+speed_ace = 43
+
+[solution]
+asm = """
+again:
+    INBOX
+    JUMPZ done
+    COPYTO 2
+    COPYFROM 1
+    JUMPZ fresh
+    COPYFROM 2
+    SUB 0
+    JUMPZ agree
+    BUMPDN 1
+    JUMP again
+agree:
+    BUMPUP 1
+    JUMP again
+fresh:
+    COPYFROM 2
+    COPYTO 0
+    BUMPUP 1
+    JUMP again
+done:
+    COPYFROM 0
+    OUTBOX
+"""
+
+[code]
+function = "majority_element"
+doc = "Returns the element that occurs in more than half of the positions."
+params = [{ name = "values", kind = "terminated" }]
+returns = "scalar"
+
+[explain]
+algorithm = "Boyer-Moore majority vote"
+text = "Pairs of different votes cancel each other out. If a value holds a strict majority it survives all cancellations, so one pass with a candidate and a counter finds it in constant space."

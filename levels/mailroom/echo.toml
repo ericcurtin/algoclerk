@@ -1,0 +1,61 @@
+id = "echo"
+title = "Echo Chamber"
+order = 1
+summary = "Pass every envelope straight through to the outbox."
+story = "Welcome to Brass & Ledger Co. Your desk faces two conveyor belts. Envelopes arrive on the left belt. Your very first job is the simplest in the building: whatever comes in, goes out."
+statement = "Take every value from the inbox and put it on the outbox, in the same order. The shift ends when the inbox is empty."
+constraints = ["The inbox holds between 0 and 8 values.", "Every value is between -9 and 9."]
+hints = [
+  "INBOX picks up the next value. OUTBOX puts down the value you are holding.",
+  "A program that ends early only handles one value. Use JUMP to go back to the start.",
+  "Try three instructions: INBOX, OUTBOX, and a JUMP back to a label before INBOX.",
+]
+
+[[examples]]
+input = [3, -1, 4]
+output = [3, -1, 4]
+note = "Everything goes straight through."
+
+[machine]
+floor = 1
+allowed = ["inbox", "outbox", "jump"]
+
+[tests]
+seed = 101
+[[tests.fixed]]
+input = []
+output = []
+note = "Nothing to do."
+[[tests.fixed]]
+input = [0]
+output = [0]
+[[tests.fixed]]
+input = [9, 9, -9, 0, 5]
+output = [9, 9, -9, 0, 5]
+[[tests.generators]]
+count = 8
+inbox = [{ kind = "list", len = [1, 8], range = [-9, 9] }]
+
+[targets]
+size_par = 4
+size_ace = 3
+speed_par = 17
+speed_ace = 11
+
+[solution]
+asm = """
+again:
+    INBOX
+    OUTBOX
+    JUMP again
+"""
+
+[code]
+function = "echo"
+doc = "Returns the values unchanged."
+params = [{ name = "values", kind = "list" }]
+returns = "list"
+
+[explain]
+algorithm = "Streaming loop"
+text = "The clerk reads one item, handles it, and goes back for the next until the input runs out. Most stream-processing code has this exact shape: a loop that stops when the input ends."

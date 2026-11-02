@@ -1,0 +1,78 @@
+id = "fibonacci"
+title = "Rabbit Ledger"
+order = 3
+summary = "Compute the n-th Fibonacci number."
+story = "The company mascot rabbits multiply with great regularity: each month there are as many as the two previous months combined. How many after n months?"
+statement = "The inbox holds a single number n. Output F(n), where F(0) = 0, F(1) = 1 and F(k) = F(k-1) + F(k-2)."
+constraints = ["0 <= n <= 20.", "Tile 0 holds 0 and tile 1 holds 1 at the start."]
+hints = [
+  "Keep two consecutive values F(k) and F(k+1) on two tiles.",
+  "One step moves the pair forward: the new second value is their sum, the new first value is the old second value.",
+  "You will need a third tile to hold the sum while you shuffle the others.",
+]
+
+[[examples]]
+input = [7]
+output = [13]
+
+[machine]
+floor = 4
+names = ["current", "next", "months_left", "sum"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "mul", "div", "mod", "bumpup", "bumpdn", "jump", "jumpz", "jumpn"]
+[machine.prefill]
+0 = 0
+1 = 1
+
+[tests]
+seed = 303
+[[tests.fixed]]
+input = [0]
+output = [0]
+[[tests.fixed]]
+input = [1]
+output = [1]
+[[tests.fixed]]
+input = [2]
+output = [1]
+[[tests.fixed]]
+input = [20]
+output = [6765]
+[[tests.generators]]
+count = 6
+inbox = [{ kind = "int", range = [0, 20] }]
+
+[targets]
+size_par = 17
+size_ace = 14
+speed_par = 144
+speed_ace = 96
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 2
+loop:
+    JUMPZ done
+    COPYFROM 0
+    ADD 1
+    COPYTO 3
+    COPYFROM 1
+    COPYTO 0
+    COPYFROM 3
+    COPYTO 1
+    BUMPDN 2
+    JUMP loop
+done:
+    COPYFROM 0
+    OUTBOX
+"""
+
+[code]
+function = "fibonacci"
+doc = "Returns the n-th Fibonacci number."
+params = [{ name = "n", kind = "scalar" }]
+returns = "scalar"
+
+[explain]
+algorithm = "Iterative Fibonacci"
+text = "Keeping only the last two values makes this linear in time and constant in space. The naive recursive definition repeats the same subproblems exponentially often."

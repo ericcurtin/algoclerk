@@ -72,6 +72,8 @@ pub enum SegKind {
     Palindrome,
     /// A linked list laid out in floor slots: see `docs/LEVEL_FORMAT.md`.
     Linked,
+    /// A shuffled list in which one value occurs more than half of the time.
+    Majority,
     /// The auxiliary value of an earlier segment (for example the head of a linked list).
     Aux,
 }
@@ -109,6 +111,9 @@ pub struct Seg {
     /// Inclusive value range.
     #[serde(default = "default_range")]
     pub range: [i32; 2],
+    /// Round the length down to a multiple of this (0 or 1 means no rounding).
+    #[serde(default)]
+    pub len_multiple: u32,
     /// Sort the values.
     #[serde(default)]
     pub sort: Option<SortOrder>,
@@ -147,6 +152,7 @@ impl Default for Seg {
             kind: SegKind::List,
             len: default_len(),
             range: default_range(),
+            len_multiple: 0,
             sort: None,
             distinct: false,
             nonzero: false,
@@ -200,13 +206,19 @@ struct SegOut {
     aux: Option<i32>,
 }
 
-fn pick_len(rng: &mut Rng, len: [u32; 2]) -> usize {
+fn pick_len_multiple(rng: &mut Rng, len: [u32; 2], multiple: u32) -> usize {
     let (lo, hi) = if len[0] <= len[1] {
         (len[0], len[1])
     } else {
         (len[1], len[0])
     };
-    (lo + rng.below(u64::from(hi - lo) + 1) as u32) as usize
+    let n = lo + rng.below(u64::from(hi - lo) + 1) as u32;
+    let n = if multiple > 1 { n - n % multiple } else { n };
+    n as usize
+}
+
+fn pick_len(rng: &mut Rng, len: [u32; 2]) -> usize {
+    pick_len_multiple(rng, len, 0)
 }
 
 fn random_list(rng: &mut Rng, seg: &Seg, len: usize) -> Vec<i32> {
@@ -252,7 +264,7 @@ fn finish(seg: &Seg, mut raw: Vec<i32>, aux: Option<i32>) -> SegOut {
 fn gen_seg(rng: &mut Rng, seg: &Seg, pool: &[SegOut]) -> Result<SegOut, String> {
     match seg.kind {
         SegKind::List => {
-            let n = pick_len(rng, seg.len);
+            let n = pick_len_multiple(rng, seg.len, seg.len_multiple);
             let raw = random_list(rng, seg, n);
             Ok(finish(seg, raw, None))
         }
@@ -324,6 +336,15 @@ fn gen_seg(rng: &mut Rng, seg: &Seg, pool: &[SegOut]) -> Result<SegOut, String> 
                 v[i] = rng.range(seg.range[0], seg.range[1]);
             }
             Ok(finish(seg, v, None))
+        }
+        SegKind::Majority => {
+            let n = pick_len_multiple(rng, seg.len, seg.len_multiple).max(1);
+            let major = random_list(rng, &Seg { distinct: false, ..seg.clone() }, 1)[0];
+            let k = n / 2 + 1;
+            let mut v = vec![major; k];
+            v.extend(random_list(rng, &Seg { distinct: false, ..seg.clone() }, n - k));
+            rng.shuffle(&mut v);
+            Ok(finish(seg, v, Some(major)))
         }
         SegKind::Linked => {
             let stride = if seg.stride == 0 { 2 } else { seg.stride as usize };

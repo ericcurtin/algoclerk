@@ -263,6 +263,19 @@ pub fn medals_for(level: &Level, size: usize, avg_steps: f64) -> Medals {
     }
 }
 
+/// Suggest medal targets from a reference solution's score: the reference earns the gold seal,
+/// and the staple allows 25% more instructions and 50% more steps.
+pub fn suggest_targets(size: usize, avg_steps: f64) -> crate::level::Targets {
+    let size = size as u32;
+    let speed_ace = avg_steps.ceil() as u32;
+    crate::level::Targets {
+        size_ace: size,
+        size_par: size + (size / 4).max(1),
+        speed_ace,
+        speed_par: (f64::from(speed_ace) * 1.5).ceil() as u32,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -307,6 +320,14 @@ mod tests {
         let looping = j.judge(&Arc::new(assemble("a:\nJUMP a").unwrap()));
         assert!(!looping.passed);
         assert!(!looping.headline(crate::i18n::english()).is_empty());
+    }
+
+    #[test]
+    fn suggested_targets_are_ordered() {
+        let t = suggest_targets(7, 12.3);
+        assert_eq!((t.size_ace, t.size_par, t.speed_ace, t.speed_par), (7, 8, 13, 20));
+        let t = suggest_targets(1, 0.0);
+        assert!(t.size_par > t.size_ace);
     }
 
     #[test]

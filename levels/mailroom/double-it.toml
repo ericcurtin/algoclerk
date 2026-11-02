@@ -1,0 +1,60 @@
+id = "double-it"
+title = "Twice As Nice"
+order = 3
+summary = "Output every value doubled."
+story = "The accounting department has decided that every figure on every envelope must be doubled before filing. Your arithmetic instructions are now unlocked."
+statement = "For each value in the inbox, output twice that value."
+constraints = ["The inbox holds between 0 and 8 values.", "Every value is between -9 and 9."]
+hints = [
+  "ADD n adds the value on tile n to the value in your hand.",
+  "Copy the value to a tile, then add that same tile to your hand.",
+]
+
+[[examples]]
+input = [1, -2, 0]
+output = [2, -4, 0]
+
+[machine]
+floor = 1
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "jump"]
+
+[tests]
+seed = 103
+[[tests.fixed]]
+input = []
+output = []
+[[tests.fixed]]
+input = [9, -9]
+output = [18, -18]
+[[tests.fixed]]
+input = [0, 0]
+output = [0, 0]
+[[tests.generators]]
+count = 8
+inbox = [{ kind = "list", len = [1, 8], range = [-9, 9] }]
+
+[targets]
+size_par = 6
+size_ace = 5
+speed_par = 32
+speed_ace = 21
+
+[solution]
+asm = """
+again:
+    INBOX
+    COPYTO 0
+    ADD 0
+    OUTBOX
+    JUMP again
+"""
+
+[code]
+function = "double_all"
+doc = "Doubles every value."
+params = [{ name = "values", kind = "list" }]
+returns = "list"
+
+[explain]
+algorithm = "Map"
+text = "Applying the same small function to every element of a sequence is called a map. The clerk maps `x -> x + x` over the inbox."

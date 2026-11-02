@@ -1,0 +1,75 @@
+id = "count-matches"
+title = "Tally Marks"
+order = 5
+summary = "Count how many times a given number appears in a list."
+story = "A customer is looking for one particular figure and wants to know how often it shows up in today's mail."
+statement = "The inbox starts with a target number, followed by a list of non-zero numbers and a 0 marker. Output how many numbers in the list equal the target."
+constraints = ["The list has between 0 and 10 numbers.", "The target and every number are between -3 and 3 and are not 0.", "Tile 1 holds 0 at the start."]
+hints = [
+  "Store the target on a tile. Tile 1 is your counter and already holds zero.",
+  "SUB the target from each number: JUMPZ means they were equal.",
+  "BUMPUP adds one to a tile. Use it on the counter for every match.",
+]
+
+[[examples]]
+input = [2, 1, 2, 3, 2, 2, 0]
+output = [3]
+
+[machine]
+floor = 2
+names = ["target", "count"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "bumpup", "jump", "jumpz"]
+[machine.prefill]
+1 = 0
+
+[tests]
+seed = 205
+[[tests.fixed]]
+input = [1, 0]
+output = [0]
+[[tests.fixed]]
+input = [-3, -3, -3, -3, 0]
+output = [3]
+[[tests.fixed]]
+input = [3, 1, 2, -3, -2, 0]
+output = [0]
+[[tests.generators]]
+count = 10
+inbox = [
+  { kind = "int", range = [-3, 3], nonzero = true },
+  { kind = "list", len = [0, 10], range = [-3, 3], nonzero = true, terminator = 0 },
+]
+
+[targets]
+size_par = 13
+size_ace = 11
+speed_par = 50
+speed_ace = 33
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 0
+again:
+    INBOX
+    JUMPZ done
+    SUB 0
+    JUMPZ hit
+    JUMP again
+hit:
+    BUMPUP 1
+    JUMP again
+done:
+    COPYFROM 1
+    OUTBOX
+"""
+
+[code]
+function = "count_matches"
+doc = "Counts how many values equal the target."
+params = [{ name = "target", kind = "scalar" }, { name = "values", kind = "terminated" }]
+returns = "scalar"
+
+[explain]
+algorithm = "Counting with a predicate"
+text = "Counting is a fold where the update is 'add one if the test passes'. Replacing the equality test by any other predicate gives filters such as 'count the negative numbers'."

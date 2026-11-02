@@ -1,0 +1,81 @@
+id = "contains-value"
+title = "Needle in the Haystack"
+order = 8
+summary = "Answer 1 if a number is in the list, otherwise 0."
+story = "A customer rings the front desk: 'Did my envelope arrive today?' You get the number they are looking for, followed by today's mail."
+statement = "The inbox starts with a target number, followed by a list of non-zero numbers and a 0 marker. Output 1 if the target appears in the list, otherwise output 0."
+constraints = ["The list has between 0 and 8 numbers.", "The target and every number are between 1 and 6.", "Tile 1 holds 1 at the start."]
+hints = [
+  "SUB the target from every number. JUMPZ means you found it.",
+  "When the list ends, the 0 marker is still in your hand. That is already the answer 'not found'.",
+  "You can stop reading as soon as you find the target.",
+]
+
+[[examples]]
+input = [3, 1, 3, 5, 0]
+output = [1]
+
+[[examples]]
+input = [4, 1, 2, 0]
+output = [0]
+
+[machine]
+floor = 2
+names = ["target", "one"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "jump", "jumpz"]
+[machine.prefill]
+1 = 1
+
+[tests]
+seed = 208
+[[tests.fixed]]
+input = [1, 0]
+output = [0]
+[[tests.fixed]]
+input = [6, 6, 0]
+output = [1]
+[[tests.fixed]]
+input = [2, 1, 3, 4, 5, 6, 1, 3, 0]
+output = [0]
+[[tests.fixed]]
+input = [5, 1, 1, 1, 1, 1, 1, 1, 5, 0]
+output = [1]
+[[tests.generators]]
+count = 10
+inbox = [
+  { kind = "int", range = [1, 6] },
+  { kind = "list", len = [0, 8], range = [1, 6], terminator = 0 },
+]
+
+[targets]
+size_par = 11
+size_ace = 9
+speed_par = 26
+speed_ace = 17
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 0
+again:
+    INBOX
+    JUMPZ out
+    SUB 0
+    JUMPZ found
+    JUMP again
+found:
+    COPYFROM 1
+out:
+    OUTBOX
+"""
+
+[code]
+function = "contains_value"
+doc = "Returns true if the target occurs in the values."
+params = [{ name = "target", kind = "scalar" }, { name = "values", kind = "terminated" }]
+returns = "scalar"
+return_type = "bool"
+
+[explain]
+algorithm = "Linear search"
+text = "Check the elements one by one and stop at the first hit. Without any structure in the data, looking at every element in the worst case is unavoidable."

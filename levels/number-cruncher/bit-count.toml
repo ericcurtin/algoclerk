@@ -1,0 +1,78 @@
+id = "bit-count"
+title = "Switchboard"
+order = 8
+summary = "Count the switches that are on, and report whether that count is odd."
+story = "A control panel stores its eight switches as one number: bit k is on when the number contains 2^k. The technician needs to know how many switches are on, and whether that count is odd."
+statement = "The inbox holds a single number n. Output the number of 1 bits in the binary representation of n, then output 1 if that count is odd and 0 if it is even."
+constraints = ["0 <= n <= 255.", "Tile 0 holds 2 and tile 1 holds 0 at the start."]
+hints = [
+  "n mod 2 is the lowest bit. n div 2 shifts the number right by one bit.",
+  "Add the lowest bit to a counter and repeat until n is zero.",
+  "The parity is the counter mod 2.",
+]
+
+[[examples]]
+input = [13]
+output = [3, 1]
+
+[machine]
+floor = 3
+names = ["two", "count", "n"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "mul", "div", "mod", "bumpup", "bumpdn", "jump", "jumpz", "jumpn"]
+[machine.prefill]
+0 = 2
+1 = 0
+
+[tests]
+seed = 308
+[[tests.fixed]]
+input = [0]
+output = [0, 0]
+[[tests.fixed]]
+input = [255]
+output = [8, 0]
+[[tests.fixed]]
+input = [128]
+output = [1, 1]
+[[tests.fixed]]
+input = [7]
+output = [3, 1]
+[[tests.generators]]
+count = 8
+inbox = [{ kind = "int", range = [0, 255] }]
+
+[targets]
+size_par = 17
+size_ace = 14
+speed_par = 78
+speed_ace = 52
+
+[solution]
+asm = """
+    INBOX
+loop:
+    JUMPZ done
+    COPYTO 2
+    MOD 0
+    ADD 1
+    COPYTO 1
+    COPYFROM 2
+    DIV 0
+    JUMP loop
+done:
+    COPYFROM 1
+    OUTBOX
+    COPYFROM 1
+    MOD 0
+    OUTBOX
+"""
+
+[code]
+function = "bit_count_and_parity"
+doc = "Returns the number of set bits and then 1 if that number is odd, otherwise 0."
+params = [{ name = "n", kind = "scalar" }]
+returns = "list"
+
+[explain]
+algorithm = "Population count and parity"
+text = "Shifting right one bit at a time and adding the lowest bit counts the set bits in time proportional to the bit length. Parity is just the lowest bit of the count."

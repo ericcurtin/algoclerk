@@ -1,0 +1,63 @@
+id = "swap-pairs"
+title = "Crossed Wires"
+order = 2
+summary = "Envelopes come in pairs. Send each pair out in reverse order."
+story = "The mail arrives in matched pairs, but the clients on the other side insist on receiving the second envelope first. You will need somewhere to set the first one down."
+statement = "The inbox holds an even number of values, grouped into consecutive pairs (a, b). For each pair, output b and then a."
+constraints = ["The inbox holds an even number of values, between 0 and 8.", "Every value is between -9 and 9."]
+hints = [
+  "You can only hold one value at a time. COPYTO stores what you hold on a floor tile, COPYFROM picks it up again.",
+  "Read the first value and park it on tile 0. Read the second and send it out. Then fetch the parked value and send that out.",
+]
+
+[[examples]]
+input = [1, 2, 3, 4]
+output = [2, 1, 4, 3]
+
+[machine]
+floor = 1
+names = ["parked"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "jump"]
+
+[tests]
+seed = 102
+[[tests.fixed]]
+input = []
+output = []
+[[tests.fixed]]
+input = [5, -5]
+output = [-5, 5]
+[[tests.fixed]]
+input = [0, 0, 7, 0]
+output = [0, 0, 0, 7]
+[[tests.generators]]
+count = 8
+inbox = [{ kind = "list", len = [2, 8], len_multiple = 2, range = [-9, 9] }]
+
+[targets]
+size_par = 8
+size_ace = 7
+speed_par = 21
+speed_ace = 14
+
+[solution]
+asm = """
+again:
+    INBOX
+    COPYTO 0
+    INBOX
+    OUTBOX
+    COPYFROM 0
+    OUTBOX
+    JUMP again
+"""
+
+[code]
+function = "swap_pairs"
+doc = "Swaps every consecutive pair of values."
+params = [{ name = "values", kind = "list" }]
+returns = "list"
+
+[explain]
+algorithm = "Swap with a temporary"
+text = "Swapping two values needs one extra storage cell, exactly like the classic `tmp = a; a = b; b = tmp`. Here the floor tile plays the role of the temporary."

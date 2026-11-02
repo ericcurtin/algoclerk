@@ -28,6 +28,7 @@ COMMANDS:
     run                          Run a program on one input (add --level for its floor and rules)
     judge                        Judge a program against a level's tests
     validate [path...]           Validate level files, pack directories or the shipped levels
+    tune                         Suggest [targets] from a level's reference solution (or --all)
     codegen                      Translate a program to C, C++ or Rust
     export                       Produce shareable solution text
     import <file>                Read shared solution text and print the canonical program
@@ -68,6 +69,7 @@ pub fn dispatch(argv: &[String]) -> Result<u8, String> {
         "run" => run(&args),
         "judge" => judge(&args),
         "validate" => validate(&args),
+        "tune" => tune(&args),
         "codegen" => codegen_cmd(&args),
         "export" => export(&args),
         "import" => import(&args),
@@ -454,5 +456,33 @@ fn import(args: &Args) -> Result<u8, String> {
     }
     print!("{}", imp.listing.to_text());
     let _ = asm::parse;
+    Ok(0)
+}
+
+fn tune(args: &Args) -> Result<u8, String> {
+    let c = campaign(args);
+    let levels: Vec<&Level> = if args.flag("all") {
+        c.all_levels().collect()
+    } else {
+        let id = args.opt("level").ok_or("tune needs --level <id> or --all")?;
+        vec![find_level(&c, id)?]
+    };
+    let mut out = Vec::new();
+    for l in levels {
+        let judge = Judge::new(l).map_err(|e| e.to_string())?;
+        let v = judge.judge(&l.reference_program().map_err(|e| e.to_string())?);
+        if !v.passed {
+            return Err(format!("the reference solution of {} does not pass", l.id));
+        }
+        let t = algoclerk_core::judge::suggest_targets(v.size, v.avg_steps);
+        if args.flag("json") {
+            out.push(json!({"level": l.id, "size_par": t.size_par, "size_ace": t.size_ace, "speed_par": t.speed_par, "speed_ace": t.speed_ace}));
+        } else {
+            println!("# {}\n[targets]\nsize_par = {}\nsize_ace = {}\nspeed_par = {}\nspeed_ace = {}\n", l.id, t.size_par, t.size_ace, t.speed_par, t.speed_ace);
+        }
+    }
+    if args.flag("json") {
+        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    }
     Ok(0)
 }

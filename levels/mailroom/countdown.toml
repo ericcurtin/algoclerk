@@ -1,0 +1,64 @@
+id = "countdown"
+title = "Liftoff"
+order = 8
+summary = "Count down from a number to 1."
+story = "The rocket-mail division needs a launch countdown for every shipment. BUMPDN subtracts one from a tile and leaves the new value in your hand, which is perfect for counting."
+statement = "The inbox holds a single value n. Output n, n-1, ..., 1."
+constraints = ["The inbox holds exactly one value n.", "1 <= n <= 12."]
+hints = [
+  "BUMPDN n lowers the value on tile n by one and picks up the new value.",
+  "After BUMPDN you are holding the new count. JUMPZ tells you whether you have reached zero.",
+  "Output first, then bump and test. Loop while the count is not zero.",
+]
+
+[[examples]]
+input = [3]
+output = [3, 2, 1]
+
+[machine]
+floor = 1
+names = ["count"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "bumpdn", "jump", "jumpz"]
+
+[tests]
+seed = 108
+[[tests.fixed]]
+input = [1]
+output = [1]
+[[tests.fixed]]
+input = [2]
+output = [2, 1]
+[[tests.fixed]]
+input = [12]
+output = [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+[[tests.generators]]
+count = 6
+inbox = [{ kind = "int", range = [1, 12] }]
+
+[targets]
+size_par = 7
+size_ace = 6
+speed_par = 33
+speed_ace = 22
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 0
+loop:
+    OUTBOX
+    BUMPDN 0
+    JUMPZ done
+    JUMP loop
+done:
+"""
+
+[code]
+function = "countdown"
+doc = "Counts down from n to 1."
+params = [{ name = "n", kind = "scalar" }]
+returns = "list"
+
+[explain]
+algorithm = "Counting loop"
+text = "A counter that is lowered each round and tested against zero is the skeleton of a `for` loop. Counting down to zero is also cheaper than counting up to a limit, because zero needs no comparison value."

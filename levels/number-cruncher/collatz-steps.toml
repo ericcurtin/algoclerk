@@ -1,0 +1,88 @@
+id = "collatz-steps"
+title = "Hailstone Express"
+order = 9
+summary = "Count the steps until the hailstone sequence reaches 1."
+story = "A parcel bounces between warehouses by a strange rule: if its number is even, halve it, otherwise triple it and add one. Dispatch wants to know how many bounces until it reaches the depot numbered 1."
+statement = "The inbox holds a number n. Repeat: if n is 1, stop; if n is even replace it by n/2; otherwise replace it by 3n + 1. Output how many replacements were made."
+constraints = ["1 <= n <= 30.", "Tile 1 holds 0, tile 2 holds 2, tile 3 holds 3 and tile 4 holds 1 at the start."]
+hints = [
+  "Compare n with 1 by subtracting the constant 1.",
+  "MOD 2 tells odd from even. Both branches end by storing the new n and counting a step.",
+  "Use MUL and ADD for the odd branch and DIV for the even branch.",
+]
+
+[[examples]]
+input = [6]
+output = [8]
+note = "6, 3, 10, 5, 16, 8, 4, 2, 1"
+
+[machine]
+floor = 5
+names = ["n", "steps", "two", "three", "one"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "mul", "div", "mod", "bumpup", "bumpdn", "jump", "jumpz", "jumpn"]
+[machine.prefill]
+1 = 0
+2 = 2
+3 = 3
+4 = 1
+
+[tests]
+seed = 309
+[[tests.fixed]]
+input = [1]
+output = [0]
+[[tests.fixed]]
+input = [2]
+output = [1]
+[[tests.fixed]]
+input = [27]
+output = [111]
+[[tests.fixed]]
+input = [16]
+output = [4]
+[[tests.generators]]
+count = 8
+inbox = [{ kind = "int", range = [1, 30] }]
+
+[targets]
+size_par = 23
+size_ace = 19
+speed_par = 551
+speed_ace = 367
+
+[solution]
+asm = """
+    INBOX
+    COPYTO 0
+loop:
+    COPYFROM 0
+    SUB 4
+    JUMPZ done
+    COPYFROM 0
+    MOD 2
+    JUMPZ even
+    COPYFROM 0
+    MUL 3
+    ADD 4
+    JUMP next
+even:
+    COPYFROM 0
+    DIV 2
+next:
+    COPYTO 0
+    BUMPUP 1
+    JUMP loop
+done:
+    COPYFROM 1
+    OUTBOX
+"""
+
+[code]
+function = "collatz_steps"
+doc = "Returns the number of steps the Collatz sequence of n needs to reach 1."
+params = [{ name = "n", kind = "scalar" }]
+returns = "scalar"
+
+[explain]
+algorithm = "Simulation of the Collatz iteration"
+text = "Nobody has proved that this loop always terminates, yet it does for every number ever tried. The clerk simply simulates the rule and counts."

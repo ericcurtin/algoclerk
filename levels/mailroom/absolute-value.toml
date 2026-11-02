@@ -1,0 +1,69 @@
+id = "absolute-value"
+title = "Never Negative"
+order = 6
+summary = "Output the absolute value of every number."
+story = "Red ink is banned in the Mail Room. Every figure must be shown as a plain, non-negative amount. JUMPN will make decisions for you: it jumps only when you are holding something below zero."
+statement = "For each value x in the inbox, output |x|, which is x if x >= 0 and -x otherwise."
+constraints = ["The inbox holds between 0 and 8 values.", "Every value is between -9 and 9.", "Tile 0 holds 0 at the start."]
+hints = [
+  "JUMPN label jumps when the hand holds a negative number, and does nothing otherwise.",
+  "Non-negative values can go straight to the outbox. Negative values take a detour that negates them first.",
+  "Negating needs the zero on tile 0 and a spare tile to park the value.",
+]
+
+[[examples]]
+input = [-3, 2, 0, -8]
+output = [3, 2, 0, 8]
+
+[machine]
+floor = 2
+names = ["zero", "x"]
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "jump", "jumpn"]
+[machine.prefill]
+0 = 0
+
+[tests]
+seed = 106
+[[tests.fixed]]
+input = []
+output = []
+[[tests.fixed]]
+input = [-9, 9, 0]
+output = [9, 9, 0]
+[[tests.fixed]]
+input = [-1]
+output = [1]
+[[tests.generators]]
+count = 8
+inbox = [{ kind = "list", len = [1, 8], range = [-9, 9] }]
+
+[targets]
+size_par = 11
+size_ace = 9
+speed_par = 29
+speed_ace = 19
+
+[solution]
+asm = """
+again:
+    INBOX
+    JUMPN negative
+    OUTBOX
+    JUMP again
+negative:
+    COPYTO 1
+    COPYFROM 0
+    SUB 1
+    OUTBOX
+    JUMP again
+"""
+
+[code]
+function = "abs_all"
+doc = "Replaces every value by its absolute value."
+params = [{ name = "values", kind = "list" }]
+returns = "list"
+
+[explain]
+algorithm = "Conditional branch"
+text = "A single `if x < 0` decides which path each value takes. Branching on the sign of a value is the most basic form of conditional logic."

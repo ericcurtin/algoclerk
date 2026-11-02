@@ -1,0 +1,61 @@
+id = "sum-pairs"
+title = "Two by Two"
+order = 4
+summary = "Add up each pair of envelopes."
+story = "Envelopes travel in pairs again, but this time the client wants a single combined figure for each pair."
+statement = "The inbox holds consecutive pairs (a, b). For each pair, output a + b."
+constraints = ["The inbox holds an even number of values, between 0 and 8.", "Every value is between -9 and 9."]
+hints = [
+  "Keep the first value of the pair on a tile, then ADD it to the second.",
+  "INBOX, COPYTO 0, INBOX, ADD 0, OUTBOX, then loop.",
+]
+
+[[examples]]
+input = [1, 2, 10, -4]
+output = [3, 6]
+
+[machine]
+floor = 1
+allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "jump"]
+
+[tests]
+seed = 104
+[[tests.fixed]]
+input = []
+output = []
+[[tests.fixed]]
+input = [9, 9]
+output = [18]
+[[tests.fixed]]
+input = [-9, 9, 0, 0]
+output = [0, 0]
+[[tests.generators]]
+count = 8
+inbox = [{ kind = "list", len = [2, 8], len_multiple = 2, range = [-9, 9] }]
+
+[targets]
+size_par = 7
+size_ace = 6
+speed_par = 17
+speed_ace = 11
+
+[solution]
+asm = """
+again:
+    INBOX
+    COPYTO 0
+    INBOX
+    ADD 0
+    OUTBOX
+    JUMP again
+"""
+
+[code]
+function = "pair_sums"
+doc = "Sums each consecutive pair of values."
+params = [{ name = "values", kind = "list" }]
+returns = "list"
+
+[explain]
+algorithm = "Pairwise reduction"
+text = "Combining neighbours two at a time is the simplest reduction. The same loop shape, with a longer window, gives sliding sums and chunked totals."
