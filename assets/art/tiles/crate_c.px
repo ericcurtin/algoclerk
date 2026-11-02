@@ -1,14 +1,17 @@
-# Crate 14x12; label plate is x2..11, y4..9 (numbers are drawn on it by the game).
-size: 14x12
-KKKKKKKKKKKKKK
-KEEEEEggEEEEEK
-KEEEEEggEEEEEK
-KnnnnnggnnnnnK
-KdWWWWWWWWWWnK
-KdWWWWWWWWWWnK
-KdWWWWWWWWWWnK
-KdWWWWWWWWWWnK
-KdWWWWWWWWWWnK
-KdwwwwwwwwwwnK
-KnnnnnggnnnnnK
-KKKKKKKKKKKKKK
+# Crate 16x15; the label plate is x2..13, y4..12 (the game prints the value on it).
+size: 16x15
+KKKKKKKKKKKKKKKK
+KEEEEEEggEEEEEEK
+KEEEEEEggEEEEEEK
+KnnnnnnggnnnnnnK
+KdWWWWWWWWWWWwnK
+KdWWWWWWWWWWWwnK
+KdWWWWWWWWWWWwnK
+KdWWWWWWWWWWWwnK
+KdWWWWWWWWWWWwnK
+KdWWWWWWWWWWWwnK
+KdWWWWWWWWWWWwnK
+KdWWWWWWWWWWWwnK
+KdwwwwwwwwwwwwnK
+KnnnnnnggnnnnnnK
+KKKKKKKggKKKKKKK

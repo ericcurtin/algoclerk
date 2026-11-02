@@ -1,6 +1,6 @@
 [package]
 name = "algoclerk-game"
-description = "AlgoClerk game"
+description = "Engine-agnostic AlgoClerk game: scenes, office, editor, UI, software renderer, headless scenarios"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,7 +10,9 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
-png.workspace = true
+algoclerk-core.workspace = true
+algoclerk-levels.workspace = true
+algoclerk-media.workspace = true
 
 [lints]
 workspace = true

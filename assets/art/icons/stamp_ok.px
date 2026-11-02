@@ -1,0 +1,11 @@
+# Outbox stamp: green disc with a tick (shape differs from the cross, so colour is never the only cue).
+size: 9x9
+...ggg...
+.ggggggg.
+.gggggXg.
+gggggXXgg
+ggXgXXggg
+ggXXXgggg
+.ggXgggg.
+.ggggggg.
+...ggg...

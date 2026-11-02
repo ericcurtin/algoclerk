@@ -151,7 +151,9 @@ dependencies = [
 name = "algoclerk-game"
 version = "0.1.0"
 dependencies = [
- "png",
+ "algoclerk-core",
+ "algoclerk-levels",
+ "algoclerk-media",
 ]
 
 [[package]]
@@ -172,6 +174,12 @@ dependencies = [
 [[package]]
 name = "algoclerk-tools"
 version = "0.1.0"
+dependencies = [
+ "algoclerk-core",
+ "algoclerk-game",
+ "algoclerk-levels",
+ "algoclerk-media",
+]
 
 [[package]]
 name = "allocator-api2"

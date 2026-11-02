@@ -1,6 +1,6 @@
 [package]
 name = "algoclerk-tools"
-description = "AlgoClerk tools"
+description = "AlgoClerk developer tools: art/font/music lint, contact sheets and headless screenshots"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,6 +8,12 @@ license = "Apache-2.0"
 authors.workspace = true
 repository.workspace = true
 publish.workspace = true
+
+[dependencies]
+algoclerk-core.workspace = true
+algoclerk-levels.workspace = true
+algoclerk-media.workspace = true
+algoclerk-game.workspace = true
 
 [lints]
 workspace = true

@@ -41,22 +41,38 @@ pub struct LevelRecord {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
-    /// `"light"`, `"dark"` or `"contrast"`.
+    /// Legacy (egui front end): `"light"`, `"dark"` or `"contrast"`. The pixel UI uses `palette`.
     pub theme: String,
-    /// Colour-blind friendly palette.
+    /// Legacy (egui front end): colour-blind friendly palette. The pixel UI uses `palette`.
     pub colorblind: bool,
-    /// Animation speed multiplier.
+    /// Legacy animation speed multiplier. The pixel UI uses `speed_level`.
     pub speed: f32,
-    /// Sound on.
+    /// Legacy master switch for sound effects. The pixel UI uses the volumes.
     pub sound: bool,
     /// Language code.
     pub language: String,
-    /// UI scale multiplier.
+    /// Legacy UI scale multiplier. The pixel UI uses `text_size`.
     pub text_scale: f32,
     /// Unlock every level.
     pub unlock_all: bool,
     /// `"c"`, `"cpp"` or `"rust"`.
     pub code_lang: String,
+    /// Pixel UI palette: `"warm"`, `"colorblind"` or `"contrast"`.
+    pub palette: String,
+    /// Clerk outfit as a compact code (empty means the default outfit).
+    pub outfit: String,
+    /// Skip decorative animation (idle motion, particles, wipes).
+    pub reduce_motion: bool,
+    /// Music volume 0..=10.
+    pub music_volume: u8,
+    /// Sound effect volume 0..=10.
+    pub sfx_volume: u8,
+    /// Reading text size: 1 or 2 (an integer scale of the pixel font).
+    pub text_size: u8,
+    /// Start in a borderless full-screen window (desktop).
+    pub fullscreen: bool,
+    /// Animation speed step 0..=4 (0 slowest, 4 = no animation).
+    pub speed_level: u8,
 }
 
 impl Default for Settings {
@@ -70,6 +86,14 @@ impl Default for Settings {
             text_scale: 1.0,
             unlock_all: false,
             code_lang: "rust".into(),
+            palette: "warm".into(),
+            outfit: String::new(),
+            reduce_motion: false,
+            music_volume: 6,
+            sfx_volume: 8,
+            text_size: 1,
+            fullscreen: false,
+            speed_level: 1,
         }
     }
 }

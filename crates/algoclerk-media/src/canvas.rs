@@ -246,6 +246,32 @@ impl Canvas {
         }
     }
 
+    /// Like [`Canvas::blit`] but letters found in `map` (`(from, to)`) are swapped first (recolouring icons).
+    pub fn blit_map(
+        &mut self,
+        s: &Sprite,
+        frame: usize,
+        pos: (i32, i32),
+        flip: bool,
+        pal: &Palette,
+        map: &[(char, char)],
+    ) {
+        let f = s.frame(frame);
+        for sy in 0..s.h {
+            for sx in 0..s.w {
+                let mut ch = f[sy * s.w + sx] as char;
+                if ch == '.' {
+                    continue;
+                }
+                if let Some((_, to)) = map.iter().find(|(from, _)| *from == ch) {
+                    ch = *to;
+                }
+                let dx = if flip { s.w - 1 - sx } else { sx } as i32;
+                self.set(pos.0 + dx, pos.1 + sy as i32, pal.col(ch));
+            }
+        }
+    }
+
     /// Like [`Canvas::blit`] but every opaque pixel is drawn in `color` (silhouettes, flashes).
     pub fn blit_tint(&mut self, s: &Sprite, frame: usize, x: i32, y: i32, flip: bool, color: Rgba) {
         let f = s.frame(frame);
