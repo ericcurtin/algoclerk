@@ -1,0 +1,18 @@
+# Clock face 16x16; centre pixel is (7.5,7.5); hands are drawn by the game from the step count.
+size: 16x16
+....KKnnnnKK....
+...KnnnnnnnnK...
+..nnnWWWKWWnnn..
+.KnnWWWWKWWWnnK.
+KnnWWWWWWWWWWnnK
+KnWWWWWWWWWWWWnK
+nnWWWWWWWWWWWWnn
+nnWWWWWWWWWWWWnn
+nnKKWWWWWWWWKKnn
+nnWWWWWWWWWWWWnn
+KnWWWWWWWWWWWWnK
+KnnWWWWWWWWWWnnK
+.KnnWWWWKWWWnnW.
+..nnnWWWKWWnnn..
+...KnnnnnnnnW...
+....KKnnnnKK....

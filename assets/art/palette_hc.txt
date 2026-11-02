@@ -1,0 +1,33 @@
+# High-contrast variant: pure black and white at the extremes, saturated mid colours, big luminance steps
+# between neighbours. Same letters as palette.txt.
+. = transparent
+K = #000000  ink (outlines, text)
+k = #14143c  slate navy
+m = #4a4aa0  dusk
+A = #e4e4f4  fog grey
+a = #8c8c98  steel grey
+W = #ffffff  paper
+w = #d2d2d2  paper shade, wallpaper
+E = #a8a8a8  kraft, wallpaper stripe
+y = #ffff00  yellow
+Y = #ffb000  signal amber
+o = #ff6a00  orange
+R = #ff2a1a  signal red
+r = #7a0000  brick red
+p = #ffb0c0  pink
+u = #8a30c8  plum
+g = #00d048  signal green
+G = #006a24  pine green
+l = #b4ff40  lime
+T = #00a0a0  carpet teal
+t = #003c3c  carpet deep teal
+c = #80ffff  aqua
+B = #2a64ff  blue
+b = #001a90  navy blue
+s = #b4e4ff  sky
+n = #a05414  desk brown
+N = #401800  walnut
+d = #ffc060  oak
+H = #ffe4c8  skin light
+S = #d49464  skin tan
+X = #ffffff  white

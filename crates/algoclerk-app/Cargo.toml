@@ -1,6 +1,6 @@
 [package]
 name = "algoclerk-app"
-description = "The AlgoClerk game: a thin egui front end over algoclerk-core"
+description = "The AlgoClerk game client (Bevy): window, input, audio and the shell around algoclerk-game"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,11 +9,11 @@ authors.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+# `rlib` for the desktop binary, `cdylib` for Android (loaded by GameActivity), `staticlib` for iOS.
 [lib]
 name = "algoclerk_app"
 path = "src/lib.rs"
-# cdylib: Android (NativeActivity). staticlib: iOS. rlib: desktop binary and tests.
-crate-type = ["cdylib", "staticlib", "rlib"]
+crate-type = ["rlib", "cdylib", "staticlib"]
 
 [[bin]]
 name = "algoclerk"
@@ -21,28 +21,33 @@ path = "src/main.rs"
 
 [features]
 default = []
-# Sound effects through rodio (needs ALSA headers on Linux: libasound2-dev / alsa-lib-devel).
-audio = ["dep:rodio"]
+# Sound output through Bevy's audio (cpal). On Linux this needs the ALSA headers
+# (libasound2-dev / alsa-lib-devel); everything else builds and runs without it.
+audio = ["bevy/bevy_audio", "bevy/wav"]
+# Android activity flavour (selected by mobile/android through cargo-ndk).
+android-game-activity = ["bevy/android-game-activity"]
+android-native-activity = ["bevy/android-native-activity"]
 
 [dependencies]
 algoclerk-core = { workspace = true }
 algoclerk-levels.workspace = true
-serde_json.workspace = true
-eframe = { version = "=0.37.0", default-features = false, features = [
-    "wgpu",
-    "clipboard",
-    "persistence",
+algoclerk-media = { path = "../algoclerk-media" }
+algoclerk-game = { path = "../algoclerk-game" }
+# Bevy 0.19.1 (same pin as the sibling project Falabichos): the newest release that builds with rustc 1.95.
+# Default features are OFF; only 2D sprite rendering, windowing, input and gamepads are enabled.
+# No web or wasm features.
+bevy = { version = "=0.19.1", default-features = false, features = [
+  "std", "async_executor", "multi_threaded", "bevy_log", "bevy_asset",
+  "bevy_window", "bevy_winit", "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_sprite_render",
+  "bevy_camera", "bevy_color", "bevy_image", "png", "bevy_gilrs",
 ] }
-png = "0.18"
-rodio = { version = "0.23", default-features = false, features = ["playback"], optional = true }
 
-# Wayland and X11 only exist on Linux and the BSDs.
-[target.'cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))'.dependencies]
-eframe = { version = "=0.37.0", default-features = false, features = ["wayland", "x11"] }
+[target.'cfg(target_os = "linux")'.dependencies]
+bevy = { version = "=0.19.1", default-features = false, features = ["x11", "wayland"] }
 
-[target.'cfg(target_os = "android")'.dependencies]
-eframe = { version = "=0.37.0", default-features = false, features = ["android-native-activity"] }
-android-activity = { version = "0.6", default-features = false, features = ["native-activity"] }
+# System clipboard on the three desktop platforms (the mobile builds keep an in-app clipboard).
+[target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
+arboard = { version = "3", default-features = false }
 
 [lints]
 workspace = true

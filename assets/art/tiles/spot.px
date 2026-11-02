@@ -1,0 +1,35 @@
+# Marked floor square: frame 0 normal, frame 1 pickable highlight.
+size: 16x16
+YYYyyyyyyyyyyYYY
+YcYccccccccccYYY
+YYYccccccccccYYY
+yccccccccccccccy
+yccccccccccccccy
+yccccccccccccccy
+yccccccccccccccy
+yccccccccccccccy
+yccccccccccccccy
+yccccccccccccccy
+yccccccccccccccy
+yccccccccccccccy
+yccccccccccccccy
+YYYccccccccccYYY
+YYYTTTTTTTTTTYYY
+YYYyyyyyyyyyyYYY
+---
+yyyXXXXXXXXXXyyy
+yWyXXXXXXXXXWyyy
+yyyWWWWWWWWWWyyy
+XXWWWWWWWWWWWWXX
+XXWWWWWWWWWWWWXX
+XXWWWWWWWWWWWWXX
+XXWWWWWWWWWWWWXX
+XXWWWWWWWWWWWWXX
+XXWWWWWWWWWWWWXX
+XXWWWWWWWWWWWWXX
+XXWWWWWWWWWWWWXX
+XXWWWWWWWWWWWWXX
+XWWWWWWWWWWWWWXX
+yyyWWWWWWWWWWyyy
+yyyXXXXXXXXXXyyy
+yyyXXXXXXXXXXyyy

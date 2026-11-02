@@ -1,0 +1,7 @@
+# Clerk outfit presets (the picker in Settings starts from these; every role can then be changed).
+# body = template id (art/clerk/_body_<id>.px); roles take palette letters.
+clerk:    body=a hair=N skin=H shirt=B pants=k shoes=K extra=R
+intern:   body=b hair=Y skin=S shirt=g pants=n shoes=N extra=W
+manager:  body=a hair=K skin=n shirt=W pants=K shoes=N extra=r
+archivist: body=b hair=A skin=H shirt=u pants=m shoes=K extra=y
+night-shift: body=a hair=R skin=d shirt=k pants=K shoes=A extra=Y
