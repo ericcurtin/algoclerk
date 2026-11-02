@@ -425,19 +425,29 @@ impl Parser<'_> {
             return Ok(args);
         }
         loop {
-            let value = match self.tok().map(|t| &t.kind) {
-                Some(Tok::Int { value, .. }) => Some(*value),
-                Some(Tok::Ident(n)) if !self.is_known_type(n) && !self.at_punct_at(1, "::") => {
-                    self.consts.get(n).and_then(|v| u64::try_from(*v).ok())
+            let numeric = match self.tok().map(|t| &t.kind) {
+                Some(Tok::Int { .. } | Tok::Punct("(" | "-")) => true,
+                Some(Tok::Ident(n)) => {
+                    self.consts.contains_key(n)
+                        && !self.is_known_type(n)
+                        && !self.at_punct_at(1, "::")
                 }
-                _ => None,
+                _ => false,
             };
-            if let Some(v) = value {
-                let Ok(v) = i64::try_from(v) else {
-                    return Err(self.expected("a smaller number"));
-                };
-                self.bump();
-                args.push(TArg::Int(v));
+            if numeric {
+                // `5`, `N`, `N + 1`, `2 * N`: a small constant expression
+                let at = self.cur_span();
+                let e = self.parse_bin(BinOp::Add.prec())?;
+                match self.const_eval(&e, 0) {
+                    Some(v) if v >= 0 => args.push(TArg::Int(v)),
+                    _ => {
+                        return Err(Diag::at(
+                            self.span_from(at.start),
+                            "parse.expected",
+                            "I expected a plain number here (a size must be a number or a `const` declared above)",
+                        ));
+                    }
+                }
             } else if matches!(self.tok().map(|t| &t.kind), Some(Tok::Ident(n))
                 if !self.is_known_type(n) && n != "std" && !is_std_type_name(n))
             {

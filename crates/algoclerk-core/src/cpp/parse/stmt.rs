@@ -551,7 +551,8 @@ impl Parser<'_> {
         Ok(StmtKind::Decl { spec, vars })
     }
 
-    /// `a = 1, b(2), c[3] = {}` after a type.
+    /// `a = 1, b(2), c[3] = {}` after a type. After a pointer type every name repeats the stars:
+    /// `ListNode *slow = head, *fast = head`.
     pub(crate) fn parse_declarators(&mut self, spec: &TypeSpec) -> PResult<Vec<Declarator>> {
         let mut vars = Vec::new();
         loop {
@@ -559,15 +560,41 @@ impl Parser<'_> {
             if !self.at_punct(",") {
                 break;
             }
-            if matches!(spec.ty, Ty::Ptr(_)) || spec.is_ref {
+            if spec.is_ref || (spec.konst && matches!(spec.ty, Ty::Ptr(_))) {
                 return Err(self.unsupported(
                     self.cur_span(),
-                    "several names after a pointer or reference type (declare one per line)",
+                    "several names after a reference or `const` pointer type (declare one per line)",
                 ));
             }
             self.bump();
+            self.eat_stars(&spec.ty)?;
         }
         Ok(vars)
+    }
+
+    /// The `*`s a further name needs after a pointer type (none for other types).
+    pub(crate) fn eat_stars(&mut self, ty: &Ty) -> PResult<()> {
+        let mut depth = 0;
+        let mut t = ty;
+        while let Ty::Ptr(inner) = t {
+            depth += 1;
+            t = inner;
+        }
+        for _ in 0..depth {
+            if !self.eat_punct("*") {
+                return Err(self.unsupported(
+                    self.cur_span(),
+                    "a name without `*` after a pointer type (declare one per line)",
+                ));
+            }
+        }
+        if depth == 0 && (self.at_punct("*") || self.at_punct("&")) {
+            return Err(self.unsupported(
+                self.cur_span(),
+                "a pointer or reference name after a plain type (declare one per line)",
+            ));
+        }
+        Ok(())
     }
 
     fn parse_declarator(&mut self) -> PResult<Declarator> {
@@ -664,7 +691,7 @@ impl Parser<'_> {
     }
 
     /// Value of a small constant expression (integer literals, known constants, `+ - * / % <<`).
-    fn const_eval(&self, e: &Expr, depth: u32) -> Option<i64> {
+    pub(crate) fn const_eval(&self, e: &Expr, depth: u32) -> Option<i64> {
         if depth > 32 {
             return None;
         }

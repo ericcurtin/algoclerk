@@ -310,13 +310,14 @@ impl Parser<'_> {
             if !self.at_punct(",") {
                 break;
             }
-            if matches!(spec.ty, Ty::Ptr(_)) || spec.is_ref {
+            if spec.is_ref || (spec.konst && matches!(spec.ty, Ty::Ptr(_))) {
                 return Err(self.unsupported(
                     self.cur_span(),
-                    "several names after a pointer or reference type (declare one per line)",
+                    "several names after a reference or `const` pointer type (declare one per line)",
                 ));
             }
             self.bump();
+            self.eat_stars(&spec.ty)?;
         }
         self.expect_punct(";")
     }

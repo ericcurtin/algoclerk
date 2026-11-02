@@ -180,7 +180,7 @@ impl Parser<'_> {
     }
 
     /// Binary operators of precedence `min` and tighter, left associative (precedence climbing).
-    fn parse_bin(&mut self, min: u8) -> PResult<Expr> {
+    pub(crate) fn parse_bin(&mut self, min: u8) -> PResult<Expr> {
         let mut lhs = self.parse_unary()?;
         let mut extra = 0;
         loop {
