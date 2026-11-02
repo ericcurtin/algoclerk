@@ -9,10 +9,11 @@ produced with `cargo deny list`.
 
 ### Dual-licensed dependencies
 
-Two dependencies offer a copyleft licence as one alternative of an `OR` expression:
-`self_cell` (`Apache-2.0 OR GPL-2.0-only`) and `r-efi` (`MIT OR Apache-2.0 OR LGPL-2.1-or-later`).
-AlgoClerk uses them under their permissive alternative (Apache-2.0 or MIT), which `cargo deny`
-accepts because `deny.toml` does not allow the copyleft alternatives.
+`self_cell` (a dependency of the text layout stack inside egui) is licensed
+`Apache-2.0 OR GPL-2.0-only`. AlgoClerk uses it under the Apache-2.0 alternative, which `cargo deny`
+accepts because `deny.toml` does not allow the copyleft alternative. (`r-efi`, which appears in
+`Cargo.lock` only for UEFI targets, has the same kind of expression and is not part of any supported
+build.)
 
 ## Fonts
 
