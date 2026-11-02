@@ -23,8 +23,8 @@ int stampDuty(int price, int qty) {
 '''
 
 [medals]
-size = [28, 22, 17]
-speed = [23, 13, 10]
+size = [31, 24, 19]
+speed = [35, 19, 14]
 
 [[examples]]
 args = ["5", "3"]

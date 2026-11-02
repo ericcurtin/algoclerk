@@ -36,8 +36,8 @@ ListNode* reverseList(ListNode* head) {
 large_steps = 2000000
 
 [medals]
-size = [37, 29, 23]
-speed = [101, 54, 38]
+size = [44, 34, 27]
+speed = [223, 119, 83]
 
 [[examples]]
 args = ["{1, 2, 3}"]

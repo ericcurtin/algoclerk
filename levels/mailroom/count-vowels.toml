@@ -29,8 +29,8 @@ int countVowels(const std::string& s) {
 '''
 
 [medals]
-size = [21, 17, 13]
-speed = [376, 201, 139]
+size = [34, 27, 21]
+speed = [422, 225, 156]
 
 [[examples]]
 args = ['"hello"']

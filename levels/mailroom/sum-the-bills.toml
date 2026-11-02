@@ -29,8 +29,8 @@ int sumTheBills(const std::vector<int>& bills) {
 '''
 
 [medals]
-size = [15, 12, 9]
-speed = [71, 38, 27]
+size = [18, 14, 11]
+speed = [77, 41, 29]
 
 [[examples]]
 args = ["{3, 4, 5}"]

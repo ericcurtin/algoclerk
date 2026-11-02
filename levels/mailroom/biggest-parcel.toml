@@ -34,8 +34,8 @@ int biggestParcel(const std::vector<int>& weights) {
 '''
 
 [medals]
-size = [24, 19, 15]
-speed = [72, 39, 28]
+size = [29, 23, 18]
+speed = [81, 44, 31]
 
 [[examples]]
 args = ["{3, 9, 4}"]

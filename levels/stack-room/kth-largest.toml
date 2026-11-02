@@ -56,8 +56,8 @@ int kthLargest(const std::vector<int>& nums, int k) {
 large_steps = 3000000
 
 [medals]
-size = [34, 27, 21]
-speed = [191, 102, 71]
+size = [40, 32, 25]
+speed = [196, 105, 73]
 
 [[examples]]
 args = ["{3, 2, 1, 5, 6, 4}", "2"]

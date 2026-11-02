@@ -36,8 +36,8 @@ int maxDepth(TreeNode* root) {
 large_steps = 3000000
 
 [medals]
-size = [26, 20, 16]
-speed = [156, 83, 59]
+size = [32, 25, 20]
+speed = [238, 127, 89]
 
 [[examples]]
 args = ["{3, 9, 20, nullptr, nullptr, 15, 7}"]

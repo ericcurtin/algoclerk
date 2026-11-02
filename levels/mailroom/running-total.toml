@@ -45,8 +45,8 @@ std::vector<int> runningTotal(const std::vector<int>& nums) {
 '''
 
 [medals]
-size = [24, 19, 15]
-speed = [97, 52, 37]
+size = [28, 22, 17]
+speed = [100, 54, 38]
 
 [[examples]]
 args = ["{1, 2, 3, 4}"]

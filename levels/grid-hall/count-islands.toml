@@ -60,8 +60,8 @@ int countIslands(const std::vector<std::vector<char>>& grid) {
 large_steps = 3000000
 
 [medals]
-size = [197, 154, 123]
-speed = [1788, 954, 657]
+size = [312, 244, 195]
+speed = [2472, 1318, 908]
 
 [[examples]]
 args = ["{{'1', '1', '0'}, {'0', '1', '0'}, {'0', '0', '1'}}"]

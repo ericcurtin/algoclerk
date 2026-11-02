@@ -31,8 +31,8 @@ std::string reverseLabel(const std::string& s) {
 '''
 
 [medals]
-size = [26, 20, 16]
-speed = [108, 58, 41]
+size = [36, 28, 22]
+speed = [210, 112, 78]
 
 [[examples]]
 args = ['"stamp"']

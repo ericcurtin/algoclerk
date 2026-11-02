@@ -34,8 +34,8 @@ std::vector<std::string> fizzMemo(int n) {
 '''
 
 [medals]
-size = [71, 55, 44]
-speed = [587, 314, 217]
+size = [90, 70, 56]
+speed = [711, 379, 262]
 
 [[examples]]
 args = ["5"]
