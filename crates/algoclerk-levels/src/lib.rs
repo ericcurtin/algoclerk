@@ -47,6 +47,36 @@ impl Campaign {
         Campaign::from_files(&embedded_files())
     }
 
+    /// The shipped levels with every `<pack>/<file>.toml` found under `root` replacing the embedded file
+    /// of the same relative path (new files are added). Used by tools to try edited levels without a
+    /// rebuild.
+    pub fn shipped_overlaid(root: &Path) -> Campaign {
+        let mut files = embedded_files();
+        if let Ok(packs) = std::fs::read_dir(root) {
+            for pack in packs.filter_map(Result::ok) {
+                let pname = pack.file_name().to_string_lossy().to_string();
+                let Ok(rd) = std::fs::read_dir(pack.path()) else {
+                    continue;
+                };
+                for f in rd.filter_map(Result::ok) {
+                    let fname = f.file_name().to_string_lossy().to_string();
+                    if !fname.ends_with(".toml") {
+                        continue;
+                    }
+                    let Ok(text) = std::fs::read_to_string(f.path()) else {
+                        continue;
+                    };
+                    let rel = format!("{pname}/{fname}");
+                    match files.iter_mut().find(|(p, _)| *p == rel) {
+                        Some(slot) => slot.1 = text,
+                        None => files.push((rel, text)),
+                    }
+                }
+            }
+        }
+        Campaign::from_files(&files)
+    }
+
     /// Build a campaign from `(relative path, contents)` pairs such as `basics/echo.toml`.
     pub fn from_files(files: &[(String, String)]) -> Campaign {
         let mut c = Campaign::default();

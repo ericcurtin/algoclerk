@@ -69,10 +69,11 @@ pub fn dispatch(argv: &[String]) -> Result<u8, String> {
 
 /// Load the shipped campaign (plus an optional extra directory).
 pub fn campaign(args: &Args) -> Campaign {
-    let mut c = Campaign::shipped();
-    if let Some(dir) = args.opt("levels") {
-        c.load_dir(Path::new(dir));
-    }
+    // `--levels DIR`: files under DIR replace the embedded files of the same pack/name (new ones are added)
+    let c = match args.opt("levels") {
+        Some(dir) => Campaign::shipped_overlaid(Path::new(dir)),
+        None => Campaign::shipped(),
+    };
     for e in &c.load_errors {
         eprintln!("warning: {e}");
     }
@@ -378,7 +379,10 @@ fn tune(args: &Args) -> Result<u8, String> {
             args.positional.first().ok_or("usage: tune LEVEL|--all")?,
         )?]
     };
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels");
+    let root = match args.opt("levels") {
+        Some(dir) => Path::new(dir).to_path_buf(),
+        None => Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels"),
+    };
     for l in levels {
         let j = match Judge::new(l) {
             Ok(j) => j,
