@@ -2,12 +2,7 @@
 resolver = "3"
 members = [
     "crates/algoclerk-core",
-    "crates/algoclerk-levels",
-    "crates/algoclerk-cli",
     "crates/algoclerk-media",
-    "crates/algoclerk-game",
-    "crates/algoclerk-tools",
-    "crates/algoclerk-app",
 ]
 
 [workspace.package]
