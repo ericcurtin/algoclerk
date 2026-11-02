@@ -253,6 +253,8 @@ mod tests {
         assert!(!c.pack_unlocked(&p, 1));
         p.record_mut("one").solved = true;
         assert!(c.level_unlocked(&p, 0, 1));
+        assert!(!c.pack_unlocked(&p, 1), "one of two levels is below the 60% threshold");
+        p.record_mut("two").solved = true;
         assert!(c.pack_unlocked(&p, 1));
         p.settings.unlock_all = true;
         assert!(c.level_unlocked(&p, 1, 0));
