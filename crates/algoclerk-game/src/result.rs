@@ -250,19 +250,23 @@ impl ResultScreen {
     pub fn draw(&self, g: &mut Gfx<'_>, v: &View<'_>) {
         let vp = v.vp;
         g.rect(vp.screen(), 'k');
-        // slow confetti behind the panel
-        if !v.progress.settings.reduce_motion {
-            for i in 0..40u32 {
-                let x = ((i * 37 + 11) % vp.w as u32) as i32;
-                let y = ((i * 53 + self.t * (1 + i % 3)) % vp.h as u32) as i32;
+        let l = layout(&vp);
+        g.panel(l.panel, 'W');
+        if self.stage == Stage::Victory && !v.progress.settings.reduce_motion {
+            // slow confetti drifting down inside the memo
+            for i in 0..46u32 {
+                let x =
+                    l.panel.x + 4 + ((i * 131 + i * i * 17 + 29) % (l.panel.w as u32 - 8)) as i32;
+                let y = l.panel.y
+                    + 16
+                    + ((i * 89 + (i * i) % 23 * 7 + self.t * (1 + i % 3)) % (l.panel.h as u32 - 40))
+                        as i32;
                 g.rect(
                     Rect::new(x, y, 2, 3),
                     ['R', 'y', 'g', 'B', 'p', 'c'][(i % 6) as usize],
                 );
             }
         }
-        let l = layout(&vp);
-        g.panel(l.panel, 'W');
         match self.stage {
             Stage::Victory => self.draw_victory(g, v, &l),
             Stage::Code => self.draw_code(g, v, &l),
@@ -370,6 +374,21 @@ impl ResultScreen {
                 }
             }
         }
+        let solved = v
+            .campaign
+            .all_levels()
+            .filter(|lv| v.progress.record(&lv.id).solved)
+            .count();
+        let total = v.campaign.level_count();
+        let tl = v.tr.format(
+            "result.totals",
+            &[
+                ("solved", solved.to_string()),
+                ("total", total.to_string()),
+                ("stars", v.progress.total_stars().to_string()),
+            ],
+        );
+        g.text_c(p.x + p.w / 2, l.next.y - 14, &tl, 'k', 1);
         if self.new_best {
             g.text_r(p.right() - 8, p.y + 20, &v.tr.t("result.new_best"), 'R', 1);
         }

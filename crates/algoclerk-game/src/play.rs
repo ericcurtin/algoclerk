@@ -411,7 +411,7 @@ impl Play {
                     cx.sfx("correct");
                 } else {
                     cx.sfx("wrong");
-                    self.office.oops("That is not what the memo asked for.");
+                    self.office.oops(&cx.tr.t("play.mismatch_bubble"));
                 }
             }
         }
@@ -626,39 +626,52 @@ impl Play {
             return Some(Nav::Victory);
         }
         cx.sfx("wrong");
+        let t = |k: &str| cx.tr.t(k);
         let (msg, bubble) = if let Some(d) = v.diags.first() {
             (d.msg.clone(), friendly(&d.msg))
         } else if let Some(f) = &v.failure {
-            let args = f.case.args.join(", ");
-            let args = clip(&args, 60);
+            let args = clip(&f.case.args.join(", "), 60);
             match f.kind {
                 FailKind::Wrong => (
-                    format!(
-                        "For ({args}) I expected {} but got {}.",
-                        f.case.expect,
-                        f.got.clone().unwrap_or_default()
+                    cx.tr.format(
+                        "play.expected_got",
+                        &[
+                            ("args", args),
+                            ("want", f.case.expect.clone()),
+                            ("got", f.got.clone().unwrap_or_default()),
+                        ],
                     ),
-                    "My answer does not match the memo!".to_string(),
+                    t("play.wrong_bubble"),
                 ),
                 FailKind::TimeLimit => (
-                    format!(
-                        "The clock ran out on {} test. {}",
-                        if f.case.large { "a big" } else { "a" },
-                        level.technique_hint()
+                    cx.tr.format(
+                        "play.too_slow",
+                        &[
+                            (
+                                "which",
+                                if f.case.large {
+                                    t("play.big")
+                                } else {
+                                    t("play.a")
+                                },
+                            ),
+                            ("technique", level.technique.clone()),
+                        ],
                     ),
-                    "Too slow! The big job is still unfinished.".to_string(),
+                    t("play.slow_bubble"),
                 ),
-                FailKind::MemoryLimit => (
-                    "Too much shelf space used.".to_string(),
-                    "The shelves are full!".to_string(),
-                ),
+                FailKind::MemoryLimit => (t("play.memory"), t("play.memory_bubble")),
                 FailKind::Error => {
                     let m = f.error.as_ref().map(|e| e.msg.clone()).unwrap_or_default();
-                    (format!("For ({args}): {m}"), m)
+                    (
+                        cx.tr
+                            .format("play.error_for", &[("args", args), ("msg", m.clone())]),
+                        m,
+                    )
                 }
             }
         } else {
-            ("Something is not right.".to_string(), "Hmm.".to_string())
+            (t("play.not_right"), t("play.hmm"))
         };
         self.status = Some((msg, true));
         self.office.oops(&bubble);
@@ -813,14 +826,4 @@ pub fn friendly(msg: &str) -> String {
     let first = msg.split(['.', '!']).next().unwrap_or(msg);
     let t: String = first.chars().take(60).collect();
     format!("{t}!")
-}
-
-trait TechniqueHint {
-    fn technique_hint(&self) -> String;
-}
-
-impl TechniqueHint for algoclerk_core::level::Level {
-    fn technique_hint(&self) -> String {
-        format!("The memo hints at: {}.", self.technique)
-    }
 }
