@@ -4,9 +4,11 @@
 
 use crate::gfx::{Gfx, Kind, State, clip};
 use crate::layout::{Hit, Viewport};
+use crate::syntax;
 use crate::ui::{Ctx, View, widget_state};
 use crate::value_view;
-use algoclerk_core::lang::value::{NodeData, parse_value};
+use crate::words;
+use algoclerk_core::cpp::value::{Heap, parse_value};
 use algoclerk_core::level::Level;
 use algoclerk_core::progress::LevelRecord;
 use algoclerk_media::{Font, Rect};
@@ -169,16 +171,7 @@ impl Memo {
                 para(g, &mut y, &level.story, 'k');
                 h(g, &mut y, &v.tr.t("brief.task"));
                 para(g, &mut y, &level.statement, 'K');
-                g.round_rect(Rect::new(x, y, m.body.w - 4, 24), 'K', 'k');
-                let sig = level.signature.text();
-                for (i, l) in Font::wrap(&sig, cols.saturating_sub(2))
-                    .iter()
-                    .take(2)
-                    .enumerate()
-                {
-                    g.text(x + 4, y + 4 + i as i32 * 9, l, 'y');
-                }
-                y += 28;
+                code_boxes(g, level, x, &mut y, m.body.w - 4, cols);
                 h(g, &mut y, &v.tr.t("brief.constraints"));
                 for c in &level.constraints {
                     for (i, l) in Font::wrap(c, cols.saturating_sub(2)).iter().enumerate() {
@@ -190,14 +183,14 @@ impl Memo {
             }
             1 => {
                 h(g, &mut y, &v.tr.t("brief.examples"));
-                let mut nodes = vec![NodeData::default()];
                 for (n, ex) in level.examples.iter().take(4).enumerate() {
                     g.text(x, y, &format!("#{}", n + 1), 'k');
                     y += 9;
+                    let mut heap = Heap::default();
                     let mut ws = Vec::new();
                     for (a, lit) in level.signature.params.iter().zip(ex.args.iter()) {
-                        if let Ok(val) = parse_value(lit, &a.ty, &mut nodes) {
-                            ws.push(value_view::build(&val, &a.ty, &nodes, 110));
+                        if let Ok(val) = parse_value(lit, &a.spec.ty, &mut heap) {
+                            ws.push(value_view::build(&val, &a.spec.ty, &heap, 110));
                         }
                     }
                     let mut cx = x + 2;
@@ -208,8 +201,9 @@ impl Memo {
                         cx += w.w + 6;
                         row_h = row_h.max(w.h + 6);
                     }
-                    if let Ok(val) = parse_value(&ex.expect, &level.signature.ret, &mut nodes) {
-                        let w = value_view::build(&val, &level.signature.ret, &nodes, 100);
+                    let ret = &level.signature.ret.ty;
+                    if let Ok(val) = parse_value(&ex.expect, ret, &mut heap) {
+                        let w = value_view::build(&val, ret, &heap, 100);
                         g.icon("right", cx, y + 6, 'k');
                         w.draw(g, cx + 12, y + 5, false);
                         row_h = row_h.max(w.h + 6);
@@ -241,11 +235,24 @@ impl Memo {
                     g.text(*cx + 4 + if lock { 9 } else { 0 }, *y + 2, label, 'K');
                     *cx += w + 3;
                 };
-                for t in level.allowed_types() {
-                    chip(g, &mut cx, &mut y, &t, 'c', false);
+                let included = included_headers(&level.prelude);
+                if !included.is_empty() {
+                    g.text(x, y, words::INCLUDED, 'k');
+                    y += 11;
+                    for h in &included {
+                        chip(g, &mut cx, &mut y, h, 'A', false);
+                    }
+                    y += 16;
+                    cx = x;
                 }
-                for b in &level.builtins {
-                    chip(g, &mut cx, &mut y, b, 'g', false);
+                g.text(x, y, words::HEADERS, 'k');
+                y += 11;
+                if level.unlocked.is_empty() {
+                    chip(g, &mut cx, &mut y, "none", 'A', false);
+                }
+                for h in &level.unlocked {
+                    let label = if h == "*" { "every header" } else { h.as_str() };
+                    chip(g, &mut cx, &mut y, label, 'g', false);
                 }
                 y += 16;
                 if level.helpers || level.recursion {
@@ -410,4 +417,53 @@ impl Memo {
 
 fn inr(r: &Rect, p: (i32, i32)) -> bool {
     p.0 >= r.x && p.0 < r.right() && p.1 >= r.y && p.1 < r.bottom()
+}
+
+/// The headers a prelude includes, as written (`<vector>`).
+fn included_headers(prelude: &str) -> Vec<String> {
+    prelude
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("#include"))
+        .map(|h| h.trim().to_string())
+        .collect()
+}
+
+/// The read-only prelude and the signature the player has to write, drawn as two code boxes.
+fn code_boxes(g: &mut Gfx<'_>, level: &Level, x: i32, y: &mut i32, w: i32, cols: usize) {
+    let prelude = level.prelude.trim();
+    if !prelude.is_empty() {
+        g.text(x, *y, words::OFFICE_SUPPLIES, 'k');
+        *y += 10;
+        let lines = syntax::lines(prelude, syntax::dark, 'W');
+        let h = lines.len() as i32 * 9 + 6;
+        g.round_rect(Rect::new(x, *y, w, h), 'k', 'K');
+        for (i, l) in lines.iter().enumerate() {
+            let mut cx = x + 4;
+            let mut used = 0usize;
+            for (t, c) in l {
+                let room = cols.saturating_sub(2).saturating_sub(used);
+                let t: String = t.chars().take(room).collect();
+                g.text(cx, *y + 3 + i as i32 * 9, &t, *c);
+                cx += t.chars().count() as i32 * 6;
+                used += t.chars().count();
+            }
+        }
+        *y += h + 4;
+    }
+    g.text(x, *y, words::YOU_WRITE, 'k');
+    *y += 10;
+    let sig = format!("{} {{", level.signature_text);
+    let lines = Font::wrap(&sig, cols.saturating_sub(2));
+    let h = (lines.len() as i32 + 1) * 9 + 6;
+    g.round_rect(Rect::new(x, *y, w, h), 'K', 'k');
+    let hl = syntax::lines(&lines.join("\n"), syntax::dark, 'W');
+    for (i, l) in hl.iter().enumerate() {
+        let mut cx = x + 4;
+        for (t, c) in l {
+            g.text(cx, *y + 3 + i as i32 * 9, t, *c);
+            cx += t.chars().count() as i32 * 6;
+        }
+    }
+    g.text(x + 4, *y + 3 + lines.len() as i32 * 9, "}", 'A');
+    *y += h + 4;
 }

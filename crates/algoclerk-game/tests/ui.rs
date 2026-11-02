@@ -3,10 +3,8 @@
 //! virtual screen at several window sizes, the pixel font covers every string and every generated code
 //! sample, and the software renderer is deterministic and close to stored coarse "golden" maps.
 
-use algoclerk_core::codegen::{Lang, generate};
 use algoclerk_core::i18n;
 use algoclerk_core::judge::Judge;
-use algoclerk_core::lang::run::compile;
 use algoclerk_game::layout::{TOUCH_MIN, choose};
 use algoclerk_game::scenarios::{NAMES, Spec, build, render};
 use algoclerk_game::{Game, GameConfig, MemoryStorage};
@@ -144,7 +142,7 @@ fn the_pixel_font_covers_every_shipped_string() {
 }
 
 #[test]
-fn the_pixel_font_covers_all_level_text_and_all_generated_code() {
+fn the_pixel_font_covers_all_level_text_and_all_reference_code() {
     let b = bank();
     let campaign = Campaign::shipped();
     let mut missing: Vec<String> = Vec::new();
@@ -155,7 +153,8 @@ fn the_pixel_font_covers_all_level_text_and_all_generated_code() {
             level.statement.clone(),
             level.technique.clone(),
             level.big_o.clone(),
-            level.signature.text(),
+            level.signature_text.clone(),
+            level.prelude.clone(),
         ];
         texts.extend(level.constraints.iter().cloned());
         texts.extend(level.hints.iter().cloned());
@@ -167,13 +166,7 @@ fn the_pixel_font_covers_all_level_text_and_all_generated_code() {
                 .chain([e.expect.clone(), e.note.clone()])
         }));
         texts.push(level.reference.clone());
-        if let Ok(c) = compile(&level.reference, &level.check_opts()) {
-            for lang in Lang::ALL {
-                let g = generate(&c, lang, &level.signature.name);
-                texts.push(g.prelude);
-                texts.push(g.code);
-            }
-        }
+        texts.extend(level.naive.iter().cloned());
         for t in texts {
             let m = b.font.missing(&t.replace('\n', " "));
             if !m.is_empty() {

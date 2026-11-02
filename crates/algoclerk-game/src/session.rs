@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: Apache-2.0
 //! One play session: the program (text is the source of truth), undo history, the compiled form with
 //! diagnostics, the recorded run that the office scene replays, and the verdict.
+//!
+//! The text held by the session is the player's part only (own includes, helpers and the function). The
+//! level's prelude (includes and structs) is read-only and is prepended whenever the text is compiled.
 
 use crate::blocks;
 use crate::textedit::TextEdit;
+use algoclerk_core::cpp::ast::{ItemKind, Program, Ty};
+use algoclerk_core::cpp::check::CheckOpts;
+use algoclerk_core::cpp::diag::{Diag, line_col};
+use algoclerk_core::cpp::interp::{Limits, RtError};
+use algoclerk_core::cpp::parse::{ParseOpts, known_types, parse};
+use algoclerk_core::cpp::run::{Compiled, compile};
+use algoclerk_core::cpp::value::{Heap, Plain};
 use algoclerk_core::judge::{Judge, Verdict};
-use algoclerk_core::lang::ast::{Program, Ty};
-use algoclerk_core::lang::check::{Allowed, CheckOpts};
-use algoclerk_core::lang::diag::Diag;
-use algoclerk_core::lang::interp::{Limits, RtError};
-use algoclerk_core::lang::run::{Compiled, compile};
-use algoclerk_core::lang::value::{NodeData, Value};
 use algoclerk_core::level::Level;
 use std::sync::Arc;
 
@@ -21,10 +25,14 @@ pub struct Frame {
     pub node: u32,
     /// Cumulative abstract cost.
     pub cost: u64,
-    /// Name, type and value of every declared local.
-    pub vars: Vec<(String, Ty, Value)>,
+    /// Call depth of the running function (0 for the entry function).
+    pub depth: u32,
+    /// Name, C++ type and value of every visible local.
+    pub vars: Vec<(String, Ty, Plain)>,
     /// The value being returned.
-    pub returned: Option<Value>,
+    pub returned: Option<Plain>,
+    /// Struct instances the pointers of this frame refer to (list and tree nodes).
+    pub heap: Heap,
 }
 
 /// A recorded run on one test case.
@@ -40,8 +48,6 @@ pub struct RunView {
     pub result: Result<String, RtError>,
     /// Total cost.
     pub cost: u64,
-    /// Node arena for list and tree widgets.
-    pub nodes: Vec<NodeData>,
     /// Expected output text.
     pub expected: String,
     /// More events happened than were recorded.
@@ -63,8 +69,12 @@ pub struct Session {
     redo: Vec<String>,
     /// Latest compile result.
     pub compiled: Result<Compiled, Vec<Diag>>,
-    /// The last program that compiled (the block view keeps showing it while the text is broken).
+    /// The last program that parsed (the block view keeps showing it while the text is broken).
     pub good: Option<Program>,
+    /// `good` was parsed from the current text (so its node ids and spans match the editor).
+    pub good_fresh: bool,
+    /// The last program that compiled without problems (type information for autocomplete).
+    pub last_ok: Option<Compiled>,
     /// Current run.
     pub run: Option<RunView>,
     /// Latest verdict from Check.
@@ -81,14 +91,14 @@ impl std::fmt::Debug for Session {
     }
 }
 
-const SANDBOX: &str = "fn main(nums: vec<int>) -> int {\n    let total = 0;\n    for x in nums {\n        total += x;\n    }\n    return total;\n}\n";
+const SANDBOX: &str = "#include <vector>\n\nint sumAll(const std::vector<int>& nums) {\n    int total = 0;\n    for (int x : nums) {\n        total += x;\n    }\n    return total;\n}\n";
 
 impl Session {
     /// A session for a level, starting from a saved draft or the starter program.
     pub fn for_level(level: &Level, draft: &str) -> Result<Session, String> {
         let judge = Judge::new(level)?;
         let text = if draft.trim().is_empty() {
-            level.starter()
+            level.starter_code()
         } else {
             draft.to_string()
         };
@@ -122,6 +132,8 @@ impl Session {
             redo: Vec::new(),
             compiled: Err(Vec::new()),
             good: None,
+            good_fresh: false,
+            last_ok: None,
             run: None,
             verdict: None,
             case: 0,
@@ -136,21 +148,27 @@ impl Session {
     fn opts(&self) -> CheckOpts {
         match &self.level {
             Some(l) => l.check_opts(),
-            None => CheckOpts {
-                allowed: Allowed::all(),
-                entry: None,
-            },
+            None => CheckOpts::all(),
         }
+    }
+
+    /// The read-only prelude text of the level (empty in the sandbox).
+    pub fn prelude(&self) -> &str {
+        self.level.as_ref().map_or("", |l| l.prelude.as_str())
     }
 
     /// Re-check after the text changed.
     pub fn recompile(&mut self) {
         let text = self.edit.text();
-        self.compiled = compile(&text, &self.opts());
+        self.compiled = compile(self.prelude(), &text, &self.opts());
+        self.good_fresh = true;
         if let Ok(c) = &self.compiled {
             self.good = Some(c.program.clone());
-        } else if let Ok(p) = algoclerk_core::lang::parse::parse(&text) {
+            self.last_ok = Some(c.clone());
+        } else if let Ok(p) = parse_with_prelude(self.prelude(), &text) {
             self.good = Some(p);
+        } else {
+            self.good_fresh = false;
         }
         self.last_text = text;
     }
@@ -239,7 +257,12 @@ impl Session {
             None => self
                 .good
                 .as_ref()
-                .and_then(|p| p.fns.last().map(|f| f.name.clone()))
+                .and_then(|p| {
+                    p.player_items().iter().rev().find_map(|i| match &i.kind {
+                        ItemKind::Func(f) if f.body.is_some() => Some(f.name.clone()),
+                        _ => None,
+                    })
+                })
                 .unwrap_or_default(),
         }
     }
@@ -254,11 +277,14 @@ impl Session {
                 .nth(self.case)
                 .map(|c| c.args.clone())
                 .unwrap_or_default(),
-            None => vec!["[3, 1, 4, 1, 5]".to_string()],
+            None => vec!["{3, 1, 4, 1, 5}".to_string()],
         }
     }
 
     /// Record a run of the chosen case. Returns an error message when the program does not compile.
+    ///
+    /// # Errors
+    /// The first problem with the program, or why the test arguments cannot be passed.
     pub fn start_run(&mut self) -> Result<(), String> {
         let c = match &self.compiled {
             Ok(c) => c,
@@ -277,47 +303,42 @@ impl Session {
             ..Limits::default()
         };
         let called = c.call(&entry, &args, &limits)?;
-        let (vals, nodes0) = c.parse_args(&entry, &args)?;
+        let (vals, heap0) = c.parse_args(&entry, &args)?;
         let f = c.program.find(&entry).ok_or("missing function")?;
-        let fidx = c
-            .program
-            .fns
-            .iter()
-            .position(|x| x.name == entry)
-            .unwrap_or(0);
         let mut frames = Vec::new();
         // first frame: the arguments sitting on the inbox
         frames.push(Frame {
             node: 0,
             cost: 0,
+            depth: 0,
             vars: f
                 .params
                 .iter()
                 .zip(vals.iter())
-                .map(|(p, v)| (p.name.clone(), p.ty.clone(), v.clone()))
+                .map(|(p, v)| (p.name.clone(), p.spec.ty.clone(), v.clone()))
                 .collect(),
             returned: None,
+            heap: heap0,
         });
         let mut truncated = false;
-        if let Some(tr) = &called.report.trace {
+        let report = called.report;
+        if let Some(tr) = report.trace {
             truncated = tr.truncated;
-            for e in &tr.events {
-                let locals = &c.info.fns[e.func as usize].locals;
-                let vars = locals
-                    .iter()
-                    .zip(e.vars.iter())
-                    .filter(|(_, v)| **v != Value::Unit)
-                    .map(|((n, t), v)| (n.clone(), t.clone(), v.clone()))
-                    .collect();
+            for e in tr.events {
                 frames.push(Frame {
                     node: e.node,
                     cost: e.cost,
-                    vars,
-                    returned: e.returned.clone(),
+                    depth: e.depth,
+                    vars: e
+                        .vars
+                        .into_iter()
+                        .map(|v| (v.name, v.ty, v.value))
+                        .collect(),
+                    returned: e.returned,
+                    heap: e.heap,
                 });
             }
         }
-        let _ = (fidx, nodes0);
         let expected = self
             .judge
             .as_ref()
@@ -329,19 +350,16 @@ impl Session {
                     .map(|c| c.expect.clone())
             })
             .unwrap_or_default();
+        let ret = f.ret.ty.clone();
         self.run = Some(RunView {
             case: self.case,
             frames,
             pos: 0,
-            result: called
-                .report
-                .result
-                .map(|_| called.output.unwrap_or_default()),
-            cost: called.report.cost,
-            nodes: called.report.nodes,
+            result: report.result.map(|_| called.output.unwrap_or_default()),
+            cost: report.cost,
             expected,
             truncated,
-            ret: f.ret.clone(),
+            ret,
         });
         Ok(())
     }
@@ -368,22 +386,43 @@ impl Session {
         self.good.as_ref().map(blocks::rows).unwrap_or_default()
     }
 
-    /// One-based line and column range of a diagnostic in the text.
-    pub fn diag_span(&self, d: &Diag) -> Option<(usize, usize, usize)> {
-        let sp = d.span.or_else(|| {
-            d.node
-                .and_then(|n| self.compiled_program().and_then(|p| p.span(n)))
-        })?;
+    /// One-based line and zero-based column range of a byte span in the text.
+    fn line_range(&self, start: u32, end: u32) -> (usize, usize, usize) {
         let text = self.edit.text();
-        let (l, c) = algoclerk_core::lang::diag::line_col(&text, sp.start);
-        let (l2, c2) = algoclerk_core::lang::diag::line_col(&text, sp.end);
-        Some((l, c - 1, if l2 == l { c2 - 1 } else { c + 3 }))
+        let (l, c) = line_col(&text, start);
+        let (l2, c2) = line_col(&text, end);
+        let to = if l2 == l {
+            c2 - 1
+        } else {
+            text.split('\n')
+                .nth(l - 1)
+                .map_or(c + 3, |t| t.chars().count())
+        };
+        (l, c - 1, to.max(c))
     }
 
-    fn compiled_program(&self) -> Option<&Program> {
-        match &self.compiled {
-            Ok(c) => Some(&c.program),
-            Err(_) => None,
+    /// The text span of a node of the current program, as `(line, col_from, col_to)`.
+    pub fn node_span(&self, node: u32) -> Option<(usize, usize, usize)> {
+        let p = match &self.compiled {
+            Ok(c) => &c.program,
+            Err(_) if self.good_fresh => self.good.as_ref()?,
+            Err(_) => return None,
+        };
+        let sp = p.span(node)?;
+        Some(self.line_range(sp.start, sp.end))
+    }
+
+    /// One-based line of a statement node.
+    pub fn node_line(&self, node: u32) -> Option<usize> {
+        self.node_span(node).map(|s| s.0)
+    }
+
+    /// One-based line and column range of a diagnostic in the text.
+    pub fn diag_span(&self, d: &Diag) -> Option<(usize, usize, usize)> {
+        match (d.span, d.node) {
+            (Some(sp), _) => Some(self.line_range(sp.start, sp.end)),
+            (None, Some(n)) => self.node_span(n),
+            _ => None,
         }
     }
 
@@ -395,17 +434,58 @@ impl Session {
         }
     }
 
-    /// Span of the problem, resolving node ids through a fresh parse when needed.
+    /// Span of the problem, resolving node ids through the freshly parsed program when needed.
     pub fn problem_span(&self) -> Option<(usize, usize, usize)> {
-        let d = self.problem()?;
-        if d.span.is_some() {
-            return self.diag_span(&d);
-        }
-        let p = algoclerk_core::lang::parse::parse(&self.edit.text()).ok()?;
-        let sp = d.node.and_then(|n| p.span(n))?;
-        let text = self.edit.text();
-        let (l, c) = algoclerk_core::lang::diag::line_col(&text, sp.start);
-        let (l2, c2) = algoclerk_core::lang::diag::line_col(&text, sp.end);
-        Some((l, c - 1, if l2 == l { c2 - 1 } else { c + 3 }))
+        self.diag_span(&self.problem()?)
     }
+
+    /// Span of the statement the recorded run stopped at (a runtime error), if the run failed.
+    pub fn run_error_span(&self) -> Option<(usize, usize, usize)> {
+        let e = self.run.as_ref()?.result.as_ref().err()?;
+        self.node_span(e.node)
+    }
+
+    /// Text of the first problem, in the clerk's words (a compile problem or a runtime error of the run).
+    pub fn problem_message(&self) -> Option<String> {
+        self.problem().map(|d| d.msg).or_else(|| {
+            self.run
+                .as_ref()?
+                .result
+                .as_ref()
+                .err()
+                .map(|e| e.msg.clone())
+        })
+    }
+}
+
+/// Parse the player's text knowing the prelude's structs and aliases, without checking it. The result
+/// holds the prelude items first (`prelude_items`) and has spans for the player's nodes only.
+///
+/// # Errors
+/// The first parse problem, with a span into `player`.
+pub fn parse_with_prelude(prelude: &str, player: &str) -> Result<Program, Vec<Diag>> {
+    let mut pre = parse(prelude, &ParseOpts::default()).unwrap_or_default();
+    let mut pl = parse(
+        player,
+        &ParseOpts {
+            first_id: pre.next_id,
+            known_types: known_types(&pre),
+        },
+    )?;
+    let prelude_items = pre.items.len();
+    let mut spans = std::mem::take(&mut pl.spans);
+    let blank = pre.next_id as usize;
+    if spans.len() < blank {
+        spans.resize(blank, Default::default());
+    }
+    for sp in spans.iter_mut().take(blank) {
+        *sp = Default::default();
+    }
+    pre.items.append(&mut pl.items);
+    Ok(Program {
+        items: pre.items,
+        prelude_items,
+        next_id: pl.next_id.max(pre.next_id),
+        spans,
+    })
 }

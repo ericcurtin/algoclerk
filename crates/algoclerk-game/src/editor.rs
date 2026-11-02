@@ -3,14 +3,15 @@
 //! an on-screen keyboard, a chip pad for building cards without typing, and undo/redo.
 
 use crate::blocks::{self, CardKind, PALETTE};
+use crate::complete::{self, Item};
 use crate::gfx::{Gfx, Kind, State, clip};
 use crate::input::{Input, Key};
 use crate::layout::Hit;
 use crate::session::Session;
 use crate::textedit::{self, KbAction, Keyboard, TextEdit};
 use crate::ui::{Ctx, View, widget_state};
-use algoclerk_core::lang::ast::Ty;
-use algoclerk_core::lang::check::{ALL_BUILTINS, FREE_BUILTINS, method_sigs};
+use crate::words;
+use algoclerk_core::cpp::ast::Ty;
 use algoclerk_media::Rect;
 
 /// Which view of the program is showing.
@@ -50,7 +51,25 @@ pub struct CardEdit {
     pub last_var: Option<Ty>,
     /// Message shown under the line.
     pub msg: Option<String>,
+    /// Scroll of the chip area in pixels.
+    pub scroll: i32,
 }
+
+/// The autocomplete popup of the text view.
+#[derive(Debug, Clone, Default)]
+pub struct Popup {
+    /// Suggestions.
+    pub items: Vec<Item>,
+    /// Selected suggestion.
+    pub sel: usize,
+    /// Character index where the typed prefix starts.
+    pub start: usize,
+    /// First visible suggestion.
+    pub top: usize,
+}
+
+/// Rows the popup shows at once.
+const POPUP_ROWS: usize = 5;
 
 /// The editor panel state.
 #[derive(Debug, Clone)]
@@ -72,6 +91,10 @@ pub struct EditorPanel {
     drag: Option<(usize, i32)>,
     /// A one-line hint shown at the bottom.
     pub note: Option<String>,
+    /// Autocomplete popup of the text view.
+    pub ac: Option<Popup>,
+    /// The popup was dismissed for this text and cursor.
+    dismissed: Option<(String, usize)>,
 }
 
 impl Default for EditorPanel {
@@ -86,6 +109,8 @@ impl Default for EditorPanel {
             palette: None,
             drag: None,
             note: None,
+            ac: None,
+            dismissed: None,
         }
     }
 }
@@ -99,6 +124,7 @@ pub struct Out {
 
 struct Parts {
     tabs: Rect,
+    strip: Rect,
     body: Rect,
     bar: Rect,
     kb: Rect,
@@ -110,6 +136,7 @@ fn parts(
     kb_open: bool,
     has_bar: bool,
     tab: Tab,
+    has_strip: bool,
 ) -> Parts {
     let th = vp.btn_h();
     let tabs = Rect::new(area.x, area.y, area.w, th);
@@ -127,16 +154,19 @@ fn parts(
     } else {
         0
     };
+    let strip_h = if has_strip && tab == Tab::Text { 10 } else { 0 };
+    let strip = Rect::new(area.x, area.y + th + 2, area.w, strip_h);
     let body = Rect::new(
         area.x,
-        area.y + th + 2,
+        area.y + th + 2 + strip_h,
         area.w,
-        area.h - th - 2 - bar_h - kb_h,
+        area.h - th - 2 - strip_h - bar_h - kb_h,
     );
     let bar = Rect::new(area.x, body.bottom() + 1, area.w, bar_h);
     let kb = Rect::new(area.x, bar.bottom() + 1, area.w, kb_h.max(0));
     Parts {
         tabs,
+        strip,
         body,
         bar,
         kb,
@@ -157,7 +187,7 @@ fn fresh_name(text: &str) -> String {
 impl EditorPanel {
     /// Hit rectangles for layout tests.
     pub fn hits(&self, vp: &crate::layout::Viewport, area: Rect) -> Vec<Hit> {
-        let p = parts(vp, area, self.kb_open, self.sel.is_some(), self.tab);
+        let p = parts(vp, area, self.kb_open, self.sel.is_some(), self.tab, false);
         let mut v = vec![Hit::area("editor", area), Hit::area("editor body", p.body)];
         for (i, r) in tab_rects(p.tabs, 4).into_iter().enumerate() {
             v.push(Hit::tap(["tab blocks", "tab text", "undo", "redo"][i], r));
@@ -173,7 +203,14 @@ impl EditorPanel {
     pub fn update(&mut self, cx: &mut Ctx<'_>, s: &mut Session, area: Rect) -> Out {
         let mut out = Out::default();
         let vp = cx.vp;
-        let p = parts(&vp, area, self.kb_open, self.sel.is_some(), self.tab);
+        let p = parts(
+            &vp,
+            area,
+            self.kb_open,
+            self.sel.is_some(),
+            self.tab,
+            !s.prelude().trim().is_empty(),
+        );
         let tr = tab_rects(p.tabs, 4);
         if self.card.is_some() {
             return self.update_card(cx, s, area);
@@ -214,16 +251,64 @@ impl EditorPanel {
         let kb_btn = Rect::new(p.bar.x, p.bar.y, (p.bar.w / 2).min(70), p.bar.h);
         let ed_rect = p.body;
         s.edit.focused = true;
-        let inp = cx.input;
+        // the popup takes the navigation keys and taps on its rows
+        let mut inp = cx.input.clone();
+        let mut accept: Option<usize> = None;
+        let mut dismiss = false;
+        if let Some(pop) = &mut self.ac {
+            let last = pop.items.len().saturating_sub(1);
+            let mut keep = Vec::new();
+            for k in inp.keys.drain(..) {
+                match k {
+                    Key::Up => pop.sel = pop.sel.saturating_sub(1),
+                    Key::Down => pop.sel = (pop.sel + 1).min(last),
+                    Key::Enter | Key::Tab => accept = Some(pop.sel),
+                    Key::Escape => dismiss = true,
+                    other => keep.push(other),
+                }
+            }
+            inp.keys = keep;
+            if pop.sel < pop.top {
+                pop.top = pop.sel;
+            }
+            if pop.sel >= pop.top + POPUP_ROWS {
+                pop.top = pop.sel + 1 - POPUP_ROWS;
+            }
+        }
+        let mut tapped_popup = false;
+        if let Some(pop) = &self.ac {
+            for (i, r) in self.popup_rects(s, ed_rect, &cx.vp).iter().enumerate() {
+                if cx.ptr.tapped_in(r) {
+                    accept = Some(pop.top + i);
+                    tapped_popup = true;
+                }
+            }
+        }
+        if let (Some(i), Some(pop)) = (accept, self.ac.take()) {
+            if let Some(item) = pop.items.get(i) {
+                s.edit.anchor = Some(pop.start);
+                s.edit.insert(&item.insert);
+                changed = true;
+                cx.sfx("pick");
+            }
+        } else if dismiss {
+            self.dismissed = Some((s.edit.text(), s.edit.cursor));
+            self.ac = None;
+        }
         let before = s.edit.text();
-        let o = s.edit.handle(inp);
+        let o = s.edit.handle(&inp);
         if let Some(t) = o.copy {
             cx.events.push(crate::ui::GameEvent::Copy(t));
         }
         if o.want_paste {
             cx.events.push(crate::ui::GameEvent::PasteRequest);
         }
-        s.edit.pointer(cx.ptr, ed_rect, scale, line_h);
+        if inp.key(Key::Tab) && !o.changed {
+            s.edit.insert("    ");
+        }
+        if !tapped_popup {
+            s.edit.pointer(cx.ptr, ed_rect, scale, line_h);
+        }
         let rows = ((ed_rect.h - 4) / line_h).max(1) as usize;
         let cols = ((ed_rect.w - 8) / 6).max(1) as usize;
         if cx.ptr.wheel != 0.0 {
@@ -231,14 +316,7 @@ impl EditorPanel {
         }
         // auto-indent after Enter
         if inp.key(Key::Enter) && s.edit.text() != before {
-            let t = s.edit.text();
-            let (line, _) = s.edit.line_col(s.edit.cursor);
-            if line > 0 {
-                let prev = t.split('\n').nth(line - 1).unwrap_or("");
-                let indent = prev.len() - prev.trim_start().len();
-                let extra = if prev.trim_end().ends_with('{') { 4 } else { 0 };
-                s.edit.insert(&" ".repeat(indent + extra));
-            }
+            auto_indent(&mut s.edit);
         }
         s.edit.scroll_to_cursor(rows, cols);
         if cx.ptr.tapped_in(&kb_btn)
@@ -255,16 +333,7 @@ impl EditorPanel {
                     }
                     KbAction::Enter => {
                         s.edit.insert("\n");
-                        let t = s.edit.text();
-                        let (line, _) = s.edit.line_col(s.edit.cursor);
-                        let prev = t
-                            .split('\n')
-                            .nth(line.saturating_sub(1))
-                            .unwrap_or("")
-                            .to_string();
-                        let indent = prev.len() - prev.trim_start().len()
-                            + if prev.trim_end().ends_with('{') { 4 } else { 0 };
-                        s.edit.insert(&" ".repeat(indent));
+                        auto_indent(&mut s.edit);
                     }
                     KbAction::Hide => self.kb_open = false,
                 }
@@ -274,7 +343,75 @@ impl EditorPanel {
         if s.sync() {
             changed = true;
         }
+        let typed_now = s.edit.text() != before || changed;
+        self.refresh_popup(s, typed_now);
         changed
+    }
+
+    /// Recompute the suggestions for the cursor (only when the text just changed or the popup is open).
+    fn refresh_popup(&mut self, s: &Session, typed_now: bool) {
+        let old = self.ac.take();
+        if (!typed_now && old.is_none()) || s.edit.anchor.is_some() {
+            return;
+        }
+        let text = s.edit.text();
+        if self.dismissed.as_ref() == Some(&(text.clone(), s.edit.cursor)) {
+            return;
+        }
+        let cursor_b = text
+            .char_indices()
+            .nth(s.edit.cursor)
+            .map_or(text.len(), |(i, _)| i);
+        let (mut items, start_b) = complete::suggest(s, &text, cursor_b);
+        items.truncate(60);
+        let typed: String = text[start_b..cursor_b].to_string();
+        if items.is_empty() || (items.len() == 1 && items[0].label == typed) {
+            return;
+        }
+        let start = text[..start_b].chars().count();
+        let mut pop = Popup {
+            items,
+            sel: 0,
+            start,
+            top: 0,
+        };
+        if let Some(o) = old
+            && o.start == pop.start
+            && o.items == pop.items
+        {
+            pop.sel = o.sel;
+            pop.top = o.top;
+        }
+        self.ac = Some(pop);
+    }
+
+    /// Rectangles of the visible popup rows, placed under (or above) the cursor line.
+    fn popup_rects(&self, s: &Session, body: Rect, vp: &crate::layout::Viewport) -> Vec<Rect> {
+        let Some(pop) = &self.ac else {
+            return Vec::new();
+        };
+        let rh = if vp.touch { 14 } else { 9 };
+        let n = pop.items.len().min(POPUP_ROWS) as i32;
+        let (line, col) = s.edit.line_col(s.edit.cursor);
+        let w = pop
+            .items
+            .iter()
+            .map(|i| {
+                (i.label.chars().count() + 2 + i.detail.chars().count().min(26)) as i32 * 6 + 8
+            })
+            .max()
+            .unwrap_or(60)
+            .clamp(70, (body.w - 8).max(70));
+        let cy = body.y + 2 + (line as i32 - s.edit.scroll_line as i32) * 9;
+        let cx = body.x + 3 + (col as i32 - s.edit.scroll_col as i32) * 6;
+        let x = cx.clamp(body.x, (body.right() - w).max(body.x));
+        let below = cy + 10;
+        let y = if below + n * rh + 2 > body.bottom() {
+            (cy - n * rh - 2).max(body.y)
+        } else {
+            below
+        };
+        (0..n).map(|i| Rect::new(x, y + i * rh, w, rh)).collect()
     }
 
     fn row_h(vp: &crate::layout::Viewport) -> i32 {
@@ -305,18 +442,26 @@ impl EditorPanel {
             let cells = self.palette_rects(list);
             for (i, r) in cells.iter().enumerate() {
                 if cx.ptr.tapped_in(r) {
-                    let text = PALETTE[i].1.replace("{n}", &fresh_name(&s.edit.text()));
                     if let Some(mut prog) = s.good.clone() {
+                        let entry = s.entry_name();
+                        let fill = blocks::Fill::for_function(
+                            fresh_name(&s.edit.text()),
+                            prog.find(&entry),
+                        );
+                        let text = fill.apply(PALETTE[i].1);
                         let anchor =
                             self.sel
                                 .and_then(|i| rows.get(i))
                                 .map(|r| r.node)
                                 .filter(|n| {
-                                    rows.iter()
-                                        .any(|r| r.node == *n && r.kind != CardKind::Header)
+                                    rows.iter().any(|r| {
+                                        r.node == *n
+                                            && !matches!(r.kind, CardKind::Header | CardKind::Item)
+                                    })
                                 });
                         let res = blocks::insert_stmt(
                             &mut prog,
+                            &entry,
                             anchor,
                             inside && anchor.is_some(),
                             &text,
@@ -351,7 +496,7 @@ impl EditorPanel {
             if cx.ptr.tapped_in(&r) && cx.ptr.pos.is_some_and(|p| list.contains(p.0, p.1)) {
                 self.sel = Some(i);
                 cx.sfx("pick");
-                if row.kind == CardKind::Header {
+                if matches!(row.kind, CardKind::Header | CardKind::Item) {
                     self.sel = None;
                 }
             }
@@ -360,8 +505,7 @@ impl EditorPanel {
                     && cx.ptr.down
                     && cx.ptr.moved
                     && r.contains(cx.ptr.start.0, cx.ptr.start.1)))
-                && row.kind != CardKind::Header
-                && row.kind != CardKind::Else
+                && row.movable()
             {
                 self.drag = Some((i, 0));
             }
@@ -409,35 +553,23 @@ impl EditorPanel {
             let b = crate::layout::columns(bar, 6, 2);
             let node = row.node;
             let mut prog = s.good.clone();
-            if cx.ptr.tapped_in(&b[0]) {
+            if cx.ptr.tapped_in(&b[0]) && row.movable() {
                 if let Some(p) = prog.as_mut() {
                     if s.apply(blocks::move_stmt(p, node, true)) {
                         changed = true;
                         self.sel = Some(i.saturating_sub(1));
                     }
                 }
-            } else if cx.ptr.tapped_in(&b[1]) {
+            } else if cx.ptr.tapped_in(&b[1]) && row.movable() {
                 if let Some(p) = prog.as_mut() {
                     if s.apply(blocks::move_stmt(p, node, false)) {
                         changed = true;
                         self.sel = Some(i + 1);
                     }
                 }
-            } else if cx.ptr.tapped_in(&b[2]) && row.kind != CardKind::Else {
-                if let Some(p) = &s.good {
-                    let stmt_text = find_header(p, node).unwrap_or_default();
-                    self.card = Some(CardEdit {
-                        node,
-                        line: TextEdit::new(&stmt_text, false),
-                        pad: Pad::Names,
-                        last_var: None,
-                        msg: None,
-                    });
-                    if let Some(c) = &mut self.card {
-                        c.line.focused = true;
-                    }
-                }
-            } else if cx.ptr.tapped_in(&b[3]) && row.kind != CardKind::Else {
+            } else if cx.ptr.tapped_in(&b[2]) && row.editable() {
+                self.open_card(s, node);
+            } else if cx.ptr.tapped_in(&b[3]) && row.movable() {
                 if let Some(p) = prog.as_mut() {
                     if s.apply(blocks::delete_stmt(p, node)) {
                         changed = true;
@@ -450,7 +582,7 @@ impl EditorPanel {
             } else if cx.ptr.tapped_in(&b[5]) && row.kind == CardKind::Compound {
                 self.palette = Some(true);
             }
-            if cx.input.key(Key::Delete) {
+            if cx.input.key(Key::Delete) && row.movable() {
                 if let Some(p) = prog.as_mut() {
                     changed |= s.apply(blocks::delete_stmt(p, node));
                     self.sel = None;
@@ -471,22 +603,31 @@ impl EditorPanel {
         }
         if cx.input.key(Key::Enter) && self.card.is_none() {
             if let Some(i) = self.sel {
-                if let (Some(row), Some(p)) = (rows.get(i), &s.good) {
-                    if row.kind != CardKind::Header && row.kind != CardKind::Else {
-                        let t = find_header(p, row.node).unwrap_or_default();
-                        self.card = Some(CardEdit {
-                            node: row.node,
-                            line: TextEdit::new(&t, false),
-                            pad: Pad::Names,
-                            last_var: None,
-                            msg: None,
-                        });
+                if let Some(row) = rows.get(i) {
+                    if row.editable() {
+                        self.open_card(s, row.node);
                     }
                 }
             }
         }
         self.scroll = self.scroll.clamp(0, max_scroll);
         changed
+    }
+
+    /// Open the card editor on a statement card.
+    pub fn open_card(&mut self, s: &Session, node: u32) {
+        if let Some(t) = s.good.as_ref().and_then(|p| blocks::card_text(p, node)) {
+            let mut line = TextEdit::new(&t, false);
+            line.focused = true;
+            self.card = Some(CardEdit {
+                node,
+                line,
+                pad: Pad::Names,
+                last_var: None,
+                msg: None,
+                scroll: 0,
+            });
+        }
     }
 
     fn palette_rects(&self, list: Rect) -> Vec<Rect> {
@@ -509,86 +650,105 @@ impl EditorPanel {
 
     // ---- card editor ----
 
+    /// The variables (name, type) a card at `node` can use.
+    fn card_names(&self, s: &Session, node: u32) -> Vec<(String, Ty)> {
+        let line = s.node_line(node).unwrap_or(usize::MAX);
+        let mut names = complete::names_at(s, line);
+        if names.is_empty()
+            && let Some(p) = &s.good
+        {
+            for f in p.fns().filter(|f| f.body.is_some()) {
+                for pa in &f.params {
+                    names.push((pa.name.clone(), pa.spec.ty.clone()));
+                }
+            }
+        }
+        let mut seen: Vec<String> = Vec::new();
+        let mut out = Vec::new();
+        for (n, t) in names.into_iter().rev() {
+            if !seen.contains(&n) {
+                seen.push(n.clone());
+                out.push((n, t));
+            }
+        }
+        out.reverse();
+        out
+    }
+
     fn pad_chips(&self, s: &Session, card: &CardEdit) -> Vec<(String, String)> {
         let mut v: Vec<(String, String)> = Vec::new();
         match card.pad {
             Pad::Names => {
-                if let Ok(c) = &s.compiled {
-                    let fidx = c
-                        .program
-                        .fns
-                        .iter()
-                        .position(|f| f.name == s.entry_name())
-                        .unwrap_or(0);
-                    let mut seen = Vec::new();
-                    for (n, t) in &c.info.fns[fidx].locals {
-                        if !seen.contains(n) {
-                            seen.push(n.clone());
-                            v.push((format!("{n}"), format!("{n}:{t}")));
-                        }
-                    }
-                } else if let Some(p) = &s.good {
-                    for f in &p.fns {
-                        for pa in &f.params {
-                            v.push((pa.name.clone(), format!("{}:{}", pa.name, pa.ty)));
-                        }
-                    }
+                for (n, _) in self.card_names(s, card.node) {
+                    v.push((n.clone(), n));
                 }
             }
             Pad::Numbers => {
                 for d in [
-                    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "true", "false", "null",
-                    "none", "\"\"", "''", "[]", "-",
+                    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "true", "false", "nullptr",
+                    "\"\"", "''", "{}", "-", "'a'",
                 ] {
                     v.push((d.to_string(), d.to_string()));
                 }
             }
             Pad::Ops => {
                 for d in [
-                    "+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "and", "or", "not",
-                    "(", ")", "[", "]", ",", "=", "+=", "-=", ".", "..", "&", "|", "^", "<<", ">>",
+                    "+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "!",
+                    "(", ")", "[", "]", "{", "}", ",", "=", "+=", "-=", "++", "--", ".", "->",
+                    "::", "&", "|", "^", "<<", ">>", "?", ":",
                 ] {
-                    v.push((d.to_string(), format!(" {d} ").replace("  ", " ")));
+                    let tight = matches!(
+                        d,
+                        "!" | "("
+                            | ")"
+                            | "["
+                            | "]"
+                            | "{"
+                            | "}"
+                            | ","
+                            | "++"
+                            | "--"
+                            | "."
+                            | "->"
+                            | "::"
+                    );
+                    let ins = if tight || d == "," {
+                        d.to_string()
+                    } else {
+                        format!(" {d} ")
+                    };
+                    v.push((d.to_string(), ins));
                 }
             }
             Pad::Tools => {
-                let allowed = s
-                    .level
-                    .as_ref()
-                    .map(|l| l.check_opts().allowed.builtins)
-                    .unwrap_or(None);
-                let ok = |n: &str| allowed.as_ref().is_none_or(|a| a.contains(n));
-                for n in FREE_BUILTINS {
-                    if ok(n) && !matches!(*n, "enumerate" | "zip") {
-                        v.push((format!("{n}()"), format!("{n}(")));
-                    }
-                }
-                if ok("enumerate") {
-                    v.push(("enumerate".into(), "enumerate(".into()));
-                }
                 if let Some(t) = &card.last_var {
-                    for n in ALL_BUILTINS {
-                        if !FREE_BUILTINS.contains(n) && ok(n) && method_sigs(t, n).is_some() {
-                            v.push((format!(".{n}"), format!(".{n}(")));
-                        }
+                    let arrow = matches!(t, Ty::Ptr(_) | Ty::Iter { .. });
+                    let sep = if arrow { "->" } else { "." };
+                    for it in complete::member_items(s, t, arrow, "") {
+                        v.push((format!("{sep}{}", it.label), format!("{sep}{}", it.insert)));
                     }
+                }
+                for it in complete::std_items(s, "") {
+                    v.push((format!("std::{}", it.label), format!("std::{}", it.insert)));
                 }
             }
             Pad::Words => {
                 for d in [
-                    "let",
+                    "int",
+                    "auto",
+                    "const",
                     "if",
                     "else",
-                    "while",
                     "for",
-                    "in",
-                    "range(",
+                    "while",
                     "return",
                     "break;",
                     "continue;",
                     "{",
                     "}",
                     ";",
+                    "std::",
+                    "static_cast<int>(",
                 ] {
                     v.push((d.to_string(), format!("{d} ").replace("( ", "(")));
                 }
@@ -623,9 +783,10 @@ impl EditorPanel {
         chips: Rect,
         labels: &[(String, String)],
         vp: &crate::layout::Viewport,
+        scroll: i32,
     ) -> Vec<Rect> {
         let h = if vp.touch { 22 } else { 13 };
-        let (mut x, mut y) = (chips.x, chips.y);
+        let (mut x, mut y) = (chips.x, chips.y - scroll);
         let mut out = Vec::new();
         for (l, _) in labels {
             let w = (l.chars().count() as i32 * 6 + 8).max(if vp.touch { 28 } else { 18 });
@@ -657,34 +818,34 @@ impl EditorPanel {
             }
         }
         let labels = self.pad_chips(s, &card);
-        let rects = self.chip_rects(chips_r, &labels, &cx.vp);
+        let rects = self.chip_rects(chips_r, &labels, &cx.vp, card.scroll);
+        let content = rects
+            .last()
+            .map_or(0, |r| r.bottom() - chips_r.y + card.scroll);
+        let max_scroll = (content - chips_r.h).max(0);
+        if cx.ptr.wheel != 0.0
+            && chips_r.contains(
+                cx.ptr.pos.map_or(-1, |p| p.0),
+                cx.ptr.pos.map_or(-1, |p| p.1),
+            )
+        {
+            card.scroll = (card.scroll + (cx.ptr.wheel * 10.0) as i32).clamp(0, max_scroll);
+        }
+        if cx.ptr.down && cx.ptr.moved && chips_r.contains(cx.ptr.start.0, cx.ptr.start.1) {
+            card.scroll = (card.scroll - cx.ptr.delta.1).clamp(0, max_scroll);
+        }
         for (i, r) in rects.iter().enumerate() {
-            if cx.ptr.tapped_in(r) {
+            if r.y >= chips_r.y && r.bottom() <= chips_r.bottom() && cx.ptr.tapped_in(r) {
                 let ins = labels[i].1.clone();
                 if card.pad == Pad::Names {
-                    card.last_var = s.compiled.as_ref().ok().and_then(|c| {
-                        let fidx = c
-                            .program
-                            .fns
-                            .iter()
-                            .position(|f| f.name == s.entry_name())
-                            .unwrap_or(0);
-                        c.info.fns[fidx]
-                            .locals
-                            .iter()
-                            .find(|(n, _)| *n == labels[i].0)
-                            .map(|(_, t)| t.clone())
-                    });
-                    if card.last_var.is_none() {
-                        card.last_var = s.good.as_ref().and_then(|p| {
-                            p.fns
-                                .iter()
-                                .flat_map(|f| f.params.iter())
-                                .find(|pa| pa.name == labels[i].0)
-                                .map(|pa| pa.ty.clone())
-                        });
-                    }
+                    let name = labels[i].0.clone();
+                    card.last_var = self
+                        .card_names(s, card.node)
+                        .into_iter()
+                        .find(|(n, _)| *n == name)
+                        .map(|(_, t)| t);
                     card.pad = Pad::Tools;
+                    card.scroll = 0;
                 }
                 card.line.insert(&ins);
                 cx.sfx("pick");
@@ -692,9 +853,12 @@ impl EditorPanel {
         }
         // live check
         let text = card.line.text();
-        card.msg = match blocks::parse_stmt(&text) {
-            Ok(_) => Some("ok".to_string()),
-            Err(e) => Some(e),
+        card.msg = match s.good.clone() {
+            Some(mut prog) => match blocks::parse_stmt(&mut prog, &text) {
+                Ok(_) => Some("ok".to_string()),
+                Err(e) => Some(e),
+            },
+            None => None,
         };
         let confirm = cx.ptr.tapped_in(&ok_r) || cx.input.key(Key::Enter);
         let cancel = cx.ptr.tapped_in(&cancel_r) || cx.input.key(Key::Escape);
@@ -737,6 +901,7 @@ impl EditorPanel {
             self.kb_open,
             self.sel.is_some(),
             self.tab,
+            !s.prelude().trim().is_empty(),
         );
         let tr = tab_rects(p.tabs, 4);
         let st = |r: &Rect| widget_state(v.ptr, r, false, false);
@@ -817,6 +982,8 @@ impl EditorPanel {
                 CardKind::Compound => ('W', 'B'),
                 CardKind::Else => ('w', 'B'),
                 CardKind::Simple => ('W', 'g'),
+                CardKind::Raw => ('w', 'o'),
+                CardKind::Item => ('A', 'a'),
             };
             let fill = if running {
                 'c'
@@ -895,12 +1062,17 @@ impl EditorPanel {
                 ("plus", t("editor.add")),
                 ("plus", t("editor.inside")),
             ];
-            let compound = self
-                .sel
-                .and_then(|i| rows.get(i))
-                .is_some_and(|r| r.kind == CardKind::Compound);
+            let cur = self.sel.and_then(|i| rows.get(i));
+            let compound = cur.is_some_and(|r| r.kind == CardKind::Compound);
+            let movable = cur.is_some_and(blocks::Row::movable);
+            let editable = cur.is_some_and(blocks::Row::editable);
             for (i, r) in b.iter().enumerate() {
-                let disabled = i == 5 && !compound;
+                let disabled = match i {
+                    0 | 1 | 3 => !movable,
+                    2 => !editable,
+                    5 => !compound,
+                    _ => false,
+                };
                 let st = State {
                     disabled,
                     ..widget_state(v.ptr, r, false, disabled)
@@ -963,15 +1135,14 @@ impl EditorPanel {
         p: &Parts,
         executing: Option<u32>,
     ) {
-        let err = s.problem();
-        let span = s.problem_span();
-        let exec_line = executing.and_then(|n| {
-            let prog = algoclerk_core::lang::parse::parse(&s.edit.text()).ok()?;
-            let sp = prog.span(n)?;
-            Some(algoclerk_core::lang::diag::line_col(&s.edit.text(), sp.start).0)
-        });
+        let msg = s.problem_message();
+        let span = s.problem_span().or_else(|| s.run_error_span());
+        let exec_line = executing.and_then(|n| s.node_line(n));
         let sq: Vec<(usize, usize, usize)> = span.into_iter().collect();
         let err_lines: Vec<usize> = span.map(|x| x.0).into_iter().collect();
+        if p.strip.h > 0 {
+            self.draw_strip(g, s, p.strip);
+        }
         textedit::draw_editor(g, &s.edit, p.body, 1, 9, &err_lines, exec_line, &sq, v.tick);
         let kb_btn = Rect::new(p.bar.x, p.bar.y, (p.bar.w / 2).min(70), p.bar.h);
         g.button(
@@ -985,8 +1156,8 @@ impl EditorPanel {
             widget_state(v.ptr, &kb_btn, false, false),
         );
         let msg_r = Rect::new(kb_btn.right() + 4, p.bar.y, p.bar.w - kb_btn.w - 4, p.bar.h);
-        if let Some(d) = err {
-            let lines = algoclerk_media::Font::wrap(&d.msg, (msg_r.w / 6).max(8) as usize);
+        if let Some(m) = msg {
+            let lines = algoclerk_media::Font::wrap(&m, (msg_r.w / 6).max(8) as usize);
             for (i, l) in lines.iter().take(2).enumerate() {
                 g.text(msg_r.x, msg_r.y + 1 + i as i32 * 8, l, 'R');
             }
@@ -1000,6 +1171,68 @@ impl EditorPanel {
         }
         if self.kb_open {
             self.kb.draw(g, p.kb, v.ptr);
+        }
+        self.draw_popup(g, v, s, p.body);
+    }
+
+    /// The one-line summary of the read-only prelude above the text.
+    fn draw_strip(&self, g: &mut Gfx<'_>, s: &Session, r: Rect) {
+        g.rect(r, 'A');
+        let mut parts: Vec<String> = Vec::new();
+        for l in s.prelude().lines() {
+            if let Some(h) = l.trim().strip_prefix("#include") {
+                parts.push(h.trim().to_string());
+            }
+        }
+        if let Some(p) = &s.good {
+            for it in p.items.iter().take(p.prelude_items) {
+                match &it.kind {
+                    algoclerk_core::cpp::ast::ItemKind::Struct(st) => parts.push(st.name.clone()),
+                    algoclerk_core::cpp::ast::ItemKind::Alias { name, .. } => {
+                        parts.push(name.clone());
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let line = format!("{}: {}", words::PRELUDE_BAR, parts.join(" "));
+        g.text(
+            r.x + 3,
+            r.y + 1,
+            &clip(&line, ((r.w - 6) / 6).max(4) as usize),
+            'm',
+        );
+    }
+
+    fn draw_popup(&self, g: &mut Gfx<'_>, v: &View<'_>, s: &Session, body: Rect) {
+        let Some(pop) = &self.ac else { return };
+        let rects = self.popup_rects(s, body, &v.vp);
+        let (Some(first), Some(last)) = (rects.first(), rects.last()) else {
+            return;
+        };
+        let all = Rect::new(first.x, first.y, first.w, last.bottom() - first.y);
+        g.rect(all.grow(1), 'K');
+        for (i, r) in rects.iter().enumerate() {
+            let idx = pop.top + i;
+            let Some(item) = pop.items.get(idx) else {
+                break;
+            };
+            g.rect(*r, if idx == pop.sel { 'y' } else { 'W' });
+            let ty = r.y + (r.h - 7) / 2;
+            g.text(r.x + 3, ty, &item.label, 'K');
+            let used = item.label.chars().count() as i32 * 6 + 12;
+            let room = ((r.w - used - 4) / 6).max(0) as usize;
+            if room > 3 {
+                g.text(r.x + used, ty, &clip(&item.detail, room), 'a');
+            }
+        }
+        if pop.items.len() > POPUP_ROWS {
+            g.tiny(
+                all.right() - 22,
+                all.bottom() + 2,
+                &format!("{}/{}", pop.sel + 1, pop.items.len()),
+                'k',
+            );
         }
     }
 
@@ -1058,9 +1291,14 @@ impl EditorPanel {
             );
         }
         let labels = self.pad_chips(s, card);
-        for (i, r) in self.chip_rects(chips_r, &labels, &v.vp).iter().enumerate() {
-            if r.bottom() > chips_r.bottom() {
-                break;
+        let saved = g.c.set_clip(chips_r.offset(g.off.0, g.off.1));
+        for (i, r) in self
+            .chip_rects(chips_r, &labels, &v.vp, card.scroll)
+            .iter()
+            .enumerate()
+        {
+            if r.bottom() < chips_r.y || r.y > chips_r.bottom() {
+                continue;
             }
             g.button(
                 *r,
@@ -1069,6 +1307,7 @@ impl EditorPanel {
                 widget_state(v.ptr, r, false, false),
             );
         }
+        g.c.set_clip(saved);
         if card.pad == Pad::Tools && card.last_var.is_none() {
             g.text(
                 chips_r.x,
@@ -1092,17 +1331,17 @@ impl EditorPanel {
     }
 }
 
-fn find_header(p: &algoclerk_core::lang::ast::Program, id: u32) -> Option<String> {
-    let mut found = None;
-    for f in &p.fns {
-        algoclerk_core::lang::ast::walk_stmts(&f.body, &mut |s| {
-            if s.id == id {
-                found = Some(blocks::header_text(s));
-            }
-        });
-    }
-    found
-}
-
 #[allow(dead_code)]
 fn unused(_: &Input) {}
+
+/// Indent a new line like the one above it (and one level deeper after `{`).
+fn auto_indent(ed: &mut TextEdit) {
+    let t = ed.text();
+    let (line, _) = ed.line_col(ed.cursor);
+    if line > 0 {
+        let prev = t.split('\n').nth(line - 1).unwrap_or("");
+        let indent = prev.len() - prev.trim_start().len();
+        let extra = if prev.trim_end().ends_with('{') { 4 } else { 0 };
+        ed.insert(&" ".repeat(indent + extra));
+    }
+}

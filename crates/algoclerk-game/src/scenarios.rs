@@ -185,7 +185,7 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
         "play-error" => {
             g.goto(Nav::Play("sum-the-bills".into()));
             let p = g.play_mut().ok_or("no play")?;
-            p.session.set_text("fn sum_the_bills(bills: vec<int>) -> int {\n    let total = 0;\n    for i in range(len(bills) + 1) {\n        total += bills[i];\n    }\n    return total;\n}\n");
+            p.session.set_text("int sumTheBills(const std::vector<int>& bills) {\n    int total = 0;\n    for (std::size_t i = 0; i <= bills.size(); ++i) {\n        total += bills[i];\n    }\n    return total;\n}\n");
             p.run_to_end();
             tick_n(&mut g, 30);
         }
@@ -193,7 +193,7 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
             g.goto(Nav::Play("sum-the-bills".into()));
             let p = g.play_mut().ok_or("no play")?;
             p.panel.tab = Tab::Text;
-            p.session.set_text("fn sum_the_bills(bills: vec<int>) -> int {\n    let total = 0;\n    for bill in bills {\n        total += \"1\";\n    }\n    return total;\n}\n");
+            p.session.set_text("int sumTheBills(const std::vector<int>& bills) {\n    int total = 0;\n    for (int bill : bills) {\n        total += \"1\";\n    }\n    return total;\n}\n");
             tick_n(&mut g, 4);
         }
         "play-keyboard" => {

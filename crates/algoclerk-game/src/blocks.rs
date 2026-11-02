@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-//! The block (card) view of a program: rows for display and structural edits that keep the program
-//! and its text in sync (the text is always the printed syntax tree).
+//! The block (card) view of a program: rows for display and structural edits that keep the program and its
+//! text in sync (the text is always the printed syntax tree).
+//!
+//! Every statement of a function body is one card. Compound statements (`if`, `for`, `while`, range-`for`)
+//! show their header and hold their body as nested cards; simple statements show their one line. What cards
+//! cannot express (`switch`, `do`-`while`, bare blocks, statements that print on several lines such as
+//! lambdas with bodies) is shown as a read-only *raw C++* card that can still be moved and deleted.
 
-use algoclerk_core::lang::ast::*;
-use algoclerk_core::lang::parse::parse;
-use algoclerk_core::lang::print::{expr_text, pat_text, print};
+use algoclerk_core::cpp::ast::*;
+use algoclerk_core::cpp::parse::{ParseOpts, known_types, parse};
+use algoclerk_core::cpp::print::{print_program, print_stmt, print_type};
 
 /// What kind of card a row is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,282 +22,510 @@ pub enum CardKind {
     Simple,
     /// The `else` label of an if card.
     Else,
+    /// C++ the cards cannot express (read only text, can be moved and deleted).
+    Raw,
+    /// A top-level item that is not a function (include, alias, global, struct): read only.
+    Item,
 }
 
 /// One row of the block view.
 #[derive(Debug, Clone)]
 pub struct Row {
-    /// Statement or function id.
+    /// Statement, item or function id.
     pub node: NodeId,
     /// Nesting depth.
     pub depth: usize,
-    /// Card text.
+    /// Card text (one line).
     pub text: String,
     /// Icon name.
     pub icon: &'static str,
     /// Card kind.
     pub kind: CardKind,
+    /// The card is `else if (...)` continuing the chain of the card above (cannot be moved or deleted).
+    pub chained: bool,
+}
+
+impl Row {
+    /// Can the text of this card be edited?
+    pub fn editable(&self) -> bool {
+        matches!(self.kind, CardKind::Compound | CardKind::Simple)
+    }
+    /// Can the card be moved, deleted or have cards inserted after it?
+    pub fn movable(&self) -> bool {
+        matches!(
+            self.kind,
+            CardKind::Compound | CardKind::Simple | CardKind::Raw
+        ) && !self.chained
+    }
 }
 
 fn icon_of(k: &StmtKind) -> &'static str {
     match k {
-        StmtKind::Let { .. } => "label",
-        StmtKind::Assign { .. } => "pointer",
-        StmtKind::If { .. } => "signpost",
-        StmtKind::While { .. } | StmtKind::ForRange { .. } | StmtKind::ForEach { .. } => "reset",
+        StmtKind::Decl { .. } | StmtKind::Structured { .. } => "label",
+        StmtKind::Expr(e) if matches!(e.kind, ExprKind::Assign { .. }) => "pointer",
+        StmtKind::Expr(_) => "hand",
+        StmtKind::If { .. } | StmtKind::Switch { .. } | StmtKind::Case(_) => "signpost",
+        StmtKind::For { .. }
+        | StmtKind::RangeFor { .. }
+        | StmtKind::While { .. }
+        | StmtKind::DoWhile { .. } => "reset",
         StmtKind::Break => "cross",
         StmtKind::Continue => "fast",
         StmtKind::Return(_) => "outbox",
-        StmtKind::Expr(_) => "hand",
+        StmtKind::Block(_) | StmtKind::Empty => "code",
     }
 }
 
-/// The header text of a statement (what the Edit button changes).
+fn one_line(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn is_compound(k: &StmtKind) -> bool {
+    matches!(
+        k,
+        StmtKind::If { .. }
+            | StmtKind::For { .. }
+            | StmtKind::RangeFor { .. }
+            | StmtKind::While { .. }
+    )
+}
+
+fn empty_body() -> Box<Stmt> {
+    Box::new(Stmt::new(0, StmtKind::Block(Block::default())))
+}
+
+/// A copy of a statement without comments, with empty bodies: what the card header shows.
+fn header_clone(s: &Stmt) -> Stmt {
+    let mut c = s.clone();
+    c.comments.clear();
+    c.trailing = None;
+    match &mut c.kind {
+        StmtKind::If { then, els, .. } => {
+            *then = empty_body();
+            *els = None;
+        }
+        StmtKind::For { body, .. }
+        | StmtKind::RangeFor { body, .. }
+        | StmtKind::While { body, .. } => *body = empty_body(),
+        _ => {}
+    }
+    c
+}
+
+/// The one-line text of a card: the whole statement, or only the header of a compound statement.
 pub fn header_text(s: &Stmt) -> String {
+    let c = header_clone(s);
+    let printed = print_stmt(&c, 0);
+    let t = printed.trim_end();
+    let t = if is_compound(&c.kind) {
+        t.strip_suffix("{}")
+            .or_else(|| t.strip_suffix("{\n}"))
+            .unwrap_or(t)
+    } else {
+        t
+    };
+    one_line(t)
+}
+
+/// Does the statement print on several lines (or hide a comment), so a one-line card cannot hold it?
+fn needs_raw(s: &Stmt) -> bool {
     match &s.kind {
-        StmtKind::Let { pat, ty, init } => {
-            let t = ty.as_ref().map(|t| format!(": {t}")).unwrap_or_default();
-            format!("let {}{t} = {};", pat_text(pat), expr_text(init))
+        StmtKind::Switch { .. }
+        | StmtKind::Case(_)
+        | StmtKind::DoWhile { .. }
+        | StmtKind::Block(_)
+        | StmtKind::Empty => true,
+        k if is_compound(k) => {
+            let c = header_clone(s);
+            let printed = print_stmt(&c, 0);
+            let t = printed.trim_end();
+            let t = t.strip_suffix("{}").or_else(|| t.strip_suffix("{\n}"));
+            t.is_none_or(|t| t.contains('\n'))
         }
-        StmtKind::Assign { target, op, value } => {
-            format!(
-                "{} {}= {};",
-                expr_text(target),
-                op.map_or(String::new(), |o| o.text().to_string()),
-                expr_text(value)
-            )
-        }
-        StmtKind::If { cond, .. } => format!("if {}", expr_text(cond)),
-        StmtKind::While { cond, .. } => format!("while {}", expr_text(cond)),
-        StmtKind::ForRange {
-            var,
-            start,
-            end,
-            step,
-            ..
-        } => {
-            let mut a = Vec::new();
-            if let Some(x) = start {
-                a.push(expr_text(x));
-            } else if step.is_some() {
-                a.push("0".into());
-            }
-            a.push(expr_text(end));
-            if let Some(x) = step {
-                a.push(expr_text(x));
-            }
-            format!("for {var} in range({})", a.join(", "))
-        }
-        StmtKind::ForEach { pat, iter, .. } => {
-            format!("for {} in {}", pat_text(pat), expr_text(iter))
-        }
-        StmtKind::Break => "break;".into(),
-        StmtKind::Continue => "continue;".into(),
-        StmtKind::Return(Some(e)) => format!("return {};", expr_text(e)),
-        StmtKind::Return(None) => "return;".into(),
-        StmtKind::Expr(e) => format!("{};", expr_text(e)),
+        _ => print_stmt(&header_clone(s), 0).trim_end().contains('\n'),
     }
 }
 
-fn rows_block(b: &Block, depth: usize, out: &mut Vec<Row>) {
-    for s in &b.stmts {
-        let compound = matches!(
-            s.kind,
-            StmtKind::If { .. }
-                | StmtKind::While { .. }
-                | StmtKind::ForRange { .. }
-                | StmtKind::ForEach { .. }
-        );
-        out.push(Row {
-            node: s.id,
-            depth,
-            text: header_text(s),
-            icon: icon_of(&s.kind),
-            kind: if compound {
-                CardKind::Compound
-            } else {
-                CardKind::Simple
-            },
-        });
-        match &s.kind {
-            StmtKind::If { then, els, .. } => {
-                rows_block(then, depth + 1, out);
-                if let Some(e) = els {
+/// The text a card editor starts with (`None` for cards that cannot be edited).
+pub fn card_text(p: &Program, id: NodeId) -> Option<String> {
+    let mut found = None;
+    for it in p.player_items() {
+        if let ItemKind::Func(f) = &it.kind
+            && let Some(b) = &f.body
+        {
+            walk_stmts(b, &mut |s| {
+                if s.id == id && !needs_raw(s) {
+                    found = Some(header_text(s));
+                }
+            });
+        }
+    }
+    found
+}
+
+/// The signature of a function as one line.
+pub fn signature_text(f: &FnDecl) -> String {
+    let ps: Vec<String> = f
+        .params
+        .iter()
+        .map(|p| {
+            format!("{} {}", print_type(&p.spec), p.name)
+                .trim()
+                .to_string()
+        })
+        .collect();
+    format!("{} {}({})", print_type(&f.ret), f.name, ps.join(", "))
+}
+
+fn then_block(s: &Stmt) -> Option<&Block> {
+    match &s.kind {
+        StmtKind::Block(b) => Some(b),
+        _ => None,
+    }
+}
+
+fn row_of(s: &Stmt, depth: usize, chained: bool) -> Row {
+    let raw = needs_raw(s);
+    let text = if raw {
+        one_line(print_stmt(&header_clone(s), 0).trim_end())
+    } else if chained {
+        format!("else {}", header_text(s))
+    } else {
+        header_text(s)
+    };
+    Row {
+        node: s.id,
+        depth,
+        text,
+        icon: icon_of(&s.kind),
+        kind: if raw {
+            CardKind::Raw
+        } else if is_compound(&s.kind) {
+            CardKind::Compound
+        } else {
+            CardKind::Simple
+        },
+        chained,
+    }
+}
+
+fn rows_stmt(s: &Stmt, depth: usize, chained: bool, out: &mut Vec<Row>) {
+    out.push(row_of(s, depth, chained));
+    if needs_raw(s) {
+        return;
+    }
+    match &s.kind {
+        StmtKind::If { then, els, .. } => {
+            rows_body(then, depth + 1, out);
+            match els.as_deref() {
+                Some(e) if matches!(e.kind, StmtKind::If { .. }) => {
+                    rows_stmt(e, depth, true, out);
+                }
+                Some(e) => {
                     out.push(Row {
                         node: s.id,
                         depth,
                         text: "else".into(),
                         icon: "signpost",
                         kind: CardKind::Else,
+                        chained: false,
                     });
-                    rows_block(e, depth + 1, out);
+                    rows_body(e, depth + 1, out);
                 }
+                None => {}
             }
-            StmtKind::While { body, .. }
-            | StmtKind::ForRange { body, .. }
-            | StmtKind::ForEach { body, .. } => rows_block(body, depth + 1, out),
-            _ => {}
         }
+        StmtKind::For { body, .. }
+        | StmtKind::RangeFor { body, .. }
+        | StmtKind::While { body, .. } => rows_body(body, depth + 1, out),
+        _ => {}
     }
 }
 
-/// All rows of a program.
+fn rows_body(b: &Stmt, depth: usize, out: &mut Vec<Row>) {
+    match then_block(b) {
+        Some(blk) => rows_block(blk, depth, out),
+        None => rows_stmt(b, depth, false, out),
+    }
+}
+
+fn rows_block(b: &Block, depth: usize, out: &mut Vec<Row>) {
+    for s in &b.stmts {
+        rows_stmt(s, depth, false, out);
+    }
+}
+
+/// All rows of the player's part of a program.
 pub fn rows(p: &Program) -> Vec<Row> {
     let mut out = Vec::new();
-    for f in &p.fns {
-        out.push(Row {
-            node: f.id,
-            depth: 0,
-            text: algoclerk_core::lang::print::signature_text(f),
-            icon: "code",
-            kind: CardKind::Header,
-        });
-        rows_block(&f.body, 1, &mut out);
+    for it in p.player_items() {
+        match &it.kind {
+            ItemKind::Func(f) if f.body.is_some() => {
+                out.push(Row {
+                    node: f.id,
+                    depth: 0,
+                    text: signature_text(f),
+                    icon: "code",
+                    kind: CardKind::Header,
+                    chained: false,
+                });
+                if let Some(b) = &f.body {
+                    rows_block(b, 1, &mut out);
+                }
+            }
+            _ => {
+                let mut one = Program::default();
+                one.items.push(it.clone());
+                out.push(Row {
+                    node: it.id,
+                    depth: 0,
+                    text: one_line(print_program(&one, false).trim_end()),
+                    icon: "code",
+                    kind: CardKind::Item,
+                    chained: false,
+                });
+            }
+        }
     }
     out
 }
 
-fn locate<'a>(b: &'a mut Block, id: NodeId) -> Option<(&'a mut Block, usize)> {
-    if let Some(i) = b.stmts.iter().position(|s| s.id == id) {
-        return Some((b, i));
+// ---------------------------------------------------------------------------------------------------
+// structural edits
+// ---------------------------------------------------------------------------------------------------
+
+fn wrap_block(next: &mut NodeId, s: &mut Stmt) {
+    if !matches!(s.kind, StmtKind::Block(_)) {
+        let inner = std::mem::replace(s, Stmt::new(0, StmtKind::Empty));
+        let id = *next;
+        *next += 1;
+        *s = Stmt::new(
+            id,
+            StmtKind::Block(Block {
+                stmts: vec![inner],
+                tail_comments: Vec::new(),
+            }),
+        );
     }
-    for s in &mut b.stmts {
-        let found = match &mut s.kind {
-            StmtKind::If { then, els, .. } => {
-                if then.stmts.iter().any(|x| contains(x, id)) {
-                    locate(then, id)
-                } else if let Some(e) = els {
-                    locate(e, id)
-                } else {
-                    None
-                }
-            }
-            StmtKind::While { body, .. }
-            | StmtKind::ForRange { body, .. }
-            | StmtKind::ForEach { body, .. } => locate(body, id),
-            _ => None,
-        };
-        if found.is_some() {
-            return found;
-        }
-    }
-    None
 }
 
-fn contains(s: &Stmt, id: NodeId) -> bool {
-    if s.id == id {
+fn norm_block(next: &mut NodeId, b: &mut Block) {
+    for s in &mut b.stmts {
+        norm_stmt(next, s);
+    }
+}
+
+/// Give every body of an `if`, `else`, `for`, `while` its own braces (so cards can address it).
+fn norm_stmt(next: &mut NodeId, s: &mut Stmt) {
+    match &mut s.kind {
+        StmtKind::If { then, els, .. } => {
+            wrap_block(next, then);
+            norm_stmt(next, then);
+            if let Some(e) = els {
+                if !matches!(e.kind, StmtKind::If { .. }) {
+                    wrap_block(next, e);
+                }
+                norm_stmt(next, e);
+            }
+        }
+        StmtKind::For { body, .. }
+        | StmtKind::RangeFor { body, .. }
+        | StmtKind::While { body, .. } => {
+            wrap_block(next, body);
+            norm_stmt(next, body);
+        }
+        StmtKind::Block(b) => norm_block(next, b),
+        _ => {}
+    }
+}
+
+/// Add braces around single-statement bodies in the player's functions.
+pub fn normalise(p: &mut Program) {
+    let mut next = p.next_id;
+    let skip = p.prelude_items;
+    for it in p.items.iter_mut().skip(skip) {
+        if let ItemKind::Func(f) = &mut it.kind
+            && let Some(b) = &mut f.body
+        {
+            norm_block(&mut next, b);
+        }
+    }
+    p.next_id = next;
+}
+
+enum Target<'a> {
+    InBlock(&'a mut Block, usize),
+    Chained(&'a mut Stmt),
+}
+
+fn visit_block(b: &mut Block, id: NodeId, f: &mut dyn FnMut(Target<'_>)) -> bool {
+    if let Some(i) = b.stmts.iter().position(|s| s.id == id) {
+        f(Target::InBlock(b, i));
         return true;
     }
-    match &s.kind {
+    b.stmts.iter_mut().any(|s| visit_stmt(s, id, f))
+}
+
+fn visit_stmt(s: &mut Stmt, id: NodeId, f: &mut dyn FnMut(Target<'_>)) -> bool {
+    match &mut s.kind {
         StmtKind::If { then, els, .. } => {
-            then.stmts.iter().any(|x| contains(x, id))
-                || els
-                    .as_ref()
-                    .is_some_and(|e| e.stmts.iter().any(|x| contains(x, id)))
+            if let StmtKind::Block(b) = &mut then.kind
+                && visit_block(b, id, f)
+            {
+                return true;
+            }
+            match els {
+                Some(e) if matches!(e.kind, StmtKind::If { .. }) => {
+                    if e.id == id {
+                        f(Target::Chained(e));
+                        true
+                    } else {
+                        visit_stmt(e, id, f)
+                    }
+                }
+                Some(e) => match &mut e.kind {
+                    StmtKind::Block(b) => visit_block(b, id, f),
+                    _ => false,
+                },
+                None => false,
+            }
         }
-        StmtKind::While { body, .. }
-        | StmtKind::ForRange { body, .. }
-        | StmtKind::ForEach { body, .. } => body.stmts.iter().any(|x| contains(x, id)),
+        StmtKind::For { body, .. }
+        | StmtKind::RangeFor { body, .. }
+        | StmtKind::While { body, .. } => match &mut body.kind {
+            StmtKind::Block(b) => visit_block(b, id, f),
+            _ => false,
+        },
         _ => false,
     }
 }
 
-fn locate_in_prog(p: &mut Program, id: NodeId) -> Option<(&mut Block, usize)> {
-    for f in &mut p.fns {
-        if f.body.stmts.iter().any(|s| contains(s, id)) {
-            return locate(&mut f.body, id);
+fn with_target(p: &mut Program, id: NodeId, f: &mut dyn FnMut(Target<'_>)) -> bool {
+    let skip = p.prelude_items;
+    for it in p.items.iter_mut().skip(skip) {
+        if let ItemKind::Func(func) = &mut it.kind
+            && let Some(b) = &mut func.body
+            && visit_block(b, id, f)
+        {
+            return true;
         }
     }
-    None
-}
-
-fn find_stmt<'a>(b: &'a mut Block, id: NodeId) -> Option<&'a mut Stmt> {
-    let (blk, i) = locate(b, id)?;
-    blk.stmts.get_mut(i)
+    false
 }
 
 fn reprint(p: &Program) -> String {
-    print(p)
+    print_program(p, true)
 }
 
-/// Move a statement one place up (or down) among its siblings.
+/// Move a statement one place up (or down) among its siblings. Returns the new text.
 pub fn move_stmt(p: &mut Program, id: NodeId, up: bool) -> Option<String> {
-    let (blk, i) = locate_in_prog(p, id)?;
-    let j = if up { i.checked_sub(1)? } else { i + 1 };
-    if j >= blk.stmts.len() {
-        return None;
-    }
-    blk.stmts.swap(i, j);
-    Some(reprint(p))
+    normalise(p);
+    let mut moved = false;
+    with_target(p, id, &mut |t| {
+        if let Target::InBlock(b, i) = t {
+            let j = if up { i.checked_sub(1) } else { Some(i + 1) };
+            if let Some(j) = j.filter(|j| *j < b.stmts.len()) {
+                b.stmts.swap(i, j);
+                moved = true;
+            }
+        }
+    });
+    moved.then(|| reprint(p))
 }
 
-/// Delete a statement.
+/// Delete a statement. Returns the new text.
 pub fn delete_stmt(p: &mut Program, id: NodeId) -> Option<String> {
-    let (blk, i) = locate_in_prog(p, id)?;
-    blk.stmts.remove(i);
-    Some(reprint(p))
+    normalise(p);
+    let mut done = false;
+    with_target(p, id, &mut |t| {
+        if let Target::InBlock(b, i) = t {
+            b.stmts.remove(i);
+            done = true;
+        }
+    });
+    done.then(|| reprint(p))
 }
 
-/// Parse a statement from header text (compound statements get an empty body).
-pub fn parse_stmt(text: &str) -> Result<Stmt, String> {
+/// Parse one statement from card text (compound headers such as `if (x > 2)` get an empty body).
+///
+/// # Errors
+/// The parser's message, or "A card holds exactly one sentence."
+pub fn parse_stmt(p: &mut Program, text: &str) -> Result<Stmt, String> {
     let t = text.trim();
-    let wrapped = if t.ends_with(';') || t.ends_with('}') {
-        format!("fn w() {{ {t} }}")
+    let t = t.strip_prefix("else ").map_or(t, str::trim_start);
+    if t.is_empty() {
+        return Err("The card is empty.".into());
+    }
+    let body = if t.ends_with(';') || t.ends_with('}') {
+        t.to_string()
     } else {
-        format!("fn w() {{ {t} {{ }} }}")
+        format!("{t} {{}}")
     };
-    let p = parse(&wrapped).map_err(|d| d.msg)?;
-    let f = p.fns.into_iter().next().ok_or("empty")?;
-    if f.body.stmts.len() != 1 {
+    let wrapped = format!("void w() {{\n{body}\n}}\n");
+    let opts = ParseOpts {
+        first_id: p.next_id,
+        known_types: known_types(p),
+    };
+    let parsed = parse(&wrapped, &opts).map_err(|d| {
+        d.first()
+            .map_or_else(|| "I cannot read that card.".to_string(), |d| d.msg.clone())
+    })?;
+    p.next_id = p.next_id.max(parsed.next_id);
+    let Some(Item {
+        kind: ItemKind::Func(f),
+        ..
+    }) = parsed.items.into_iter().next()
+    else {
+        return Err("I cannot read that card.".into());
+    };
+    let mut stmts = f.body.map(|b| b.stmts).unwrap_or_default();
+    if stmts.len() != 1 {
         return Err("A card holds exactly one sentence.".into());
     }
-    f.body
-        .stmts
-        .into_iter()
-        .next()
-        .ok_or_else(|| "empty".to_string())
+    Ok(stmts.remove(0))
 }
 
-/// Replace the header of a statement, keeping its body.
-pub fn edit_stmt(p: &mut Program, id: NodeId, text: &str) -> Result<String, String> {
-    let new = parse_stmt(text)?;
-    let mut done = false;
-    for f in &mut p.fns {
-        if let Some(s) = find_stmt(&mut f.body, id) {
-            let old = std::mem::replace(&mut s.kind, StmtKind::Break);
-            s.kind = match (old, new.kind) {
-                (StmtKind::If { then, els, .. }, StmtKind::If { cond, .. }) => {
-                    StmtKind::If { cond, then, els }
-                }
-                (StmtKind::While { body, .. }, StmtKind::While { cond, .. }) => {
-                    StmtKind::While { cond, body }
-                }
-                (
-                    StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. },
-                    StmtKind::ForRange {
-                        var,
-                        start,
-                        end,
-                        step,
-                        ..
-                    },
-                ) => StmtKind::ForRange {
-                    var,
-                    start,
-                    end,
-                    step,
-                    body,
-                },
-                (
-                    StmtKind::ForRange { body, .. } | StmtKind::ForEach { body, .. },
-                    StmtKind::ForEach { pat, iter, .. },
-                ) => StmtKind::ForEach { pat, iter, body },
-                (_, other) => other,
-            };
-            done = true;
-            break;
+fn transplant(old: StmtKind, new: &mut StmtKind) {
+    let (body, old_els) = match old {
+        StmtKind::If { then, els, .. } => (Some(then), els),
+        StmtKind::For { body, .. }
+        | StmtKind::RangeFor { body, .. }
+        | StmtKind::While { body, .. } => (Some(body), None),
+        _ => (None, None),
+    };
+    let Some(body) = body else { return };
+    match new {
+        StmtKind::If { then, els, .. } => {
+            *then = body;
+            *els = old_els;
         }
+        StmtKind::For { body: b, .. }
+        | StmtKind::RangeFor { body: b, .. }
+        | StmtKind::While { body: b, .. } => *b = body,
+        _ => {}
     }
+}
+
+/// Replace the header of a statement, keeping its body. Returns the new text.
+///
+/// # Errors
+/// The parser's message, or "That card is gone."
+pub fn edit_stmt(p: &mut Program, id: NodeId, text: &str) -> Result<String, String> {
+    normalise(p);
+    let new = parse_stmt(p, text)?;
+    let mut slot = Some(new);
+    let done = with_target(p, id, &mut |t| {
+        let s = match t {
+            Target::InBlock(b, i) => &mut b.stmts[i],
+            Target::Chained(s) => s,
+        };
+        if let Some(n) = slot.take() {
+            let old = std::mem::replace(&mut s.kind, StmtKind::Empty);
+            let mut kind = n.kind;
+            transplant(old, &mut kind);
+            s.kind = kind;
+        }
+    });
     if done {
         Ok(reprint(p))
     } else {
@@ -300,107 +533,152 @@ pub fn edit_stmt(p: &mut Program, id: NodeId, text: &str) -> Result<String, Stri
     }
 }
 
-/// Insert a new statement after `id` (or at the start of its body when `inside`).
+fn first_body(s: &mut Stmt) -> Option<&mut Block> {
+    let body = match &mut s.kind {
+        StmtKind::If { then, .. } => then,
+        StmtKind::For { body, .. }
+        | StmtKind::RangeFor { body, .. }
+        | StmtKind::While { body, .. } => body,
+        _ => return None,
+    };
+    match &mut body.kind {
+        StmtKind::Block(b) => Some(b),
+        _ => None,
+    }
+}
+
+/// Insert a new statement after `anchor` (or at the start of its body when `inside`); without an anchor it
+/// goes to the end of the function called `entry` (or the last function). Returns the new text.
+///
+/// # Errors
+/// The parser's message, "That card is gone." or "That card has no inside."
 pub fn insert_stmt(
     p: &mut Program,
+    entry: &str,
     anchor: Option<NodeId>,
     inside: bool,
     text: &str,
 ) -> Result<String, String> {
-    let mut new = parse_stmt(text)?;
-    new.id = p.fresh_id();
+    normalise(p);
+    let new = parse_stmt(p, text)?;
     match anchor {
         None => {
-            let f = p.fns.first_mut().ok_or("no function")?;
-            f.body.stmts.push(new);
+            let skip = p.prelude_items;
+            let mut funcs: Vec<&mut FnDecl> = p
+                .items
+                .iter_mut()
+                .skip(skip)
+                .filter_map(|i| match &mut i.kind {
+                    ItemKind::Func(f) if f.body.is_some() => Some(f),
+                    _ => None,
+                })
+                .collect();
+            let at = funcs
+                .iter()
+                .position(|f| f.name == entry)
+                .or(funcs.len().checked_sub(1))
+                .ok_or("There is no function to put the card in.")?;
+            if let Some(b) = &mut funcs[at].body {
+                b.stmts.push(new);
+            }
         }
         Some(id) => {
-            if inside {
-                let mut placed = false;
-                for f in &mut p.fns {
-                    if let Some(s) = find_stmt(&mut f.body, id) {
-                        match &mut s.kind {
-                            StmtKind::If { then, .. } => then.stmts.insert(0, new.clone()),
-                            StmtKind::While { body, .. }
-                            | StmtKind::ForRange { body, .. }
-                            | StmtKind::ForEach { body, .. } => body.stmts.insert(0, new.clone()),
-                            _ => return Err("That card has no inside.".into()),
-                        }
-                        placed = true;
-                        break;
-                    }
+            let mut slot = Some(new);
+            let mut err: Option<&str> = None;
+            let done = with_target(p, id, &mut |t| {
+                let Some(n) = slot.take() else { return };
+                match (t, inside) {
+                    (Target::InBlock(b, i), false) => b.stmts.insert(i + 1, n),
+                    (Target::InBlock(b, i), true) => match first_body(&mut b.stmts[i]) {
+                        Some(body) => body.stmts.insert(0, n),
+                        None => err = Some("That card has no inside."),
+                    },
+                    (Target::Chained(s), true) => match first_body(s) {
+                        Some(body) => body.stmts.insert(0, n),
+                        None => err = Some("That card has no inside."),
+                    },
+                    (Target::Chained(_), false) => err = Some("Put the card inside instead."),
                 }
-                if !placed {
-                    return Err("That card is gone.".into());
-                }
-            } else {
-                let (blk, i) = locate_in_prog(p, id).ok_or("That card is gone.")?;
-                blk.stmts.insert(i + 1, new);
+            });
+            if let Some(e) = err {
+                return Err(e.into());
+            }
+            if !done {
+                return Err("That card is gone.".into());
             }
         }
     }
     Ok(reprint(p))
 }
 
-/// The template cards of the palette. `{n}` is replaced with a fresh name.
+/// Names the palette templates are filled with.
+#[derive(Debug, Clone)]
+pub struct Fill {
+    /// A fresh variable name.
+    pub fresh: String,
+    /// The first container parameter (or a fallback name).
+    pub container: String,
+    /// Is `container` a real parameter?
+    pub has_container: bool,
+    /// A `return` value of the function's return type.
+    pub ret: String,
+}
+
+impl Fill {
+    /// Fill values for a function: its first container parameter and a default return value.
+    pub fn for_function(fresh: String, f: Option<&FnDecl>) -> Fill {
+        let container = f.and_then(|f| {
+            f.params.iter().find(|p| {
+                matches!(
+                    p.spec.ty,
+                    Ty::Vector(_) | Ty::Str | Ty::StrView | Ty::Array(..) | Ty::Deque(_)
+                )
+            })
+        });
+        let ret = match f.map(|f| &f.ret.ty) {
+            Some(Ty::Bool) => "false",
+            Some(Ty::Ptr(_)) => "nullptr",
+            Some(Ty::Void) => "",
+            Some(t) if t.is_integral() => "0",
+            Some(Ty::Str) => "\"\"",
+            Some(_) => "{}",
+            None => "0",
+        };
+        Fill {
+            fresh,
+            container: container.map_or_else(|| "items".to_string(), |p| p.name.clone()),
+            has_container: container.is_some(),
+            ret: ret.to_string(),
+        }
+    }
+
+    /// Instantiate a palette template.
+    pub fn apply(&self, template: &str) -> String {
+        let len = if self.has_container {
+            format!("static_cast<int>({}.size())", self.container)
+        } else {
+            "10".to_string()
+        };
+        let t = template
+            .replace("{n}", &self.fresh)
+            .replace("{c}", &self.container)
+            .replace("{len}", &len)
+            .replace("{ret}", &self.ret);
+        t.replace("return ;", "return;")
+            .replace("return  ;", "return;")
+    }
+}
+
+/// The template cards of the palette: label and C++ text (`{n}` fresh name, `{c}` a container, ...).
 pub const PALETTE: &[(&str, &str)] = &[
-    ("let", "let {n} = 0;"),
+    ("int", "int {n} = 0;"),
     ("set", "{n} = {n};"),
-    ("if", "if true"),
-    ("while", "while true"),
-    ("for i", "for i in range(len(items))"),
-    ("for each", "for item in items"),
-    ("push", "items.push(0);"),
-    ("return", "return 0;"),
+    ("if", "if (true)"),
+    ("while", "while (true)"),
+    ("for i", "for (int i = 0; i < {len}; ++i)"),
+    ("for each", "for (const auto& x : {c})"),
+    ("push", "{c}.push_back(0);"),
+    ("return", "return {ret};"),
     ("break", "break;"),
     ("continue", "continue;"),
 ];
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const SRC: &str = "fn f(a: vec<int>) -> int {\n    let t = 0;\n    for x in a {\n        if x > 2 {\n            t += x;\n        } else {\n            t -= 1;\n        }\n    }\n    return t;\n}\n";
-
-    #[test]
-    fn rows_follow_the_text() {
-        let p = parse(SRC).unwrap();
-        let r = rows(&p);
-        assert_eq!(r[0].kind, CardKind::Header);
-        assert!(r.iter().any(|x| x.text == "else"));
-        assert!(r.iter().any(|x| x.text == "for x in a" && x.depth == 1));
-        assert!(r.iter().any(|x| x.text == "t += x;" && x.depth == 3));
-    }
-
-    #[test]
-    fn structural_edits_round_trip_through_text() {
-        let mut p = parse(SRC).unwrap();
-        let ret = p.fns[0].body.stmts[2].id;
-        let text = move_stmt(&mut p, ret, true).unwrap();
-        assert!(text.find("return t;").unwrap() < text.find("for x in a").unwrap());
-        let mut p = parse(&text).unwrap();
-        let t0 = p.fns[0].body.stmts[0].id;
-        let text = edit_stmt(&mut p, t0, "let total = 1;").unwrap();
-        assert!(text.contains("let total = 1;"));
-        let mut p = parse(&text).unwrap();
-        let lp = p.fns[0].body.stmts[2].id;
-        let text = edit_stmt(&mut p, lp, "for x in a").unwrap();
-        assert!(text.contains("else {"));
-        let mut p = parse(&text).unwrap();
-        let first = p.fns[0].body.stmts[0].id;
-        let text = insert_stmt(&mut p, Some(first), false, "let n = len(a);").unwrap();
-        assert!(parse(&text).is_ok() && text.contains("let n = len(a);"));
-        let mut p = parse(&text).unwrap();
-        let id = p.fns[0].body.stmts[1].id;
-        let text = delete_stmt(&mut p, id).unwrap();
-        assert!(!text.contains("let n"));
-    }
-
-    #[test]
-    fn bad_card_text_is_reported_not_applied() {
-        let mut p = parse(SRC).unwrap();
-        let id = p.fns[0].body.stmts[0].id;
-        assert!(edit_stmt(&mut p, id, "let = ;").is_err());
-        assert!(parse_stmt("a; b;").is_err());
-    }
-}

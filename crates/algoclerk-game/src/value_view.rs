@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Pixel-art widgets for ClerkScript values: ints are crates, chars are letter tiles, strings are
-//! ribbons of tiles, vectors are shelves, maps are filing-cabinet drawers, sets are bins, stacks are
-//! spring plates, queues are belts, heaps are pyramids, lists are chains of tags and trees are org charts.
+//! Pixel-art widgets for C++ values: ints are crates, chars are letter tiles, strings are ribbons of
+//! tiles, vectors and arrays are shelves, maps are filing-cabinet drawers, sets are bins, stacks are spring
+//! plates, queues and deques are belts, priority queues are pyramids, `ListNode*` are chains of tags and
+//! `TreeNode*` are org charts.
 
 use crate::gfx::Gfx;
-use algoclerk_core::lang::ast::Ty;
-use algoclerk_core::lang::value::{NodeData, Value};
+use algoclerk_core::cpp::ast::Ty;
+use algoclerk_core::cpp::value::{Heap, Plain, render};
 use algoclerk_media::Rect;
 use std::collections::VecDeque;
 
@@ -73,234 +74,123 @@ fn crate_w(label: &str) -> i32 {
     (label.chars().count() as i32 * 4 + 5).max(16)
 }
 
-/// Build the widget for a value inside a width budget.
-pub fn build(v: &Value, t: &Ty, nodes: &[NodeData], max_w: i32) -> W {
+fn tag(label: &'static str) -> W {
+    W {
+        w: (label.len() as i32 * 4 + 10).max(22),
+        h: 12,
+        k: K::Tag { label, inner: None },
+    }
+}
+
+fn tile(c: u8) -> W {
+    let ch = if (0x20..0x7f).contains(&c) {
+        c as char
+    } else {
+        '?'
+    };
+    W {
+        w: 9,
+        h: 11,
+        k: K::Tile(ch),
+    }
+}
+
+fn int_widget(i: i128) -> W {
+    let label = if i.abs() >= 100_000 {
+        format!("{}k", i / 1000)
+    } else {
+        i.to_string()
+    };
+    W {
+        w: crate_w(&label),
+        h: 16,
+        k: K::Crate(label, i < 0),
+    }
+}
+
+fn string_widget(s: &[u8], max_w: i32) -> W {
+    let max_cells = ((max_w - 4) / 9).clamp(3, 24) as usize;
+    let cell = |c: &u8| (String::new(), tile(*c));
+    if s.len() <= max_cells {
+        let cells: Vec<(String, W)> = s.iter().map(cell).collect();
+        let w = cells.len() as i32 * 9 + 4;
+        return W {
+            w: w.max(13),
+            h: 15,
+            k: K::Shelf {
+                cells,
+                gap_at: None,
+                total: s.len(),
+            },
+        };
+    }
+    let head = max_cells - 3;
+    let mut cells: Vec<(String, W)> = s[..head].iter().map(cell).collect();
+    cells.extend(s[s.len() - 2..].iter().map(cell));
+    W {
+        w: (cells.len() as i32 + 1) * 9 + 4,
+        h: 15,
+        k: K::Shelf {
+            cells,
+            gap_at: Some(head),
+            total: s.len(),
+        },
+    }
+}
+
+/// Element type of a sequence-like container.
+fn elem_ty(t: &Ty) -> Option<&Ty> {
+    match t {
+        Ty::Vector(e)
+        | Ty::Array(e, _)
+        | Ty::Deque(e)
+        | Ty::List(e)
+        | Ty::Stack(e)
+        | Ty::Queue(e)
+        | Ty::Set(e)
+        | Ty::UnorderedSet(e)
+        | Ty::PriorityQueue(e, _) => Some(e),
+        _ => None,
+    }
+}
+
+fn is_grid_elem(t: &Ty) -> bool {
+    matches!(t, Ty::Vector(_) | Ty::Array(..))
+}
+
+/// Build the widget for a value inside a width budget. `heap` holds the struct instances behind pointers.
+pub fn build(v: &Plain, t: &Ty, heap: &Heap, max_w: i32) -> W {
     match (v, t) {
-        (Value::Int(i), _) => {
-            let label = if i.abs() >= 100_000 {
-                format!("{}k", i / 1000)
-            } else {
-                i.to_string()
-            };
-            W {
-                w: crate_w(&label),
-                h: 16,
-                k: K::Crate(label, *i < 0),
-            }
-        }
-        (Value::Bool(b), _) => W {
+        (Plain::Uninit, _) => tag("uninit"),
+        (Plain::Void, _) => tag("..."),
+        (Plain::Int(i), Ty::Bool) => W {
             w: 14,
             h: 14,
-            k: K::Stamp(*b),
+            k: K::Stamp(*i != 0),
         },
-        (Value::Char(c), _) => W {
-            w: 9,
-            h: 11,
-            k: K::Tile(*c as char),
+        (Plain::Int(i), Ty::Char) => tile(*i as u8),
+        (Plain::Int(i), _) => int_widget(*i),
+        (Plain::Str(s), _) => string_widget(s, max_w),
+        (Plain::Seq(items), Ty::Pair(a, b)) if items.len() == 2 => {
+            group(items, &[(**a).clone(), (**b).clone()], heap, max_w)
+        }
+        (Plain::Seq(items), Ty::Tuple(ts)) => group(items, ts, heap, max_w),
+        (Plain::Seq(items), Ty::Stack(et)) => plates(items, et, heap, max_w),
+        (Plain::Seq(items), Ty::Queue(et) | Ty::Deque(et)) => {
+            belt(items, et, heap, max_w, matches!(t, Ty::Deque(_)))
+        }
+        (Plain::Seq(items), Ty::PriorityQueue(et, _)) => pyramid(items, et, heap),
+        (Plain::Seq(items), Ty::Set(et) | Ty::UnorderedSet(et)) => bin(items, et, heap, max_w),
+        (Plain::Seq(items), _) => match elem_ty(t) {
+            Some(et) => vec_widget(items, et, heap, max_w),
+            None => other(t),
         },
-        (Value::Str(s), _) => {
-            let max_cells = ((max_w - 4) / 9).clamp(3, 24) as usize;
-            let chars: Vec<char> = s.iter().map(|b| *b as char).collect();
-            if chars.len() <= max_cells {
-                let cells: Vec<(String, W)> = chars
-                    .iter()
-                    .map(|c| {
-                        (
-                            String::new(),
-                            W {
-                                w: 9,
-                                h: 11,
-                                k: K::Tile(*c),
-                            },
-                        )
-                    })
-                    .collect();
-                let w = cells.len() as i32 * 9 + 4;
-                W {
-                    w: w.max(13),
-                    h: 15,
-                    k: K::Shelf {
-                        cells,
-                        gap_at: None,
-                        total: chars.len(),
-                    },
-                }
-            } else {
-                let head = max_cells - 3;
-                let mut cells: Vec<(String, W)> = chars[..head]
-                    .iter()
-                    .map(|c| {
-                        (
-                            String::new(),
-                            W {
-                                w: 9,
-                                h: 11,
-                                k: K::Tile(*c),
-                            },
-                        )
-                    })
-                    .collect();
-                cells.extend(chars[chars.len() - 2..].iter().map(|c| {
-                    (
-                        String::new(),
-                        W {
-                            w: 9,
-                            h: 11,
-                            k: K::Tile(*c),
-                        },
-                    )
-                }));
-                W {
-                    w: (cells.len() as i32 + 1) * 9 + 4,
-                    h: 15,
-                    k: K::Shelf {
-                        cells,
-                        gap_at: Some(head),
-                        total: chars.len(),
-                    },
-                }
-            }
+        (Plain::Map(items), Ty::Map(kt, vt) | Ty::UnorderedMap(kt, vt)) => {
+            drawers(items, kt, vt, heap, max_w)
         }
-        (Value::Vec(items), Ty::Vec(et)) | (Value::Stack(items), Ty::Stack(et))
-            if matches!(v, Value::Vec(_)) =>
-        {
-            vec_widget(items, et, nodes, max_w)
-        }
-        (Value::Stack(items), Ty::Stack(et)) => {
-            let cap = 5usize;
-            let shown: Vec<W> = items
-                .iter()
-                .rev()
-                .take(cap)
-                .rev()
-                .map(|x| build(x, et, nodes, max_w - 8))
-                .collect();
-            let hidden = items.len().saturating_sub(cap);
-            let w = shown.iter().map(|x| x.w).max().unwrap_or(10) + 8;
-            let h = shown.iter().map(|x| x.h + 3).sum::<i32>() + 6 + if hidden > 0 { 8 } else { 0 };
-            W {
-                w: w.max(26),
-                h,
-                k: K::Plates {
-                    items: shown,
-                    hidden,
-                },
-            }
-        }
-        (Value::Queue(items), Ty::Queue(et) | Ty::Deque(et)) => {
-            let cap = ((max_w - 12) / 18).clamp(2, 7) as usize;
-            let shown: Vec<W> = items
-                .iter()
-                .take(cap)
-                .map(|x| build(x, et, nodes, 30))
-                .collect();
-            let hidden = items.len().saturating_sub(cap);
-            let w =
-                shown.iter().map(|x| x.w + 2).sum::<i32>() + 12 + if hidden > 0 { 14 } else { 0 };
-            let h = shown.iter().map(|x| x.h).max().unwrap_or(12) + 8;
-            W {
-                w: w.max(30),
-                h,
-                k: K::Belt {
-                    items: shown,
-                    hidden,
-                    double: matches!(t, Ty::Deque(_)),
-                },
-            }
-        }
-        (Value::Heap(items), Ty::Heap(et)) => {
-            let mut levels: Vec<Vec<W>> = Vec::new();
-            let mut i = 0;
-            let mut width = 1;
-            while i < items.len() && levels.len() < 4 {
-                let row: Vec<W> = items[i..(i + width).min(items.len())]
-                    .iter()
-                    .map(|x| build(x, et, nodes, 30))
-                    .collect();
-                i += width;
-                width *= 2;
-                levels.push(row);
-            }
-            let w = levels
-                .iter()
-                .map(|r| r.iter().map(|x| x.w + 2).sum::<i32>())
-                .max()
-                .unwrap_or(10)
-                + 6;
-            let h = levels
-                .iter()
-                .map(|r| r.iter().map(|x| x.h).max().unwrap_or(0) + 2)
-                .sum::<i32>()
-                + 4;
-            W {
-                w,
-                h,
-                k: K::Pyramid(levels),
-            }
-        }
-        (Value::Set(items), Ty::Set(et)) => {
-            let cap = ((max_w - 8) / 20).clamp(2, 8) as usize;
-            let shown: Vec<W> = items
-                .iter()
-                .take(cap)
-                .map(|x| build(x, et, nodes, 30))
-                .collect();
-            let hidden = items.len().saturating_sub(cap);
-            let w =
-                shown.iter().map(|x| x.w + 2).sum::<i32>() + 10 + if hidden > 0 { 14 } else { 0 };
-            let h = shown.iter().map(|x| x.h).max().unwrap_or(12) + 8;
-            W {
-                w: w.max(26),
-                h,
-                k: K::Bin {
-                    items: shown,
-                    hidden,
-                },
-            }
-        }
-        (Value::Map(items), Ty::Map(kt, vt)) => {
-            let cap = 5usize;
-            let rows: Vec<(W, W)> = items
-                .iter()
-                .take(cap)
-                .map(|(k, x)| (build(k, kt, nodes, 50), build(x, vt, nodes, max_w - 70)))
-                .collect();
-            let hidden = items.len().saturating_sub(cap);
-            let kw = rows.iter().map(|r| r.0.w).max().unwrap_or(10);
-            let vw = rows.iter().map(|r| r.1.w).max().unwrap_or(10);
-            let h = rows.iter().map(|r| r.0.h.max(r.1.h) + 4).sum::<i32>()
-                + 4
-                + if hidden > 0 { 8 } else { 0 };
-            W {
-                w: kw + vw + 14,
-                h: h.max(18),
-                k: K::Drawers { rows, hidden },
-            }
-        }
-        (Value::Tuple(items), Ty::Tuple(ts)) => {
-            let parts: Vec<W> = items
-                .iter()
-                .zip(ts.iter())
-                .map(|(x, t)| build(x, t, nodes, (max_w / items.len().max(1) as i32).max(30)))
-                .collect();
-            let w = parts.iter().map(|x| x.w + 3).sum::<i32>() + 6;
-            let h = parts.iter().map(|x| x.h).max().unwrap_or(10) + 2;
-            W {
-                w,
-                h,
-                k: K::Group(parts),
-            }
-        }
-        (Value::Opt(None), _) => W {
-            w: 22,
-            h: 12,
-            k: K::Tag {
-                label: "none",
-                inner: None,
-            },
-        },
-        (Value::Opt(Some(x)), Ty::Option(et)) => {
-            let inner = build(x, et, nodes, max_w - 24);
+        (Plain::Opt(None), _) => tag("nullopt"),
+        (Plain::Opt(Some(x)), Ty::Optional(et)) => {
+            let inner = build(x, et, heap, max_w - 24);
             W {
                 w: inner.w + 6,
                 h: inner.h + 8,
@@ -310,124 +200,281 @@ pub fn build(v: &Value, t: &Ty, nodes: &[NodeData], max_w: i32) -> W {
                 },
             }
         }
-        (Value::Node(h), Ty::LNode) => {
-            let mut vals = Vec::new();
-            let mut seen = Vec::new();
-            let mut cur = *h;
-            let mut cycle = None;
-            let mut more = false;
-            while cur != 0 {
-                if let Some(p) = seen.iter().position(|s| *s == cur) {
-                    cycle = Some(p.min(7));
-                    break;
-                }
-                if vals.len() >= ((max_w - 8) / 22).clamp(2, 8) as usize {
-                    more = true;
-                    break;
-                }
-                seen.push(cur);
-                let Some(n) = nodes.get(cur as usize) else {
-                    break;
-                };
-                vals.push(n.val.to_string());
-                cur = n.a;
-            }
-            if vals.is_empty() {
-                return W {
-                    w: 22,
-                    h: 12,
-                    k: K::Tag {
-                        label: "null",
-                        inner: None,
-                    },
-                };
-            }
-            W {
-                w: vals.iter().map(|s| crate_w(s).max(14) + 6).sum::<i32>()
-                    + 4
-                    + if more { 10 } else { 0 },
-                h: 22,
-                k: K::Chain { vals, cycle, more },
-            }
-        }
-        (Value::Node(h), Ty::TNode) => {
-            if *h == 0 {
-                return W {
-                    w: 22,
-                    h: 12,
-                    k: K::Tag {
-                        label: "null",
-                        inner: None,
-                    },
-                };
-            }
-            // level order, at most 15 nodes
-            let mut layout: Vec<(i32, i32, String)> = Vec::new();
-            let mut edges = Vec::new();
-            let mut q: VecDeque<(u32, i32, i32, i32, Option<usize>)> = VecDeque::new();
-            q.push_back((*h, 0, 0, 64, None));
-            let mut more = false;
-            while let Some((n, depth, x, span, parent)) = q.pop_front() {
-                if layout.len() >= 15 || depth > 3 {
-                    more = true;
-                    continue;
-                }
-                let Some(d) = nodes.get(n as usize) else {
-                    continue;
-                };
-                let id = layout.len();
-                layout.push((x, depth, d.val.to_string()));
-                if let Some(p) = parent {
-                    edges.push((p, id));
-                }
-                if d.a != 0 {
-                    q.push_back((d.a, depth + 1, x - span / 2, span / 2, Some(id)));
-                }
-                if d.b != 0 {
-                    q.push_back((d.b, depth + 1, x + span / 2, span / 2, Some(id)));
-                }
-            }
-            let min_x = layout.iter().map(|n| n.0).min().unwrap_or(0);
-            let max_x = layout.iter().map(|n| n.0).max().unwrap_or(0);
-            let max_d = layout.iter().map(|n| n.1).max().unwrap_or(0);
-            let scale_x = ((max_w - 24) as f32 / ((max_x - min_x).max(1)) as f32).clamp(0.2, 0.5);
-            let nodes_l: Vec<(i32, i32, String)> = layout
-                .iter()
-                .map(|(x, d, s)| {
-                    (
-                        ((x - min_x) as f32 * scale_x) as i32 + 8,
-                        d * 15 + 7,
-                        s.clone(),
-                    )
-                })
-                .collect();
-            let w = nodes_l.iter().map(|n| n.0).max().unwrap_or(10) + 12;
-            W {
-                w,
-                h: (max_d + 1) * 15 + 4,
-                k: K::Org {
-                    nodes: nodes_l,
-                    edges,
-                    more,
-                },
-            }
-        }
-        (other, _) => W {
-            w: 24,
+        (Plain::Ptr(h), Ty::Ptr(inner)) => pointer(*h, inner, heap, max_w),
+        (Plain::Struct(_), Ty::Struct(name)) => W {
+            w: (name.chars().count() as i32 * 4 + 10).max(24),
             h: 12,
-            k: K::Plate(format!("{other:?}").chars().take(4).collect(), 'A'),
+            k: K::Plate(name.chars().take(10).collect(), 'A'),
+        },
+        _ => other(t),
+    }
+}
+
+fn other(t: &Ty) -> W {
+    let label: String = t.to_string().chars().take(5).collect();
+    W {
+        w: (label.chars().count() as i32 * 4 + 10).max(24),
+        h: 12,
+        k: K::Plate(label, 'A'),
+    }
+}
+
+fn group(items: &[Plain], ts: &[Ty], heap: &Heap, max_w: i32) -> W {
+    let each = (max_w / items.len().max(1) as i32).max(30);
+    let parts: Vec<W> = items
+        .iter()
+        .zip(ts.iter())
+        .map(|(x, t)| build(x, t, heap, each))
+        .collect();
+    let w = parts.iter().map(|x| x.w + 3).sum::<i32>() + 6;
+    let h = parts.iter().map(|x| x.h).max().unwrap_or(10) + 2;
+    W {
+        w,
+        h,
+        k: K::Group(parts),
+    }
+}
+
+fn plates(items: &[Plain], et: &Ty, heap: &Heap, max_w: i32) -> W {
+    let cap = 5usize;
+    let shown: Vec<W> = items
+        .iter()
+        .rev()
+        .take(cap)
+        .rev()
+        .map(|x| build(x, et, heap, max_w - 8))
+        .collect();
+    let hidden = items.len().saturating_sub(cap);
+    let w = shown.iter().map(|x| x.w).max().unwrap_or(10) + 8;
+    let h = shown.iter().map(|x| x.h + 3).sum::<i32>() + 6 + if hidden > 0 { 8 } else { 0 };
+    W {
+        w: w.max(26),
+        h,
+        k: K::Plates {
+            items: shown,
+            hidden,
         },
     }
 }
 
-fn vec_widget(items: &[Value], et: &Ty, nodes: &[NodeData], max_w: i32) -> W {
-    if matches!(et, Ty::Vec(_)) && !items.is_empty() {
+fn belt(items: &[Plain], et: &Ty, heap: &Heap, max_w: i32, double: bool) -> W {
+    let cap = ((max_w - 12) / 18).clamp(2, 7) as usize;
+    let shown: Vec<W> = items
+        .iter()
+        .take(cap)
+        .map(|x| build(x, et, heap, 30))
+        .collect();
+    let hidden = items.len().saturating_sub(cap);
+    let w = shown.iter().map(|x| x.w + 2).sum::<i32>() + 12 + if hidden > 0 { 14 } else { 0 };
+    let h = shown.iter().map(|x| x.h).max().unwrap_or(12) + 8;
+    W {
+        w: w.max(30),
+        h,
+        k: K::Belt {
+            items: shown,
+            hidden,
+            double,
+        },
+    }
+}
+
+fn pyramid(items: &[Plain], et: &Ty, heap: &Heap) -> W {
+    let mut levels: Vec<Vec<W>> = Vec::new();
+    let mut i = 0;
+    let mut width = 1;
+    while i < items.len() && levels.len() < 4 {
+        let row: Vec<W> = items[i..(i + width).min(items.len())]
+            .iter()
+            .map(|x| build(x, et, heap, 30))
+            .collect();
+        i += width;
+        width *= 2;
+        levels.push(row);
+    }
+    let w = levels
+        .iter()
+        .map(|r| r.iter().map(|x| x.w + 2).sum::<i32>())
+        .max()
+        .unwrap_or(10)
+        + 6;
+    let h = levels
+        .iter()
+        .map(|r| r.iter().map(|x| x.h).max().unwrap_or(0) + 2)
+        .sum::<i32>()
+        + 4;
+    W {
+        w: w.max(24),
+        h: h.max(14),
+        k: K::Pyramid(levels),
+    }
+}
+
+fn bin(items: &[Plain], et: &Ty, heap: &Heap, max_w: i32) -> W {
+    let cap = ((max_w - 8) / 20).clamp(2, 8) as usize;
+    let shown: Vec<W> = items
+        .iter()
+        .take(cap)
+        .map(|x| build(x, et, heap, 30))
+        .collect();
+    let hidden = items.len().saturating_sub(cap);
+    let w = shown.iter().map(|x| x.w + 2).sum::<i32>() + 10 + if hidden > 0 { 14 } else { 0 };
+    let h = shown.iter().map(|x| x.h).max().unwrap_or(12) + 8;
+    W {
+        w: w.max(26),
+        h,
+        k: K::Bin {
+            items: shown,
+            hidden,
+        },
+    }
+}
+
+fn drawers(items: &[(Plain, Plain)], kt: &Ty, vt: &Ty, heap: &Heap, max_w: i32) -> W {
+    let cap = 5usize;
+    let rows: Vec<(W, W)> = items
+        .iter()
+        .take(cap)
+        .map(|(k, x)| {
+            (
+                build(k, kt, heap, 50),
+                build(x, vt, heap, (max_w - 70).max(30)),
+            )
+        })
+        .collect();
+    let hidden = items.len().saturating_sub(cap);
+    let kw = rows.iter().map(|r| r.0.w).max().unwrap_or(10);
+    let vw = rows.iter().map(|r| r.1.w).max().unwrap_or(10);
+    let h =
+        rows.iter().map(|r| r.0.h.max(r.1.h) + 4).sum::<i32>() + 4 + if hidden > 0 { 8 } else { 0 };
+    W {
+        w: kw + vw + 14,
+        h: h.max(18),
+        k: K::Drawers { rows, hidden },
+    }
+}
+fn node_label(heap: &Heap, id: u32) -> String {
+    match heap.nodes.get(id as usize).and_then(|f| f.first()) {
+        Some(Plain::Int(i)) => i.to_string(),
+        Some(p) => render(p, &Ty::Unknown, heap).chars().take(4).collect(),
+        None => "?".to_string(),
+    }
+}
+
+fn ptr_field(heap: &Heap, id: u32, idx: usize) -> u32 {
+    match heap.nodes.get(id as usize).and_then(|f| f.get(idx)) {
+        Some(Plain::Ptr(p)) => *p,
+        _ => 0,
+    }
+}
+
+fn pointer(h: u32, inner: &Ty, heap: &Heap, max_w: i32) -> W {
+    if h == 0 {
+        return tag("nullptr");
+    }
+    let name = match inner {
+        Ty::Struct(n) => n.as_str(),
+        _ => "",
+    };
+    if name == "TreeNode" {
+        return tree_widget(h, heap, max_w);
+    }
+    let fields = heap.nodes.get(h as usize).map_or(0, Vec::len);
+    if name == "ListNode" || (fields == 2 && matches!(heap.nodes[h as usize][1], Plain::Ptr(_))) {
+        return chain_widget(h, heap, max_w);
+    }
+    W {
+        w: (name.chars().count() as i32 * 4 + 10).max(24),
+        h: 12,
+        k: K::Plate(name.chars().take(10).collect(), 'y'),
+    }
+}
+
+fn chain_widget(head: u32, heap: &Heap, max_w: i32) -> W {
+    let mut vals = Vec::new();
+    let mut seen: Vec<u32> = Vec::new();
+    let mut cur = head;
+    let mut cycle = None;
+    let mut more = false;
+    let cap = ((max_w - 8) / 22).clamp(2, 8) as usize;
+    while cur != 0 {
+        if let Some(p) = seen.iter().position(|s| *s == cur) {
+            cycle = Some(p.min(7));
+            break;
+        }
+        if vals.len() >= cap {
+            more = true;
+            break;
+        }
+        seen.push(cur);
+        vals.push(node_label(heap, cur));
+        cur = ptr_field(heap, cur, 1);
+    }
+    W {
+        w: vals.iter().map(|s| crate_w(s).max(14) + 6).sum::<i32>() + 4 + if more { 10 } else { 0 },
+        h: 22,
+        k: K::Chain { vals, cycle, more },
+    }
+}
+
+fn tree_widget(root: u32, heap: &Heap, max_w: i32) -> W {
+    // level order, at most 15 nodes
+    let mut layout: Vec<(i32, i32, String)> = Vec::new();
+    let mut edges = Vec::new();
+    let mut q: VecDeque<(u32, i32, i32, i32, Option<usize>)> = VecDeque::new();
+    q.push_back((root, 0, 0, 64, None));
+    let mut more = false;
+    while let Some((n, depth, x, span, parent)) = q.pop_front() {
+        if layout.len() >= 15 || depth > 3 {
+            more = true;
+            continue;
+        }
+        let id = layout.len();
+        layout.push((x, depth, node_label(heap, n)));
+        if let Some(p) = parent {
+            edges.push((p, id));
+        }
+        let (l, r) = (ptr_field(heap, n, 1), ptr_field(heap, n, 2));
+        if l != 0 {
+            q.push_back((l, depth + 1, x - span / 2, span / 2, Some(id)));
+        }
+        if r != 0 {
+            q.push_back((r, depth + 1, x + span / 2, span / 2, Some(id)));
+        }
+    }
+    let min_x = layout.iter().map(|n| n.0).min().unwrap_or(0);
+    let max_x = layout.iter().map(|n| n.0).max().unwrap_or(0);
+    let max_d = layout.iter().map(|n| n.1).max().unwrap_or(0);
+    let scale_x = ((max_w - 24) as f32 / ((max_x - min_x).max(1)) as f32).clamp(0.2, 0.5);
+    let nodes_l: Vec<(i32, i32, String)> = layout
+        .iter()
+        .map(|(x, d, s)| {
+            (
+                ((x - min_x) as f32 * scale_x) as i32 + 8,
+                d * 15 + 7,
+                s.clone(),
+            )
+        })
+        .collect();
+    let w = nodes_l.iter().map(|n| n.0).max().unwrap_or(10) + 12;
+    W {
+        w,
+        h: (max_d + 1) * 15 + 4,
+        k: K::Org {
+            nodes: nodes_l,
+            edges,
+            more,
+        },
+    }
+}
+
+fn vec_widget(items: &[Plain], et: &Ty, heap: &Heap, max_w: i32) -> W {
+    if is_grid_elem(et) && !items.is_empty() {
         // a rack of shelves
         let cap = 4usize;
         let rows: Vec<W> = items
             .iter()
             .take(cap)
-            .map(|x| build(x, et, nodes, max_w - 10))
+            .map(|x| build(x, et, heap, max_w - 10))
             .collect();
         let hidden = items.len().saturating_sub(cap);
         let w = rows.iter().map(|r| r.w).max().unwrap_or(10) + 8;
@@ -449,10 +496,10 @@ fn vec_widget(items: &[Value], et: &Ty, nodes: &[NodeData], max_w: i32) -> W {
             },
         };
     }
-    let probe = build(&items[0], et, nodes, 40);
+    let probe = build(&items[0], et, heap, 40);
     let cell_w = probe.w.max(CELL - 2) + 3;
     let cap = ((max_w - 6) / cell_w).clamp(2, 12) as usize;
-    let mk = |i: usize, x: &Value| (i.to_string(), build(x, et, nodes, 40));
+    let mk = |i: usize, x: &Plain| (i.to_string(), build(x, et, heap, 40));
     let (cells, gap) = if items.len() <= cap {
         (
             items

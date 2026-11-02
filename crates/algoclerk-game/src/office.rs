@@ -6,8 +6,8 @@ use crate::clerk::{ClerkArt, ClerkState, Dir, Pose};
 use crate::gfx::Gfx;
 use crate::session::Frame;
 use crate::value_view::{self, W};
-use algoclerk_core::lang::ast::Ty;
-use algoclerk_core::lang::value::{NodeData, Value};
+use algoclerk_core::cpp::ast::Ty;
+use algoclerk_core::cpp::value::{Heap, parse_value, render};
 use algoclerk_media::{ArtBank, Outfit, Rect};
 
 /// Scene width.
@@ -39,7 +39,7 @@ pub struct Office {
     art: ClerkArt,
     trays: Vec<Tray>,
     hidden: usize,
-    prev: Vec<(String, Value)>,
+    prev: Vec<(String, String)>,
     target: (f32, f32),
     out_value: Option<(W, bool)>,
     expected: Option<(W, String)>,
@@ -101,23 +101,22 @@ impl Office {
     }
 
     /// Show a recorded frame: lay out the trays and send the clerk to whatever changed.
-    pub fn show(
-        &mut self,
-        f: &Frame,
-        nodes: &[NodeData],
-        nparams: usize,
-        expected: Option<(&str, &Ty, &[NodeData], &str)>,
-    ) {
+    pub fn show(&mut self, f: &Frame, nparams: usize, expected: Option<(&str, &Ty, &str)>) {
         self.cost = f.cost;
         self.nparams = nparams;
         let width_budget = SCENE_W - 16;
         let mut items: Vec<(String, W, bool, bool)> = Vec::new();
+        let texts: Vec<String> = f
+            .vars
+            .iter()
+            .map(|(_, ty, v)| render(v, ty, &f.heap))
+            .collect();
         for (i, (name, ty, v)) in f.vars.iter().enumerate() {
             let changed = self
                 .prev
                 .iter()
                 .find(|(n, _)| n == name)
-                .is_none_or(|(_, old)| old != v);
+                .is_none_or(|(_, old)| *old != texts[i]);
             let budget = if f.vars.len() <= 2 {
                 width_budget - 20
             } else {
@@ -125,7 +124,7 @@ impl Office {
             };
             items.push((
                 name.clone(),
-                value_view::build(v, ty, nodes, budget),
+                value_view::build(v, ty, &f.heap, budget),
                 changed,
                 i < nparams,
             ));
@@ -167,7 +166,8 @@ impl Office {
         self.prev = f
             .vars
             .iter()
-            .map(|(n, _, v)| (n.clone(), v.clone()))
+            .zip(texts)
+            .map(|((n, _, _), t)| (n.clone(), t))
             .collect();
         // the clerk walks to the first tray that changed
         let go = trays
@@ -188,21 +188,18 @@ impl Office {
         // returned value goes to the outbox
         match (&f.returned, expected) {
             (Some(v), exp) => {
-                if let Some((_, ty, _, _)) = exp {
-                    self.out_value = Some((value_view::build(v, ty, nodes, 110), false));
+                if let Some((_, ty, _)) = exp {
+                    self.out_value = Some((value_view::build(v, ty, &f.heap, 110), false));
                 }
                 self.clerk.carrying = false;
                 self.target = ((SCENE_W - 136) as f32, (SCENE_H - 12) as f32);
             }
             (None, _) => {}
         }
-        if let Some((text, ty, enodes, got)) = expected {
-            let mut n2 = enodes.to_vec();
-            if n2.is_empty() {
-                n2.push(NodeData::default());
-            }
-            if let Ok(ev) = algoclerk_core::lang::value::parse_value(text, ty, &mut n2) {
-                self.expected = Some((value_view::build(&ev, ty, &n2, 110), text.to_string()));
+        if let Some((text, ty, got)) = expected {
+            let mut h2 = Heap::default();
+            if let Ok(ev) = parse_value(text, ty, &mut h2) {
+                self.expected = Some((value_view::build(&ev, ty, &h2, 110), text.to_string()));
             }
             self.out_ok = if f.returned.is_some() {
                 Some(got == text)

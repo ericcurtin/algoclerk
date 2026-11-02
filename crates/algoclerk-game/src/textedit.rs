@@ -320,73 +320,6 @@ impl TextEdit {
     }
 }
 
-const KEYWORDS: &[&str] = &[
-    "fn", "let", "if", "else", "while", "for", "in", "break", "continue", "return", "and", "or",
-    "not", "mut",
-];
-const CONSTS: &[&str] = &["true", "false", "null", "none"];
-const TYPES: &[&str] = &[
-    "int", "bool", "char", "string", "vec", "set", "map", "option", "stack", "queue", "deque",
-    "heap", "lnode", "tnode",
-];
-
-/// ClerkScript colouring of one line: `(text, colour letter)` spans covering the whole line.
-pub fn cs_spans(line: &str) -> Vec<(String, char)> {
-    let chars: Vec<char> = line.chars().collect();
-    let mut spans: Vec<(String, char)> = Vec::new();
-    let mut i = 0;
-    let push = |s: String, c: char, spans: &mut Vec<(String, char)>| spans.push((s, c));
-    while i < chars.len() {
-        let c = chars[i];
-        let start = i;
-        if c == '/' && chars.get(i + 1) == Some(&'/') || c == '#' {
-            push(chars[i..].iter().collect(), 'a', &mut spans);
-            break;
-        }
-        if c.is_ascii_alphabetic() || c == '_' {
-            while i < chars.len() && (chars[i].is_ascii_alphanumeric() || chars[i] == '_') {
-                i += 1;
-            }
-            let w: String = chars[start..i].iter().collect();
-            let col = if KEYWORDS.contains(&w.as_str()) {
-                'b'
-            } else if TYPES.contains(&w.as_str()) {
-                'u'
-            } else if CONSTS.contains(&w.as_str()) {
-                'o'
-            } else if chars.get(i) == Some(&'(') || (start > 0 && chars[start - 1] == '.') {
-                'G'
-            } else {
-                'K'
-            };
-            push(w, col, &mut spans);
-        } else if c.is_ascii_digit() {
-            while i < chars.len() && chars[i].is_ascii_alphanumeric() {
-                i += 1;
-            }
-            push(chars[start..i].iter().collect(), 'o', &mut spans);
-        } else if c == '"' || c == '\'' {
-            i += 1;
-            while i < chars.len() && chars[i] != c {
-                if chars[i] == '\\' {
-                    i += 1;
-                }
-                i += 1;
-            }
-            i = (i + 1).min(chars.len());
-            push(chars[start..i].iter().collect(), 'r', &mut spans);
-        } else {
-            i += 1;
-            push(
-                c.to_string(),
-                if "{}()[];,".contains(c) { 'k' } else { 'K' },
-                &mut spans,
-            );
-        }
-    }
-    spans
-}
-
 /// Draw a text editor into `r`. `error_lines` are one-based lines with problems (marked in red).
 #[allow(clippy::too_many_arguments)]
 pub fn draw_editor(
@@ -407,6 +340,7 @@ pub fn draw_editor(
     let rows = (inner.h / line_h).max(1) as usize;
     let cols = ((inner.w - 2) / (6 * scale)).max(1) as usize;
     let text = ed.text();
+    let colored = crate::syntax::lines(&text, crate::syntax::light, 'K');
     let sel = ed.selection();
     let mut idx = 0usize;
     for (ln, line) in text.split('\n').enumerate() {
@@ -431,8 +365,8 @@ pub fn draw_editor(
                 }
             }
             let mut x = inner.x + 1 - ed.scroll_col as i32 * 6 * scale;
-            for (s, col) in cs_spans(line) {
-                g.text_s(x, y, &s, col, scale);
+            for (s, col) in colored.get(ln).into_iter().flatten() {
+                g.text_s(x, y, s, *col, scale);
                 x += s.chars().count() as i32 * 6 * scale;
             }
             for (sl, c0, c1) in squiggles {

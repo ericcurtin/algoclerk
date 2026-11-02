@@ -5,9 +5,10 @@ use crate::gfx::{Gfx, Kind, State, clip};
 use crate::input::Key;
 use crate::layout::{Hit, Viewport};
 use crate::play::Play;
+use crate::session::Session;
+use crate::syntax::{self, Piece};
 use crate::ui::{Ctx, GameEvent, Nav, View, widget_state};
-use algoclerk_core::codegen::highlight::{Class, highlight};
-use algoclerk_core::codegen::{Generated, Lang, generate};
+use crate::words;
 use algoclerk_core::judge::Medal;
 use algoclerk_media::{Font, Rect};
 
@@ -18,6 +19,63 @@ pub enum Stage {
     Victory,
     /// Generated code.
     Code,
+}
+
+/// The solution in one language, for the code reveal.
+#[derive(Debug, Clone)]
+pub struct Translation {
+    /// Tab label.
+    pub label: &'static str,
+    /// Short id (`c`, `cpp`, `rust`), the value stored in the settings.
+    pub id: &'static str,
+    /// Read-only support code above the player's (the level prelude for C++).
+    pub prelude: String,
+    /// The solution.
+    pub code: String,
+    /// The translation is not available yet: the tab shows a friendly message instead of code.
+    pub pending: bool,
+}
+
+impl Translation {
+    /// Prelude and code as one text.
+    pub fn full(&self) -> String {
+        if self.prelude.trim().is_empty() {
+            self.code.clone()
+        } else {
+            format!("{}\n\n{}", self.prelude.trim_end(), self.code)
+        }
+    }
+}
+
+/// The tabs of the code reveal, in tab order (C, C++, Rust).
+///
+/// C++ is the player's own program. The C and Rust translators live in the code generation package: until
+/// they are connected here the tabs are marked `pending` and the screen says that the translation is coming.
+/// Connect them by filling `code` (and `prelude`) and clearing `pending`.
+pub fn translations(session: &Session) -> Vec<Translation> {
+    let prelude = session
+        .level
+        .as_ref()
+        .map(|l| l.prelude.trim().to_string())
+        .unwrap_or_default();
+    let pending = |label, id| Translation {
+        label,
+        id,
+        prelude: String::new(),
+        code: String::new(),
+        pending: true,
+    };
+    vec![
+        pending("C", "c"),
+        Translation {
+            label: "C++",
+            id: "cpp",
+            prelude,
+            code: session.text(),
+            pending: false,
+        },
+        pending("Rust", "rust"),
+    ]
 }
 
 /// The screen.
@@ -36,7 +94,7 @@ pub struct ResultScreen {
     pub t: u32,
     /// The solution beat the previous best.
     pub new_best: bool,
-    code: Vec<Generated>,
+    code: Vec<Translation>,
     solved: bool,
 }
 
@@ -96,19 +154,18 @@ fn layout(vp: &Viewport) -> Layout {
 impl ResultScreen {
     /// Build from the play screen. `victory` selects the stage.
     pub fn new(cx: &mut Ctx<'_>, play: Box<Play>, victory: bool) -> ResultScreen {
-        let mut code = Vec::new();
-        if let Ok(c) = &play.session.compiled {
-            let entry = play.session.entry_name();
-            for lang in Lang::ALL {
-                code.push(generate(c, lang, &entry));
-            }
-        }
+        let code = translations(&play.session);
         let lang = match cx.progress.settings.code_lang.as_str() {
             "c" => 0,
             "cpp" => 1,
             _ => 2,
         };
         let solved = play.solved;
+        let lang = if code.get(lang).is_some_and(|t| t.pending) {
+            1
+        } else {
+            lang
+        };
         ResultScreen {
             play,
             stage: if victory { Stage::Victory } else { Stage::Code },
@@ -145,11 +202,19 @@ impl ResultScreen {
         v
     }
 
-    fn text_for(&self) -> (Vec<Vec<(String, Class)>>, usize) {
+    fn text_for(&self, cols: usize) -> (Vec<Vec<Piece>>, usize) {
         let Some(g) = self.code.get(self.lang) else {
             return (Vec::new(), 0);
         };
-        let lang = g.lang;
+        if g.pending {
+            return (
+                Font::wrap(words::TRANSLATION_COMING, cols.max(10))
+                    .into_iter()
+                    .map(|l| vec![(l, 'A')])
+                    .collect(),
+                0,
+            );
+        }
         let pre_lines = g.prelude.lines().count();
         let mut text = String::new();
         if self.show_prelude {
@@ -157,7 +222,7 @@ impl ResultScreen {
             text.push('\n');
         }
         text.push_str(&g.code);
-        (highlight(lang, &text), pre_lines)
+        (syntax::lines(&text, syntax::dark, 'W'), pre_lines)
     }
 
     /// Handle input.
@@ -203,7 +268,7 @@ impl ResultScreen {
                     self.lang = (self.lang + 2) % 3;
                     self.scroll = 0;
                 }
-                let (lines, _) = self.text_for();
+                let (lines, _) = self.text_for(((l.body.w - 8) / 6) as usize);
                 let rows = (l.body.h / 9).max(1);
                 let max_scroll = (lines.len() as i32 - rows).max(0);
                 if cx.ptr.wheel != 0.0 {
@@ -225,7 +290,9 @@ impl ResultScreen {
                 }
                 if cx.ptr.tapped_in(&l.copy) || cx.input.ctrl_ch('c') {
                     if let Some(g) = self.code.get(self.lang) {
-                        cx.events.push(GameEvent::Copy(g.full()));
+                        if !g.pending {
+                            cx.events.push(GameEvent::Copy(g.full()));
+                        }
                         cx.sfx("button");
                     }
                 }
@@ -430,7 +497,7 @@ impl ResultScreen {
         for (i, t) in l.tabs.iter().enumerate() {
             g.button(
                 *t,
-                ["C", "C++", "Rust"][i],
+                self.code.get(i).map_or("", |t| t.label),
                 if self.lang == i {
                     Kind::On
                 } else {
@@ -442,7 +509,7 @@ impl ResultScreen {
         g.button(l.copy, &v.tr.t("result.copy"), Kind::Normal, st(&l.copy));
         g.rect(l.body, 'K');
         g.frame(l.body, 'k');
-        let (lines, pre_lines) = self.text_for();
+        let (lines, pre_lines) = self.text_for(((l.body.w - 8) / 6) as usize);
         let saved = g.c.set_clip(l.body.inset(1).offset(g.off.0, g.off.1));
         let rows = (l.body.h / 9).max(1);
         let cols = ((l.body.w - 8) / 6).max(10) as usize;
@@ -456,17 +523,7 @@ impl ResultScreen {
             let mut x = l.body.x + 3;
             let mut used = 0usize;
             for (text, class) in spans {
-                let col = match class {
-                    Class::Plain => 'W',
-                    Class::Keyword => 'o',
-                    Class::Type => 'c',
-                    Class::Number => 'y',
-                    Class::Str => 'l',
-                    Class::Comment => 'a',
-                    Class::Preproc => 'p',
-                    Class::Punct => 'A',
-                    Class::Func => 's',
-                };
+                let col = *class;
                 let room = cols.saturating_sub(used);
                 if room == 0 {
                     break;
