@@ -113,9 +113,11 @@ impl TextEdit {
 
     /// The selection as an ordered range.
     pub fn selection(&self) -> Option<(usize, usize)> {
+        let n = self.chars.len();
         self.anchor
-            .filter(|a| *a != self.cursor)
-            .map(|a| (a.min(self.cursor), a.max(self.cursor)))
+            .map(|a| a.min(n))
+            .filter(|a| *a != self.cursor.min(n))
+            .map(|a| (a.min(self.cursor.min(n)), a.max(self.cursor.min(n))))
     }
 
     /// The selected text.

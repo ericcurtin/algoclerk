@@ -384,3 +384,79 @@ fn every_song_parses_and_the_game_has_all_it_asks_for() {
         }
     }
 }
+
+#[test]
+fn random_input_never_panics_on_any_screen() {
+    use algoclerk_core::testgen::Rng;
+    use algoclerk_game::{Input, Key};
+    const KEYS: [Key; 15] = [
+        Key::Up,
+        Key::Down,
+        Key::Left,
+        Key::Right,
+        Key::Enter,
+        Key::Escape,
+        Key::Backspace,
+        Key::Delete,
+        Key::Tab,
+        Key::Home,
+        Key::End,
+        Key::PageUp,
+        Key::PageDown,
+        Key::Space,
+        Key::Char('r'),
+    ];
+    let seed = std::env::var("ALGOCLERK_FUZZ_SEED")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(7);
+    let rng = Rng::new(seed);
+    for name in NAMES {
+        for portrait in [false, true] {
+            let spec = Spec {
+                portrait,
+                touch: portrait,
+                ..Spec::new(name)
+            };
+            let mut g = build(&spec).unwrap();
+            let (w, h) = (g.vp.w, g.vp.h);
+            let mut down = false;
+            for _ in 0..500 {
+                let mut i = Input::default();
+                if rng.chance(30) {
+                    i.keys
+                        .push(KEYS[rng.range(0, KEYS.len() as i64 - 1) as usize]);
+                }
+                if rng.chance(20) {
+                    i.typed = ["a", "{", ")", "\"", " ", "\n", "9", "é", "\t"]
+                        [rng.range(0, 8) as usize]
+                        .to_string();
+                }
+                i.pointer = Some((
+                    rng.range(-5, i64::from(w) + 5) as i32,
+                    rng.range(-5, i64::from(h) + 5) as i32,
+                ));
+                i.ctrl = rng.chance(5);
+                i.shift = rng.chance(10);
+                i.touch = portrait;
+                if rng.chance(15) {
+                    i.wheel = rng.range(-3, 3) as f32;
+                }
+                if !down && rng.chance(25) {
+                    i.pressed = true;
+                    down = true;
+                } else if down && rng.chance(40) {
+                    i.released = true;
+                    down = false;
+                }
+                i.down = down;
+                g.tick(&i);
+                if rng.chance(10) {
+                    let mut c = Canvas::new(w as usize, h as usize);
+                    g.draw(&mut c);
+                }
+                let _ = g.take_events();
+            }
+        }
+    }
+}
