@@ -115,7 +115,10 @@ impl Verdict {
 
     /// Number of passing tests.
     pub fn passed_count(&self) -> usize {
-        self.tests.iter().filter(|t| t.outcome == Outcome::Pass).count()
+        self.tests
+            .iter()
+            .filter(|t| t.outcome == Outcome::Pass)
+            .count()
     }
 
     /// A one-line explanation for the player.
@@ -282,11 +285,7 @@ mod tests {
     use crate::asm::assemble;
 
     fn level() -> Level {
-        Level::from_toml(
-            include_str!("../tests/data/echo.toml"),
-            "test",
-        )
-        .unwrap()
+        Level::from_toml(include_str!("../tests/data/echo.toml"), "test").unwrap()
     }
 
     #[test]
@@ -304,7 +303,9 @@ mod tests {
     fn wrong_and_error_and_rules() {
         let l = level();
         let j = Judge::new(&l).unwrap();
-        let wrong = j.judge(&Arc::new(assemble("a:\nINBOX\nOUTBOX\nOUTBOX\nJUMP a").unwrap()));
+        let wrong = j.judge(&Arc::new(
+            assemble("a:\nINBOX\nOUTBOX\nOUTBOX\nJUMP a").unwrap(),
+        ));
         assert!(!wrong.passed);
         assert!(matches!(
             wrong.first_failure().unwrap().outcome,
@@ -325,7 +326,10 @@ mod tests {
     #[test]
     fn suggested_targets_are_ordered() {
         let t = suggest_targets(7, 12.3);
-        assert_eq!((t.size_ace, t.size_par, t.speed_ace, t.speed_par), (7, 8, 13, 20));
+        assert_eq!(
+            (t.size_ace, t.size_par, t.speed_ace, t.speed_par),
+            (7, 8, 13, 20)
+        );
         let t = suggest_targets(1, 0.0);
         assert!(t.size_par > t.size_ace);
     }
@@ -334,7 +338,8 @@ mod tests {
     fn slow_but_correct_gets_clip() {
         let l = level();
         let j = Judge::new(&l).unwrap();
-        let p = assemble("a:\nINBOX\nCOPYTO 0\nCOPYFROM 0\nCOPYTO 0\nCOPYFROM 0\nOUTBOX\nJUMP a").unwrap();
+        let p = assemble("a:\nINBOX\nCOPYTO 0\nCOPYFROM 0\nCOPYTO 0\nCOPYFROM 0\nOUTBOX\nJUMP a")
+            .unwrap();
         let v = j.judge(&Arc::new(p));
         assert!(v.passed);
         assert_eq!(v.medals.size, Some(Medal::Clip));

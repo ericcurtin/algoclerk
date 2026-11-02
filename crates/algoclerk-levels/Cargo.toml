@@ -11,7 +11,12 @@ description = "Shipped AlgoClerk puzzle packs, embedded into the binary"
 build = "build.rs"
 
 [dependencies]
-algoclerk-core.workspace = true
+algoclerk-core = { workspace = true, default-features = false }
+
+[features]
+default = ["compile-tests"]
+# Compile the generated C, C++ and Rust of every reference solution with the host compilers.
+compile-tests = ["algoclerk-core/compile-tests"]
 
 [dev-dependencies]
 proptest.workspace = true

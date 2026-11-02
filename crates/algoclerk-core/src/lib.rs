@@ -14,12 +14,12 @@
 
 pub mod asm;
 pub mod codegen;
-pub mod testgen;
 pub mod i18n;
 pub mod isa;
 pub mod judge;
 pub mod level;
 pub mod progress;
 pub mod share;
+pub mod testgen;
 pub mod validate;
 pub mod vm;

@@ -273,7 +273,9 @@ pub fn parse(text: &str) -> Result<Listing, Vec<ParseError>> {
                     continue;
                 }
                 if !is_ident(args[0]) {
-                    errors.push(err(ParseErrorKind::BadLabel(args[0].chars().take(24).collect())));
+                    errors.push(err(ParseErrorKind::BadLabel(
+                        args[0].chars().take(24).collect(),
+                    )));
                     continue;
                 }
                 Instr::with_addr(op, Addr::Direct(0), args[0].to_string())
@@ -637,7 +639,10 @@ mod tests {
 
     #[test]
     fn compile_errors() {
-        let e = parse("a:\na:\nJUMP nowhere").unwrap().compile().unwrap_err();
+        let e = parse("a:\na:\nJUMP nowhere")
+            .unwrap()
+            .compile()
+            .unwrap_err();
         assert_eq!(e.len(), 2);
     }
 

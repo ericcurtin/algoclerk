@@ -347,7 +347,12 @@ impl Machine {
         fx.push(Effect::FloorWrite { slot, value: v });
     }
 
-    fn exec(&mut self, pc: usize, fx: &mut Vec<Effect>, undo: &mut Undo) -> Result<(), RuntimeError> {
+    fn exec(
+        &mut self,
+        pc: usize,
+        fx: &mut Vec<Effect>,
+        undo: &mut Undo,
+    ) -> Result<(), RuntimeError> {
         let instr = self.program.instrs[pc].clone();
         let mut next = pc + 1;
         match instr {
@@ -411,7 +416,14 @@ impl Machine {
             Instr::BumpUp(a) | Instr::BumpDn(a) => {
                 let s = self.resolve(a, fx)?;
                 let t = self.tile(s)?;
-                let r = Self::checked(i64::from(t) + if matches!(instr, Instr::BumpUp(_)) { 1 } else { -1 })?;
+                let r = Self::checked(
+                    i64::from(t)
+                        + if matches!(instr, Instr::BumpUp(_)) {
+                            1
+                        } else {
+                            -1
+                        },
+                )?;
                 self.write_floor(s, r, fx, undo);
                 self.hand = Some(r);
                 fx.push(Effect::HandSet(Some(r)));
@@ -513,14 +525,22 @@ mod tests {
 
     #[test]
     fn bump_updates_slot_and_hand() {
-        let r = run("BUMPUP 0\nOUTBOX\nBUMPDN 0\nBUMPDN 0\nOUTBOX", &[], &[Some(5)]);
+        let r = run(
+            "BUMPUP 0\nOUTBOX\nBUMPDN 0\nBUMPDN 0\nOUTBOX",
+            &[],
+            &[Some(5)],
+        );
         assert_eq!(r.outbox, vec![6, 4]);
     }
 
     #[test]
     fn indirect() {
         let f = [Some(2), None, Some(42)];
-        let r = run("COPYFROM [0]\nOUTBOX\nINBOX\nCOPYTO [0]\nCOPYFROM 2\nOUTBOX", &[9], &f);
+        let r = run(
+            "COPYFROM [0]\nOUTBOX\nINBOX\nCOPYTO [0]\nCOPYFROM 2\nOUTBOX",
+            &[9],
+            &f,
+        );
         assert_eq!(r.outbox, vec![42, 9]);
         let bad = run("COPYFROM [1]", &[], &f);
         assert_eq!(bad.status, Status::Error(RuntimeError::EmptyTile(1)));
@@ -590,16 +610,40 @@ mod tests {
     fn rewind_restores_everything() {
         let p = Arc::new(assemble("a:\nINBOX\nCOPYTO 0\nBUMPUP 0\nOUTBOX\nJUMP a").unwrap());
         let mut m = Machine::new(p, vec![5, 6], vec![None], 1000).with_history();
-        let mut snaps = vec![(m.hand, m.pc, m.floor.clone(), m.outbox.clone(), m.in_pos, m.steps)];
+        let mut snaps = vec![(
+            m.hand,
+            m.pc,
+            m.floor.clone(),
+            m.outbox.clone(),
+            m.in_pos,
+            m.steps,
+        )];
         for _ in 0..7 {
             m.step();
-            snaps.push((m.hand, m.pc, m.floor.clone(), m.outbox.clone(), m.in_pos, m.steps));
+            snaps.push((
+                m.hand,
+                m.pc,
+                m.floor.clone(),
+                m.outbox.clone(),
+                m.in_pos,
+                m.steps,
+            ));
         }
         while snaps.len() > 1 {
             snaps.pop();
             assert!(m.step_back());
             let s = snaps.last().unwrap();
-            assert_eq!((m.hand, m.pc, m.floor.clone(), m.outbox.clone(), m.in_pos, m.steps), s.clone());
+            assert_eq!(
+                (
+                    m.hand,
+                    m.pc,
+                    m.floor.clone(),
+                    m.outbox.clone(),
+                    m.in_pos,
+                    m.steps
+                ),
+                s.clone()
+            );
         }
         assert!(!m.step_back());
     }

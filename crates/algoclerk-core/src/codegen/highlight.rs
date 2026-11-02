@@ -36,21 +36,62 @@ pub struct Token<'a> {
 }
 
 const C_KW: &[&str] = &[
-    "if", "else", "while", "for", "do", "break", "continue", "return", "goto", "static", "const", "struct",
-    "sizeof", "switch", "case", "default", "true", "false",
+    "if", "else", "while", "for", "do", "break", "continue", "return", "goto", "static", "const",
+    "struct", "sizeof", "switch", "case", "default", "true", "false",
 ];
 const CPP_KW: &[&str] = &[
-    "if", "else", "while", "for", "do", "break", "continue", "return", "goto", "static", "const", "struct",
-    "sizeof", "switch", "case", "default", "true", "false", "auto", "namespace", "using", "static_cast",
+    "if",
+    "else",
+    "while",
+    "for",
+    "do",
+    "break",
+    "continue",
+    "return",
+    "goto",
+    "static",
+    "const",
+    "struct",
+    "sizeof",
+    "switch",
+    "case",
+    "default",
+    "true",
+    "false",
+    "auto",
+    "namespace",
+    "using",
+    "static_cast",
     "constexpr",
 ];
 const RUST_KW: &[&str] = &[
-    "if", "else", "while", "for", "loop", "break", "continue", "return", "fn", "let", "mut", "pub", "match",
-    "as", "in", "true", "false", "const", "static", "use", "struct", "impl",
+    "if", "else", "while", "for", "loop", "break", "continue", "return", "fn", "let", "mut", "pub",
+    "match", "as", "in", "true", "false", "const", "static", "use", "struct", "impl",
 ];
 const TYPES: &[&str] = &[
-    "int", "char", "void", "bool", "size_t", "long", "short", "unsigned", "signed", "float", "double",
-    "i32", "i64", "u8", "u32", "u64", "usize", "isize", "Vec", "std", "vector", "array", "size_type",
+    "int",
+    "char",
+    "void",
+    "bool",
+    "size_t",
+    "long",
+    "short",
+    "unsigned",
+    "signed",
+    "float",
+    "double",
+    "i32",
+    "i64",
+    "u8",
+    "u32",
+    "u64",
+    "usize",
+    "isize",
+    "Vec",
+    "std",
+    "vector",
+    "array",
+    "size_type",
 ];
 
 /// Split `code` into classified tokens. Concatenating the token texts gives `code` back.
@@ -87,7 +128,10 @@ pub fn highlight(lang: Lang, code: &str) -> Vec<Token<'_>> {
                 i += 1;
             }
             kind = TokenKind::Comment;
-        } else if c == b'#' && (lang != Lang::Rust && line_start || lang == Lang::Rust && code[i..].starts_with("#[")) {
+        } else if c == b'#'
+            && (lang != Lang::Rust && line_start
+                || lang == Lang::Rust && code[i..].starts_with("#["))
+        {
             while i < bytes.len() && bytes[i] != b'\n' {
                 i += 1;
             }
@@ -150,7 +194,11 @@ mod tests {
     #[test]
     fn classes() {
         let t = highlight(Lang::Rust, "let mut x: i32 = 5; // c");
-        let kinds: Vec<_> = t.iter().filter(|t| t.kind != TokenKind::Space).map(|t| t.kind).collect();
+        let kinds: Vec<_> = t
+            .iter()
+            .filter(|t| t.kind != TokenKind::Space)
+            .map(|t| t.kind)
+            .collect();
         assert_eq!(kinds[0], TokenKind::Keyword);
         assert!(kinds.contains(&TokenKind::Type));
         assert!(kinds.contains(&TokenKind::Number));

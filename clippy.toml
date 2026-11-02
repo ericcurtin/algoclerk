@@ -1,0 +1,4 @@
+# Clippy configuration. CI runs: cargo clippy --workspace --all-targets -- -D warnings
+msrv = "1.95"
+too-many-arguments-threshold = 8
+cognitive-complexity-threshold = 40

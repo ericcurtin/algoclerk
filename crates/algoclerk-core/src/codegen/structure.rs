@@ -320,13 +320,22 @@ mod tests {
     #[test]
     fn while_loop_recovered() {
         let t = s("INBOX\nl:\nJUMPZ e\nOUTBOX\nINBOX\nJUMP l\ne:").unwrap();
-        assert!(matches!(&t[1], Stmt::While { cond: Cond::NotZero, .. }));
+        assert!(matches!(
+            &t[1],
+            Stmt::While {
+                cond: Cond::NotZero,
+                ..
+            }
+        ));
     }
 
     #[test]
     fn if_else_recovered() {
         let t = s("INBOX\nJUMPN neg\nCOPYTO 0\nJUMP end\nneg:\nCOPYTO 1\nend:\nOUTBOX").unwrap();
-        assert!(t.iter().any(|x| matches!(x, Stmt::If { els, .. } if !els.is_empty())));
+        assert!(
+            t.iter()
+                .any(|x| matches!(x, Stmt::If { els, .. } if !els.is_empty()))
+        );
     }
 
     #[test]

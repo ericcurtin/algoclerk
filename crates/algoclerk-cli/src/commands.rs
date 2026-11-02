@@ -73,7 +73,9 @@ pub fn dispatch(argv: &[String]) -> Result<u8, String> {
         "codegen" => codegen_cmd(&args),
         "export" => export(&args),
         "import" => import(&args),
-        other => Err(format!("unknown command \"{other}\" (try `algoclerk-cli help`)")),
+        other => Err(format!(
+            "unknown command \"{other}\" (try `algoclerk-cli help`)"
+        )),
     }
 }
 
@@ -90,14 +92,19 @@ fn campaign(args: &Args) -> Campaign {
 
 fn find_level<'a>(c: &'a Campaign, id: &str) -> Result<&'a Level, String> {
     let bare = id.rsplit('/').next().unwrap_or(id);
-    c.find(bare).ok_or_else(|| format!("no level called \"{id}\" (see `algoclerk-cli list`)"))
+    c.find(bare)
+        .ok_or_else(|| format!("no level called \"{id}\" (see `algoclerk-cli list`)"))
 }
 
 fn read_source(args: &Args) -> Result<String, String> {
-    let path = args.opt("solution").ok_or("give --solution <file> (or --reference)")?;
+    let path = args
+        .opt("solution")
+        .ok_or("give --solution <file> (or --reference)")?;
     if path == "-" {
         let mut s = String::new();
-        std::io::stdin().read_to_string(&mut s).map_err(|e| e.to_string())?;
+        std::io::stdin()
+            .read_to_string(&mut s)
+            .map_err(|e| e.to_string())?;
         Ok(s)
     } else {
         std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))
@@ -107,16 +114,27 @@ fn read_source(args: &Args) -> Result<String, String> {
 fn program_for(args: &Args, level: Option<&Level>) -> Result<(Arc<Program>, Listing), String> {
     let text = if args.flag("reference") {
         let l = level.ok_or("--reference needs --level")?;
-        l.solution.as_ref().ok_or("this level has no reference solution")?.asm.clone()
+        l.solution
+            .as_ref()
+            .ok_or("this level has no reference solution")?
+            .asm
+            .clone()
     } else {
         read_source(args)?
     };
     // Accept shared text with headers.
-    let imported = share::import(&text).map_err(|e| e.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n"))?;
-    let program = imported
-        .listing
-        .compile()
-        .map_err(|e| e.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n"))?;
+    let imported = share::import(&text).map_err(|e| {
+        e.iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+    })?;
+    let program = imported.listing.compile().map_err(|e| {
+        e.iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+    })?;
     Ok((Arc::new(program), imported.listing))
 }
 
@@ -142,7 +160,11 @@ fn list(args: &Args) -> Result<u8, String> {
                 })
             })
             .collect();
-        println!("{}", serde_json::to_string_pretty(&json!({"packs": packs, "level_count": c.level_count()})).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({"packs": packs, "level_count": c.level_count()}))
+                .unwrap_or_default()
+        );
         return Ok(0);
     }
     for p in &c.packs {
@@ -157,7 +179,12 @@ fn list(args: &Args) -> Result<u8, String> {
 
 fn show(args: &Args) -> Result<u8, String> {
     let c = campaign(args);
-    let id = args.positional.first().map(String::as_str).or(args.opt("level")).ok_or("show needs a level id")?;
+    let id = args
+        .positional
+        .first()
+        .map(String::as_str)
+        .or(args.opt("level"))
+        .ok_or("show needs a level id")?;
     let l = find_level(&c, id)?;
     println!("{}\n{}\n", l.title, "=".repeat(l.title.chars().count()));
     println!("{}\n", l.story);
@@ -170,13 +197,30 @@ fn show(args: &Args) -> Result<u8, String> {
         println!();
     }
     for (i, e) in l.examples.iter().enumerate() {
-        println!("Example {}: inbox {:?} -> outbox {:?} {}", i + 1, e.input.to_vec(), e.output.to_vec(), e.note);
+        println!(
+            "Example {}: inbox {:?} -> outbox {:?} {}",
+            i + 1,
+            e.input.to_vec(),
+            e.output.to_vec(),
+            e.note
+        );
     }
     let allowed = l.allowed().map_err(|e| e.to_string())?;
     let ops: Vec<&str> = allowed.opcodes().iter().map(|o| o.mnemonic()).collect();
-    println!("\nInstructions: {}{}", ops.join(" "), if allowed.allows_indirect() { " (+ [n] pointers)" } else { "" });
+    println!(
+        "\nInstructions: {}{}",
+        ops.join(" "),
+        if allowed.allows_indirect() {
+            " (+ [n] pointers)"
+        } else {
+            ""
+        }
+    );
     println!("Floor tiles: {}", l.machine.floor);
-    println!("Targets: size {}/{} (par/ace), speed {}/{}", l.targets.size_par, l.targets.size_ace, l.targets.speed_par, l.targets.speed_ace);
+    println!(
+        "Targets: size {}/{} (par/ace), speed {}/{}",
+        l.targets.size_par, l.targets.size_ace, l.targets.speed_par, l.targets.speed_ace
+    );
     Ok(0)
 }
 
@@ -184,7 +228,10 @@ fn parse_ints(s: &str) -> Result<Vec<i32>, String> {
     s.split(',')
         .map(str::trim)
         .filter(|t| !t.is_empty())
-        .map(|t| t.parse::<i32>().map_err(|_| format!("\"{t}\" is not an integer")))
+        .map(|t| {
+            t.parse::<i32>()
+                .map_err(|_| format!("\"{t}\" is not an integer"))
+        })
         .collect()
 }
 
@@ -200,7 +247,12 @@ fn run(args: &Args) -> Result<u8, String> {
     let floor: Vec<Option<i32>> = match level {
         Some(l) => l.floor_template().map_err(|e| e.to_string())?,
         None => {
-            let n: usize = args.opt("floor").map(str::parse).transpose().map_err(|_| "--floor needs a number")?.unwrap_or(16);
+            let n: usize = args
+                .opt("floor")
+                .map(str::parse)
+                .transpose()
+                .map_err(|_| "--floor needs a number")?
+                .unwrap_or(16);
             vec![None; n]
         }
     };
@@ -219,7 +271,12 @@ fn run(args: &Args) -> Result<u8, String> {
             return Err(p.to_string());
         }
     }
-    let limit: u64 = args.opt("limit").map(str::parse).transpose().map_err(|_| "--limit needs a number")?.unwrap_or(100_000);
+    let limit: u64 = args
+        .opt("limit")
+        .map(str::parse)
+        .transpose()
+        .map_err(|_| "--limit needs a number")?
+        .unwrap_or(100_000);
     let mut m = Machine::new(program.clone(), inbox.clone(), floor, limit);
     let trace = args.flag("trace");
     while !m.is_done() {
@@ -229,7 +286,12 @@ fn run(args: &Args) -> Result<u8, String> {
             println!(
                 "{:>5}  {:<18} hand={:<8} outbox={:?}",
                 m.steps,
-                program.instrs[pc].map_target(|t| program.labels[*t].first().cloned().unwrap_or_else(|| t.to_string())).to_string(),
+                program.instrs[pc]
+                    .map_target(|t| program.labels[*t]
+                        .first()
+                        .cloned()
+                        .unwrap_or_else(|| t.to_string()))
+                    .to_string(),
                 m.hand.map_or("-".to_string(), |h| h.to_string()),
                 m.outbox
             );
@@ -276,21 +338,38 @@ fn judge(args: &Args) -> Result<u8, String> {
     if args.flag("all") {
         return judge_all(&c, args);
     }
-    let id = args.opt("level").ok_or("judge needs --level <id> (or --all --reference)")?;
+    let id = args
+        .opt("level")
+        .ok_or("judge needs --level <id> (or --all --reference)")?;
     let l = find_level(&c, id)?;
     let (program, _) = program_for(args, Some(l))?;
     let judge = Judge::new(l).map_err(|e| e.to_string())?;
     let v = judge.judge(&program);
     if args.flag("json") {
-        println!("{}", serde_json::to_string_pretty(&verdict_json(l, &v)).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&verdict_json(l, &v)).unwrap_or_default()
+        );
     } else {
         println!("{}: {}", l.title, v.headline(english()));
         println!(
             "tests {}/{}  size {} (par {}, ace {})  speed avg {:.1} worst {} (par {}, ace {})",
-            v.passed_count(), v.tests.len(), v.size, l.targets.size_par, l.targets.size_ace,
-            v.avg_steps, v.worst_steps, l.targets.speed_par, l.targets.speed_ace
+            v.passed_count(),
+            v.tests.len(),
+            v.size,
+            l.targets.size_par,
+            l.targets.size_ace,
+            v.avg_steps,
+            v.worst_steps,
+            l.targets.speed_par,
+            l.targets.speed_ace
         );
-        println!("medals: size {}, speed {}  stars {}", medal_name(v.medals.size), medal_name(v.medals.speed), v.medals.stars());
+        println!(
+            "medals: size {}, speed {}  stars {}",
+            medal_name(v.medals.size),
+            medal_name(v.medals.speed),
+            v.medals.stars()
+        );
     }
     Ok(u8::from(!v.passed))
 }
@@ -312,7 +391,11 @@ fn judge_all(c: &Campaign, args: &Args) -> Result<u8, String> {
     }
     if args.flag("json") {
         let vals: Vec<Value> = rows.iter().map(|(l, v)| verdict_json(l, v)).collect();
-        println!("{}", serde_json::to_string_pretty(&json!({"results": vals, "failed": failed})).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({"results": vals, "failed": failed}))
+                .unwrap_or_default()
+        );
     } else {
         println!(
             "{:<4} {:<12} {:<26} {:>5} {:>9} {:>8} {:>9} {:>8} {:>7}",
@@ -341,15 +424,26 @@ fn judge_all(c: &Campaign, args: &Args) -> Result<u8, String> {
 
 fn collect_level_files(path: &Path, out: &mut Vec<(String, String)>) -> Result<(), String> {
     if path.is_dir() {
-        let mut entries: Vec<_> = std::fs::read_dir(path).map_err(|e| format!("{}: {e}", path.display()))?.filter_map(Result::ok).map(|e| e.path()).collect();
+        let mut entries: Vec<_> = std::fs::read_dir(path)
+            .map_err(|e| format!("{}: {e}", path.display()))?
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .collect();
         entries.sort();
         for e in entries {
             collect_level_files(&e, out)?;
         }
     } else if path.extension().is_some_and(|e| e == "toml") {
         let text = std::fs::read_to_string(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        let pack = path.parent().and_then(Path::file_name).map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
-        let file = path.file_name().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
+        let pack = path
+            .parent()
+            .and_then(Path::file_name)
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let file = path
+            .file_name()
+            .map(|s| s.to_string_lossy().to_string())
+            .unwrap_or_default();
         out.push((format!("{pack}/{file}"), text));
     }
     Ok(())
@@ -379,7 +473,13 @@ fn validate(args: &Args) -> Result<u8, String> {
             bad += 1;
         }
         if !args.flag("json") {
-            println!("{}  {}/{}  ({} tests)", if r.ok() { "ok  " } else { "FAIL" }, l.pack, l.id, r.test_count);
+            println!(
+                "{}  {}/{}  ({} tests)",
+                if r.ok() { "ok  " } else { "FAIL" },
+                l.pack,
+                l.id,
+                r.test_count
+            );
             for e in &r.errors {
                 println!("      error: {e}");
             }
@@ -390,9 +490,17 @@ fn validate(args: &Args) -> Result<u8, String> {
         results.push(json!({"level": l.id, "pack": l.pack, "ok": r.ok(), "tests": r.test_count, "errors": r.errors, "warnings": r.warnings}));
     }
     if args.flag("json") {
-        println!("{}", serde_json::to_string_pretty(&json!({"results": results, "failed": bad})).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&json!({"results": results, "failed": bad}))
+                .unwrap_or_default()
+        );
     } else {
-        println!("\n{} levels checked, {} with problems", campaign.level_count(), bad);
+        println!(
+            "\n{} levels checked, {} with problems",
+            campaign.level_count(),
+            bad
+        );
     }
     Ok(u8::from(bad > 0))
 }
@@ -400,7 +508,8 @@ fn validate(args: &Args) -> Result<u8, String> {
 fn codegen_cmd(args: &Args) -> Result<u8, String> {
     let c = campaign(args);
     let level = args.opt("level").map(|id| find_level(&c, id)).transpose()?;
-    let lang = Lang::from_key(args.opt("lang").unwrap_or("rust")).ok_or("--lang must be c, cpp or rust")?;
+    let lang = Lang::from_key(args.opt("lang").unwrap_or("rust"))
+        .ok_or("--lang must be c, cpp or rust")?;
     let (program, _) = program_for(args, level)?;
     let mut opts = Options {
         force_generic: args.flag("generic"),
@@ -419,7 +528,11 @@ fn codegen_cmd(args: &Args) -> Result<u8, String> {
             ));
         }
         if v.passed {
-            opts.stats = Some(Stats { size: v.size, avg_steps: v.avg_steps, worst_steps: v.worst_steps });
+            opts.stats = Some(Stats {
+                size: v.size,
+                avg_steps: v.avg_steps,
+                worst_steps: v.worst_steps,
+            });
         }
     }
     let g = codegen::generate(&program, lang, level, &opts);
@@ -441,16 +554,33 @@ fn export(args: &Args) -> Result<u8, String> {
     let (program, listing) = program_for(args, Some(l))?;
     let judge = Judge::new(l).map_err(|e| e.to_string())?;
     let v = judge.judge(&program);
-    let stats = v.passed.then_some(share::ShareStats { size: v.size, avg_steps: v.avg_steps, worst_steps: v.worst_steps });
-    print!("{}", share::export(&format!("{}/{}", l.pack, l.id), &listing, stats));
+    let stats = v.passed.then_some(share::ShareStats {
+        size: v.size,
+        avg_steps: v.avg_steps,
+        worst_steps: v.worst_steps,
+    });
+    print!(
+        "{}",
+        share::export(&format!("{}/{}", l.pack, l.id), &listing, stats)
+    );
     Ok(0)
 }
 
 fn import(args: &Args) -> Result<u8, String> {
     let path = args.positional.first().ok_or("import needs a file")?;
     let text = std::fs::read_to_string(path).map_err(|e| format!("{path}: {e}"))?;
-    let imp = share::import(&text).map_err(|e| e.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n"))?;
-    imp.listing.compile().map_err(|e| e.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n"))?;
+    let imp = share::import(&text).map_err(|e| {
+        e.iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+    })?;
+    imp.listing.compile().map_err(|e| {
+        e.iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("\n")
+    })?;
     if let Some(l) = &imp.level {
         eprintln!("level: {l}");
     }
@@ -464,7 +594,9 @@ fn tune(args: &Args) -> Result<u8, String> {
     let levels: Vec<&Level> = if args.flag("all") {
         c.all_levels().collect()
     } else {
-        let id = args.opt("level").ok_or("tune needs --level <id> or --all")?;
+        let id = args
+            .opt("level")
+            .ok_or("tune needs --level <id> or --all")?;
         vec![find_level(&c, id)?]
     };
     let mut out = Vec::new();
@@ -478,7 +610,10 @@ fn tune(args: &Args) -> Result<u8, String> {
         if args.flag("json") {
             out.push(json!({"level": l.id, "size_par": t.size_par, "size_ace": t.size_ace, "speed_par": t.speed_par, "speed_ace": t.speed_ace}));
         } else {
-            println!("# {}\n[targets]\nsize_par = {}\nsize_ace = {}\nspeed_par = {}\nspeed_ace = {}\n", l.id, t.size_par, t.size_ace, t.speed_par, t.speed_ace);
+            println!(
+                "# {}\n[targets]\nsize_par = {}\nsize_ace = {}\nspeed_par = {}\nspeed_ace = {}\n",
+                l.id, t.size_par, t.size_ace, t.speed_par, t.speed_ace
+            );
         }
     }
     if args.flag("json") {

@@ -5,8 +5,8 @@ Running log of milestones, decisions and verification status. Updated at every c
 ## Milestones
 
 - [x] M1: workspace, licence, core crate (ISA, assembler, VM, levels, judge, codegen, i18n, progress)
-- [ ] M2: levels (40+), validator tests, oracles
-- [ ] M3: codegen compile-tests
+- [x] M2: 48 levels in 7 packs, validator, independent Rust oracles for every level
+- [x] M3: codegen compile-tests (gcc, clang, g++, clang++, rustc) for every reference solution plus proptest corpora, robustness fuzz tests
 - [ ] M4: CLI polish, GUI toolkit ADR and app
 - [ ] M5: community docs, CI, packaging
 - [ ] M6: cross-compilation checks, final report

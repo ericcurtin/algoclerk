@@ -2,8 +2,8 @@
 //! The level data model: what a `levels/<pack>/<id>.toml` file contains.
 
 use crate::asm::{self, Program};
-use crate::testgen::{self, Generator, Rng};
 use crate::isa::Allowed;
+use crate::testgen::{self, Generator, Rng};
 use crate::vm::{Status, run_program};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -351,17 +351,20 @@ impl Level {
 
     /// The instruction set offered by the level.
     pub fn allowed(&self) -> Result<Allowed, LevelError> {
-        Allowed::from_keys(&self.machine.allowed)
-            .map_err(|k| LevelError(format!("unknown instruction key \"{k}\" in machine.allowed")))
+        Allowed::from_keys(&self.machine.allowed).map_err(|k| {
+            LevelError(format!(
+                "unknown instruction key \"{k}\" in machine.allowed"
+            ))
+        })
     }
 
     /// Prefilled floor (no per-test fills).
     pub fn floor_template(&self) -> Result<Vec<Option<i32>>, LevelError> {
         let mut floor = vec![None; self.machine.floor];
         for (k, v) in &self.machine.prefill {
-            let slot: usize = k
-                .parse()
-                .map_err(|_| LevelError(format!("machine.prefill key \"{k}\" is not a slot number")))?;
+            let slot: usize = k.parse().map_err(|_| {
+                LevelError(format!("machine.prefill key \"{k}\" is not a slot number"))
+            })?;
             if slot >= floor.len() {
                 return err(format!("machine.prefill slot {slot} is outside the floor"));
             }
@@ -385,9 +388,13 @@ impl Level {
             .solution
             .as_ref()
             .ok_or_else(|| LevelError(format!("level {} has no reference solution", self.id)))?;
-        asm::assemble(&sol.asm)
-            .map(Arc::new)
-            .map_err(|e| LevelError(format!("reference solution of {} does not assemble: {}", self.id, e.join("; "))))
+        asm::assemble(&sol.asm).map(Arc::new).map_err(|e| {
+            LevelError(format!(
+                "reference solution of {} does not assemble: {}",
+                self.id,
+                e.join("; ")
+            ))
+        })
     }
 
     fn apply_fills(
@@ -420,7 +427,9 @@ impl Level {
             if reference.is_none() {
                 reference = Some(self.reference_program()?);
             }
-            let prog = reference.as_ref().ok_or_else(|| LevelError("no reference".into()))?;
+            let prog = reference
+                .as_ref()
+                .ok_or_else(|| LevelError("no reference".into()))?;
             let r = run_program(prog, inbox, floor, self.tests.step_limit);
             match r.status {
                 Status::Error(e) => err(format!(
@@ -464,7 +473,8 @@ impl Level {
                 .wrapping_add((gi as u64 + 1).wrapping_mul(0x1000_0000_01B3));
             let mut rng = Rng::new(seed);
             for _ in 0..g.count {
-                let gen_in = testgen::generate_one(&mut rng, g).map_err(|e| LevelError(format!("level {}: {e}", self.id)))?;
+                let gen_in = testgen::generate_one(&mut rng, g)
+                    .map_err(|e| LevelError(format!("level {}: {e}", self.id)))?;
                 let floor = self.apply_fills(template.clone(), &gen_in.floor)?;
                 let expected = oracle(&floor, &gen_in.inbox)?;
                 tests.push(TestCase {

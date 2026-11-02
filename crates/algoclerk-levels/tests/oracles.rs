@@ -17,7 +17,9 @@ fn upto_zero(v: &[i32]) -> &[i32] {
 }
 
 fn floor_vals(t: &TestCase, from: usize, len: usize) -> Vec<i32> {
-    (from..from + len).map(|i| t.floor[i].unwrap_or(0)).collect()
+    (from..from + len)
+        .map(|i| t.floor[i].unwrap_or(0))
+        .collect()
 }
 
 fn is_prime(n: i32) -> bool {
@@ -32,11 +34,17 @@ fn sorted(mut v: Vec<i32>) -> Vec<i32> {
 fn oracle_table() -> Vec<(&'static str, Oracle)> {
     vec![
         ("echo", |t| t.inbox.clone()),
-        ("swap-pairs", |t| t.inbox.chunks(2).flat_map(|c| [c[1], c[0]]).collect()),
+        ("swap-pairs", |t| {
+            t.inbox.chunks(2).flat_map(|c| [c[1], c[0]]).collect()
+        }),
         ("double-it", |t| t.inbox.iter().map(|x| x * 2).collect()),
-        ("sum-pairs", |t| t.inbox.chunks(2).map(|c| c[0] + c[1]).collect()),
+        ("sum-pairs", |t| {
+            t.inbox.chunks(2).map(|c| c[0] + c[1]).collect()
+        }),
         ("negate", |t| t.inbox.iter().map(|x| -x).collect()),
-        ("absolute-value", |t| t.inbox.iter().map(|x| x.abs()).collect()),
+        ("absolute-value", |t| {
+            t.inbox.iter().map(|x| x.abs()).collect()
+        }),
         ("sign-of", |t| t.inbox.iter().map(|x| x.signum()).collect()),
         ("countdown", |t| (1..=t.inbox[0]).rev().collect()),
         ("sum-list", |t| vec![upto_zero(&t.inbox).iter().sum()]),
@@ -49,13 +57,20 @@ fn oracle_table() -> Vec<(&'static str, Oracle)> {
                 })
                 .collect()
         }),
-        ("max-of", |t| vec![*upto_zero(&t.inbox).iter().max().unwrap()]),
+        ("max-of", |t| {
+            vec![*upto_zero(&t.inbox).iter().max().unwrap()]
+        }),
         ("min-and-max", |t| {
             let l = upto_zero(&t.inbox);
             vec![*l.iter().min().unwrap(), *l.iter().max().unwrap()]
         }),
         ("count-matches", |t| {
-            vec![upto_zero(&t.inbox[1..]).iter().filter(|x| **x == t.inbox[0]).count() as i32]
+            vec![
+                upto_zero(&t.inbox[1..])
+                    .iter()
+                    .filter(|x| **x == t.inbox[0])
+                    .count() as i32,
+            ]
         }),
         ("longest-run", |t| {
             let l = upto_zero(&t.inbox);
@@ -68,10 +83,14 @@ fn oracle_table() -> Vec<(&'static str, Oracle)> {
         }),
         ("majority-vote", |t| {
             let l = upto_zero(&t.inbox);
-            let m = l.iter().find(|x| l.iter().filter(|y| y == x).count() * 2 > l.len());
+            let m = l
+                .iter()
+                .find(|x| l.iter().filter(|y| y == x).count() * 2 > l.len());
             vec![*m.unwrap()]
         }),
-        ("contains-value", |t| vec![i32::from(upto_zero(&t.inbox[1..]).contains(&t.inbox[0]))]),
+        ("contains-value", |t| {
+            vec![i32::from(upto_zero(&t.inbox[1..]).contains(&t.inbox[0]))]
+        }),
         ("factorial", |t| vec![(1..=t.inbox[0]).product()]),
         ("power", |t| vec![t.inbox[0].pow(t.inbox[1] as u32)]),
         ("fibonacci", |t| {
@@ -99,7 +118,15 @@ fn oracle_table() -> Vec<(&'static str, Oracle)> {
                 })
                 .collect()
         }),
-        ("digit-sum", |t| vec![t.inbox[0].to_string().chars().map(|c| c.to_digit(10).unwrap() as i32).sum()]),
+        ("digit-sum", |t| {
+            vec![
+                t.inbox[0]
+                    .to_string()
+                    .chars()
+                    .map(|c| c.to_digit(10).unwrap() as i32)
+                    .sum(),
+            ]
+        }),
         ("bit-count", |t| {
             let c = t.inbox[0].count_ones() as i32;
             vec![c, c % 2]
@@ -112,14 +139,18 @@ fn oracle_table() -> Vec<(&'static str, Oracle)> {
             }
             vec![s]
         }),
-        ("reverse-list", |t| upto_zero(&t.inbox).iter().rev().copied().collect()),
+        ("reverse-list", |t| {
+            upto_zero(&t.inbox).iter().rev().copied().collect()
+        }),
         ("find-duplicate", |t| {
             let l = upto_zero(&t.inbox);
             vec![i32::from(l.iter().collect::<HashSet<_>>().len() != l.len())]
         }),
         ("histogram", |t| {
             let l = upto_zero(&t.inbox);
-            (1..=5).map(|k| l.iter().filter(|x| **x == k).count() as i32).collect()
+            (1..=5)
+                .map(|k| l.iter().filter(|x| **x == k).count() as i32)
+                .collect()
         }),
         ("palindrome-check", |t| {
             let l = upto_zero(&t.inbox);
@@ -153,10 +184,16 @@ fn oracle_table() -> Vec<(&'static str, Oracle)> {
         }),
         ("insertion-sort", |t| sorted(upto_zero(&t.inbox).to_vec())),
         ("selection-sort", |t| sorted(upto_zero(&t.inbox).to_vec())),
-        ("bubble-sort", |t| sorted(floor_vals(t, 0, t.inbox[0] as usize))),
+        ("bubble-sort", |t| {
+            sorted(floor_vals(t, 0, t.inbox[0] as usize))
+        }),
         ("binary-search", |t| {
             let a = floor_vals(t, 0, t.inbox[0] as usize);
-            vec![a.iter().position(|x| *x == t.inbox[1]).map_or(-1, |p| p as i32)]
+            vec![
+                a.iter()
+                    .position(|x| *x == t.inbox[1])
+                    .map_or(-1, |p| p as i32),
+            ]
         }),
         ("pair-sum", |t| {
             let a = floor_vals(t, 0, t.inbox[0] as usize);
@@ -169,7 +206,9 @@ fn oracle_table() -> Vec<(&'static str, Oracle)> {
             let mut w = vec![0i32; n + 4];
             w[0] = 1;
             for k in 1..=n {
-                w[k] = w[k - 1] + if k >= 2 { w[k - 2] } else { 0 } + if k >= 3 { w[k - 3] } else { 0 };
+                w[k] = w[k - 1]
+                    + if k >= 2 { w[k - 2] } else { 0 }
+                    + if k >= 3 { w[k - 3] } else { 0 };
             }
             vec![w[n]]
         }),
@@ -240,7 +279,10 @@ fn oracle_table() -> Vec<(&'static str, Oracle)> {
         }),
         ("knapsack-tiny", |t| {
             let cap = t.inbox[0];
-            let items: Vec<(i32, i32)> = upto_zero(&t.inbox[1..]).chunks(2).map(|c| (c[0], c[1])).collect();
+            let items: Vec<(i32, i32)> = upto_zero(&t.inbox[1..])
+                .chunks(2)
+                .map(|c| (c[0], c[1]))
+                .collect();
             (0..1u32 << items.len())
                 .filter_map(|mask| {
                     let (w, v) = items
@@ -254,7 +296,9 @@ fn oracle_table() -> Vec<(&'static str, Oracle)> {
                 .into_iter()
                 .collect()
         }),
-        ("sieve", |t| (2..=t.inbox[0]).filter(|n| is_prime(*n)).collect()),
+        ("sieve", |t| {
+            (2..=t.inbox[0]).filter(|n| is_prime(*n)).collect()
+        }),
         ("run-length-encode", |t| {
             let l = upto_zero(&t.inbox);
             let mut out = Vec::new();
@@ -283,7 +327,9 @@ fn oracles_agree_with_expected_outputs_of_every_test() {
     let table = oracle_table();
     let mut checked = 0;
     for (id, oracle) in &table {
-        let level = campaign.find(id).unwrap_or_else(|| panic!("oracle for unknown level {id}"));
+        let level = campaign
+            .find(id)
+            .unwrap_or_else(|| panic!("oracle for unknown level {id}"));
         let tests = level.build_tests().unwrap();
         for (i, t) in tests.iter().enumerate() {
             assert_eq!(
@@ -304,6 +350,13 @@ fn every_shipped_level_has_an_oracle() {
     let campaign = algoclerk_levels::Campaign::shipped();
     let table = oracle_table();
     let ids: HashSet<&str> = table.iter().map(|(id, _)| *id).collect();
-    let missing: Vec<&str> = campaign.all_levels().map(|l| l.id.as_str()).filter(|id| !ids.contains(id)).collect();
-    assert!(missing.is_empty(), "levels without an oracle in tests/oracles.rs: {missing:?}");
+    let missing: Vec<&str> = campaign
+        .all_levels()
+        .map(|l| l.id.as_str())
+        .filter(|id| !ids.contains(id))
+        .collect();
+    assert!(
+        missing.is_empty(),
+        "levels without an oracle in tests/oracles.rs: {missing:?}"
+    );
 }

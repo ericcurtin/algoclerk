@@ -9,18 +9,111 @@ use crate::level::{CodeMeta, Level, ParamKind, ParamSpec, RetType, ReturnKind};
 use std::collections::HashSet;
 
 const KEYWORDS: &[&str] = &[
-    "alignas", "alignof", "and", "as", "asm", "async", "auto", "await", "bool", "break", "case", "catch",
-    "char", "class", "const", "constexpr", "continue", "crate", "default", "delete", "do", "double", "dyn",
-    "else", "enum", "extern", "false", "final", "float", "fn", "for", "friend", "goto", "if", "impl", "in",
-    "inline", "int", "let", "long", "loop", "match", "mod", "move", "mut", "namespace", "new", "not", "or",
-    "override", "pub", "ref", "register", "restrict", "return", "self", "short", "signed", "sizeof",
-    "static", "struct", "super", "switch", "template", "this", "throw", "trait", "true", "try", "type",
-    "typedef", "typename", "union", "unsafe", "unsigned", "use", "using", "virtual", "void", "volatile",
-    "where", "while", "yield", "main", "std", "size_t", "i32", "usize", "u32", "u8", "i64", "u64",
+    "alignas",
+    "alignof",
+    "and",
+    "as",
+    "asm",
+    "async",
+    "auto",
+    "await",
+    "bool",
+    "break",
+    "case",
+    "catch",
+    "char",
+    "class",
+    "const",
+    "constexpr",
+    "continue",
+    "crate",
+    "default",
+    "delete",
+    "do",
+    "double",
+    "dyn",
+    "else",
+    "enum",
+    "extern",
+    "false",
+    "final",
+    "float",
+    "fn",
+    "for",
+    "friend",
+    "goto",
+    "if",
+    "impl",
+    "in",
+    "inline",
+    "int",
+    "let",
+    "long",
+    "loop",
+    "match",
+    "mod",
+    "move",
+    "mut",
+    "namespace",
+    "new",
+    "not",
+    "or",
+    "override",
+    "pub",
+    "ref",
+    "register",
+    "restrict",
+    "return",
+    "self",
+    "short",
+    "signed",
+    "sizeof",
+    "static",
+    "struct",
+    "super",
+    "switch",
+    "template",
+    "this",
+    "throw",
+    "trait",
+    "true",
+    "try",
+    "type",
+    "typedef",
+    "typename",
+    "union",
+    "unsafe",
+    "unsigned",
+    "use",
+    "using",
+    "virtual",
+    "void",
+    "volatile",
+    "where",
+    "while",
+    "yield",
+    "main",
+    "std",
+    "size_t",
+    "i32",
+    "usize",
+    "u32",
+    "u8",
+    "i64",
+    "u64",
 ];
 
 const RESERVED: &[&str] = &[
-    "hand", "next", "inbox", "inbox_len", "outbox", "out_len", "floor", "floor_start", "pc", "i",
+    "hand",
+    "next",
+    "inbox",
+    "inbox_len",
+    "outbox",
+    "out_len",
+    "floor",
+    "floor_start",
+    "pc",
+    "i",
 ];
 
 fn snake(s: &str) -> String {
@@ -102,7 +195,8 @@ impl Gen<'_> {
         if t.is_empty() {
             self.lines.push(String::new());
         } else {
-            self.lines.push(format!("{}{}", "    ".repeat(self.indent), t));
+            self.lines
+                .push(format!("{}{}", "    ".repeat(self.indent), t));
         }
     }
 
@@ -157,7 +251,9 @@ impl Gen<'_> {
     }
 
     fn instr_comment(&self, i: usize) -> String {
-        self.prog.instrs[i].map_target(|t| self.target_name(*t)).to_string()
+        self.prog.instrs[i]
+            .map_target(|t| self.target_name(*t))
+            .to_string()
     }
 
     /// Statements implementing a non-jump instruction.
@@ -349,7 +445,7 @@ impl Gen<'_> {
         self.line("// The jumps in this program do not fit loops and branches,");
         self.line("// so the clerk's own labels are kept and the code uses goto.");
         for i in 0..n {
-            if targeted[i] {
+            if targeted.get(i).copied().unwrap_or(false) {
                 let l = self.label_for(i);
                 self.indent = 0;
                 self.line(format!("{l}:"));
@@ -370,7 +466,11 @@ impl Gen<'_> {
                     self.line_c(g, &comment);
                 }
                 Instr::JumpZ(t) | Instr::JumpN(t) => {
-                    let c = if matches!(ins, Instr::JumpZ(_)) { Cond::Zero } else { Cond::Neg };
+                    let c = if matches!(ins, Instr::JumpZ(_)) {
+                        Cond::Zero
+                    } else {
+                        Cond::Neg
+                    };
                     let g = goto(self, t);
                     let ct = cond_text(self.lang, c);
                     self.line_c(format!("if {ct} {{ {g} }}"), &comment);
@@ -415,7 +515,11 @@ impl Gen<'_> {
                         ended = true;
                     }
                     Instr::JumpZ(t) | Instr::JumpN(t) => {
-                        let c = if matches!(ins, Instr::JumpZ(_)) { Cond::Zero } else { Cond::Neg };
+                        let c = if matches!(ins, Instr::JumpZ(_)) {
+                            Cond::Zero
+                        } else {
+                            Cond::Neg
+                        };
                         let ct = cond_text(Lang::Rust, c);
                         self.line_c(
                             format!("pc = if {ct} {{ {t} }} else {{ {} }};", i + 1),
@@ -474,18 +578,39 @@ fn rust_param(p: &ParamSpec) -> String {
     }
 }
 
-pub(super) fn generate(program: &Program, lang: Lang, level: Option<&Level>, opts: &Options) -> Generated {
+pub(super) fn generate(
+    program: &Program,
+    lang: Lang,
+    level: Option<&Level>,
+    opts: &Options,
+) -> Generated {
     let n = program.instrs.len();
-    let max_slot = program.instrs.iter().filter_map(|i| i.addr()).map(|a| a.slot()).max();
+    let max_slot = program
+        .instrs
+        .iter()
+        .filter_map(|i| i.addr())
+        .map(|a| a.slot())
+        .max();
     let referenced = max_slot.map_or(1, |m| m + 1);
     let floor_len = match level {
         Some(l) => l.machine.floor.max(1),
-        None => opts.floor_len.unwrap_or(0).max(referenced),
+        None => opts
+            .floor_len
+            .unwrap_or(0)
+            .max(opts.floor_init.as_ref().map_or(0, Vec::len))
+            .max(referenced),
     };
     let template: Vec<Option<i32>> = level
         .and_then(|l| l.floor_template().ok())
+        .or_else(|| {
+            opts.floor_init
+                .as_ref()
+                .map(|v| v.iter().map(|x| Some(*x)).collect())
+        })
         .unwrap_or_else(|| vec![None; floor_len]);
-    let meta: Option<&CodeMeta> = level.and_then(|l| l.code.as_ref()).filter(|_| !opts.force_generic);
+    let meta: Option<&CodeMeta> = level
+        .and_then(|l| l.code.as_ref())
+        .filter(|_| !opts.force_generic);
     let floor_input = meta.is_none() && level.is_some_and(meta::level_has_floor_input);
     let meta_floor = meta.is_some_and(|m| m.params.iter().any(|p| p.at.is_some()));
     let array = program.uses_indirect() || floor_input || meta_floor;
@@ -533,7 +658,9 @@ pub(super) fn generate(program: &Program, lang: Lang, level: Option<&Level>, opt
     // Header and includes.
     let title = level.map(|l| l.title.as_str());
     match title {
-        Some(t) => g.line(format!("// Generated by AlgoClerk from your solution to \"{t}\".")),
+        Some(t) => g.line(format!(
+            "// Generated by AlgoClerk from your solution to \"{t}\"."
+        )),
         None => g.line("// Generated by AlgoClerk from a clerk program."),
     }
     if let Some(s) = &opts.stats {
@@ -566,14 +693,34 @@ pub(super) fn generate(program: &Program, lang: Lang, level: Option<&Level>, opt
     let doc = meta
         .map(|m| m.doc.clone())
         .filter(|d| !d.is_empty())
-        .unwrap_or_else(|| "Runs the clerk's program: reads the inbox, returns the outbox.".to_string());
+        .unwrap_or_else(|| {
+            "Runs the clerk's program: reads the inbox, returns the outbox.".to_string()
+        });
     g.line(format!("// {doc}"));
     let params: Vec<String> = match (meta, lang) {
-        (Some(m), Lang::C) => m.params.iter().filter(|p| p.kind != ParamKind::Length).map(c_param).collect(),
-        (Some(m), Lang::Cpp) => m.params.iter().filter(|p| p.kind != ParamKind::Length).map(cpp_param).collect(),
-        (Some(m), Lang::Rust) => m.params.iter().filter(|p| p.kind != ParamKind::Length).map(rust_param).collect(),
+        (Some(m), Lang::C) => m
+            .params
+            .iter()
+            .filter(|p| p.kind != ParamKind::Length)
+            .map(c_param)
+            .collect(),
+        (Some(m), Lang::Cpp) => m
+            .params
+            .iter()
+            .filter(|p| p.kind != ParamKind::Length)
+            .map(cpp_param)
+            .collect(),
+        (Some(m), Lang::Rust) => m
+            .params
+            .iter()
+            .filter(|p| p.kind != ParamKind::Length)
+            .map(rust_param)
+            .collect(),
         (None, Lang::C) => {
-            let mut v = vec!["const int *inbox".to_string(), "size_t inbox_len".to_string()];
+            let mut v = vec![
+                "const int *inbox".to_string(),
+                "size_t inbox_len".to_string(),
+            ];
             if floor_input {
                 v.push("const int *floor_start".into());
             }
@@ -644,17 +791,15 @@ pub(super) fn generate(program: &Program, lang: Lang, level: Option<&Level>, opt
     if has_inbox {
         match lang {
             Lang::C => g.line("size_t next = 0;  // how many inbox values the clerk has taken"),
-            Lang::Cpp => g.line("std::size_t next = 0;  // how many inbox values the clerk has taken"),
+            Lang::Cpp => {
+                g.line("std::size_t next = 0;  // how many inbox values the clerk has taken")
+            }
             Lang::Rust => g.line("let mut next = 0;  // how many inbox values the clerk has taken"),
         }
     }
     if list_ret {
         match lang {
-            Lang::C => {
-                if program.instrs.iter().any(|i| matches!(i, Instr::Outbox)) {
-                    g.line("size_t out_len = 0;");
-                }
-            }
+            Lang::C => g.line("size_t out_len = 0;"),
             Lang::Cpp => g.line("std::vector<int> outbox;"),
             Lang::Rust => g.line("let mut outbox = Vec::new();"),
         }
@@ -668,7 +813,11 @@ pub(super) fn generate(program: &Program, lang: Lang, level: Option<&Level>, opt
     declare_floor(&mut g, level, &template, &used, floor_input, meta);
 
     // Body.
-    let tree = if opts.force_fallback { None } else { structure(program) };
+    let tree = if opts.force_fallback {
+        None
+    } else {
+        structure(program)
+    };
     let structured = tree.is_some();
     if n > 0 {
         match tree {
@@ -698,7 +847,9 @@ pub(super) fn generate(program: &Program, lang: Lang, level: Option<&Level>, opt
         structured,
         shape: match meta {
             Some(m) => Shape::Meta(m.clone()),
-            None => Shape::Generic { floor_param: floor_input },
+            None => Shape::Generic {
+                floor_param: floor_input,
+            },
         },
         floor_len,
         explain: level.and_then(|l| l.explain.clone()),
@@ -726,7 +877,9 @@ fn prologue_inbox(g: &mut Gen<'_>, ps: &[&ParamSpec], single_list: bool) {
                 match p.kind {
                     ParamKind::Scalar | ParamKind::Length => terms.push("1".into()),
                     ParamKind::List => terms.push(format!("{}_len", p.name)),
-                    ParamKind::Counted | ParamKind::Terminated => terms.push(format!("{}_len + 1", p.name)),
+                    ParamKind::Counted | ParamKind::Terminated => {
+                        terms.push(format!("{}_len + 1", p.name))
+                    }
                 }
             }
             if terms.is_empty() {
@@ -745,13 +898,19 @@ fn prologue_inbox(g: &mut Gen<'_>, ps: &[&ParamSpec], single_list: bool) {
                     }
                     ParamKind::Counted => {
                         g.line(format!("inbox[filled++] = (int){n}_len;"));
-                        g.line(format!("for (size_t i = 0; i < {n}_len; i++) inbox[filled++] = {n}[i];"));
+                        g.line(format!(
+                            "for (size_t i = 0; i < {n}_len; i++) inbox[filled++] = {n}[i];"
+                        ));
                     }
                     ParamKind::List => {
-                        g.line(format!("for (size_t i = 0; i < {n}_len; i++) inbox[filled++] = {n}[i];"));
+                        g.line(format!(
+                            "for (size_t i = 0; i < {n}_len; i++) inbox[filled++] = {n}[i];"
+                        ));
                     }
                     ParamKind::Terminated => {
-                        g.line(format!("for (size_t i = 0; i < {n}_len; i++) inbox[filled++] = {n}[i];"));
+                        g.line(format!(
+                            "for (size_t i = 0; i < {n}_len; i++) inbox[filled++] = {n}[i];"
+                        ));
                         g.line(format!("inbox[filled++] = {};", p.terminator));
                     }
                 }
@@ -769,11 +928,17 @@ fn prologue_inbox(g: &mut Gen<'_>, ps: &[&ParamSpec], single_list: bool) {
                     }
                     ParamKind::Counted => {
                         g.line(format!("inbox.push_back(static_cast<int>({n}.size()));"));
-                        g.line(format!("inbox.insert(inbox.end(), {n}.begin(), {n}.end());"));
+                        g.line(format!(
+                            "inbox.insert(inbox.end(), {n}.begin(), {n}.end());"
+                        ));
                     }
-                    ParamKind::List => g.line(format!("inbox.insert(inbox.end(), {n}.begin(), {n}.end());")),
+                    ParamKind::List => g.line(format!(
+                        "inbox.insert(inbox.end(), {n}.begin(), {n}.end());"
+                    )),
                     ParamKind::Terminated => {
-                        g.line(format!("inbox.insert(inbox.end(), {n}.begin(), {n}.end());"));
+                        g.line(format!(
+                            "inbox.insert(inbox.end(), {n}.begin(), {n}.end());"
+                        ));
                         g.line(format!("inbox.push_back({});", p.terminator));
                     }
                 }
@@ -827,26 +992,42 @@ fn declare_floor(
     }
     let n = g.floor_len;
     let names: Vec<String> = (0..n)
-        .filter_map(|s| level.and_then(|l| l.slot_name(s)).map(|nm| format!("{s} = {nm}")))
+        .filter_map(|s| {
+            level
+                .and_then(|l| l.slot_name(s))
+                .map(|nm| format!("{s} = {nm}"))
+        })
         .collect();
     if !names.is_empty() {
         g.line(format!("// Floor tiles: {}.", names.join(", ")));
     }
     let values: Vec<i32> = (0..n).map(init).collect();
     let all_zero = values.iter().all(|v| *v == 0);
-    let list = values.iter().map(ToString::to_string).collect::<Vec<_>>().join(", ");
+    let list = values
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
     if floor_input {
         match lang {
             Lang::C => {
                 g.line(format!("int floor[{n}];  // starts as `floor_start`"));
-                g.line(format!("for (size_t i = 0; i < {n}; i++) floor[i] = floor_start[i];"));
+                g.line(format!(
+                    "for (size_t i = 0; i < {n}; i++) floor[i] = floor_start[i];"
+                ));
             }
             Lang::Cpp => {
-                g.line(format!("std::array<int, {n}> floor{{}};  // starts as `floor_start`"));
-                g.line(format!("for (std::size_t i = 0; i < {n}; i++) floor[i] = floor_start[i];"));
+                g.line(format!(
+                    "std::array<int, {n}> floor{{}};  // starts as `floor_start`"
+                ));
+                g.line(format!(
+                    "for (std::size_t i = 0; i < {n}; i++) floor[i] = floor_start[i];"
+                ));
             }
             Lang::Rust => {
-                g.line(format!("let mut floor = [0i32; {n}];  // starts as `floor_start`"));
+                g.line(format!(
+                    "let mut floor = [0i32; {n}];  // starts as `floor_start`"
+                ));
                 g.line(format!("floor.copy_from_slice(&floor_start[..{n}]);"));
             }
         }

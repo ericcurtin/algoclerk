@@ -29,11 +29,10 @@ pub fn split_args(
         if let Some(at) = p.at {
             match p.kind {
                 ParamKind::Scalar => {
-                    let v = floor
-                        .get(at)
-                        .copied()
-                        .flatten()
-                        .ok_or_else(|| format!("parameter {}: floor slot {at} is empty", p.name))?;
+                    let v =
+                        floor.get(at).copied().flatten().ok_or_else(|| {
+                            format!("parameter {}: floor slot {at} is empty", p.name)
+                        })?;
                     args.push(Arg::Scalar(v));
                 }
                 _ => {
@@ -72,10 +71,17 @@ pub fn split_args(
                     .get(pos)
                     .ok_or_else(|| format!("parameter {}: the inbox ended too early", p.name))?;
                 pos += 1;
-                let want = list_len_of(meta, &args, p.of.as_deref())
-                    .ok_or_else(|| format!("parameter {}: `of` must name an earlier list parameter", p.name))?;
+                let want = list_len_of(meta, &args, p.of.as_deref()).ok_or_else(|| {
+                    format!(
+                        "parameter {}: `of` must name an earlier list parameter",
+                        p.name
+                    )
+                })?;
                 if i64::from(v) != want as i64 {
-                    return Err(format!("parameter {}: the inbox says {v} but the list has {want} values", p.name));
+                    return Err(format!(
+                        "parameter {}: the inbox says {v} but the list has {want} values",
+                        p.name
+                    ));
                 }
                 args.push(Arg::Scalar(v));
             }
@@ -84,10 +90,14 @@ pub fn split_args(
                     .get(pos)
                     .ok_or_else(|| format!("parameter {}: missing length", p.name))?;
                 pos += 1;
-                let n = usize::try_from(n).map_err(|_| format!("parameter {}: negative length", p.name))?;
+                let n = usize::try_from(n)
+                    .map_err(|_| format!("parameter {}: negative length", p.name))?;
                 let end = pos + n;
                 if end > inbox.len() {
-                    return Err(format!("parameter {}: the inbox is shorter than its length", p.name));
+                    return Err(format!(
+                        "parameter {}: the inbox is shorter than its length",
+                        p.name
+                    ));
                 }
                 args.push(Arg::List(inbox[pos..end].to_vec()));
                 pos = end;
@@ -96,7 +106,12 @@ pub fn split_args(
                 let rel = inbox[pos.min(inbox.len())..]
                     .iter()
                     .position(|v| *v == p.terminator)
-                    .ok_or_else(|| format!("parameter {}: terminator {} not found", p.name, p.terminator))?;
+                    .ok_or_else(|| {
+                        format!(
+                            "parameter {}: terminator {} not found",
+                            p.name, p.terminator
+                        )
+                    })?;
                 args.push(Arg::List(inbox[pos..pos + rel].to_vec()));
                 pos += rel + 1;
             }
@@ -131,8 +146,12 @@ pub fn apply_args(
     let mut floor = template.to_vec();
     for (i, (p, a)) in meta.params.iter().zip(args).enumerate() {
         if p.kind == ParamKind::Length {
-            let n = list_len_of(meta, &args[..i], p.of.as_deref())
-                .ok_or_else(|| format!("parameter {}: `of` must name an earlier list parameter", p.name))?;
+            let n = list_len_of(meta, &args[..i], p.of.as_deref()).ok_or_else(|| {
+                format!(
+                    "parameter {}: `of` must name an earlier list parameter",
+                    p.name
+                )
+            })?;
             inbox.push(n as i32);
             continue;
         }
@@ -144,7 +163,8 @@ pub fn apply_args(
             for (i, v) in vals.iter().enumerate() {
                 *floor
                     .get_mut(at + i)
-                    .ok_or_else(|| format!("parameter {} does not fit on the floor", p.name))? = Some(*v);
+                    .ok_or_else(|| format!("parameter {} does not fit on the floor", p.name))? =
+                    Some(*v);
             }
             continue;
         }
@@ -180,16 +200,23 @@ pub fn check_layout(level: &Level, tests: &[TestCase]) -> Vec<String> {
     };
     let ident_ok = |s: &str| {
         !s.is_empty()
-            && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+            && s.chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
             && !s.starts_with(|c: char| c.is_ascii_digit())
     };
     if !ident_ok(&meta.function) {
-        problems.push(format!("code.function \"{}\" must be snake_case ascii", meta.function));
+        problems.push(format!(
+            "code.function \"{}\" must be snake_case ascii",
+            meta.function
+        ));
     }
     let mut seen = std::collections::HashSet::new();
     for p in &meta.params {
         if !ident_ok(&p.name) {
-            problems.push(format!("code parameter name \"{}\" must be snake_case ascii", p.name));
+            problems.push(format!(
+                "code parameter name \"{}\" must be snake_case ascii",
+                p.name
+            ));
         }
         if !seen.insert(p.name.clone()) {
             problems.push(format!("duplicate code parameter \"{}\"", p.name));
@@ -198,9 +225,13 @@ pub fn check_layout(level: &Level, tests: &[TestCase]) -> Vec<String> {
     for (i, p) in meta.params.iter().enumerate() {
         if p.kind == ParamKind::Length {
             let ok = p.of.as_ref().is_some_and(|o| {
-                meta.params[..i]
-                    .iter()
-                    .any(|q| &q.name == o && matches!(q.kind, ParamKind::List | ParamKind::Counted | ParamKind::Terminated))
+                meta.params[..i].iter().any(|q| {
+                    &q.name == o
+                        && matches!(
+                            q.kind,
+                            ParamKind::List | ParamKind::Counted | ParamKind::Terminated
+                        )
+                })
             });
             if !ok || p.at.is_some() {
                 problems.push(format!("length parameter \"{}\" needs `of` naming an earlier list parameter and no `at`", p.name));
@@ -211,7 +242,8 @@ pub fn check_layout(level: &Level, tests: &[TestCase]) -> Vec<String> {
     if let Some(pos) = inbox_params.iter().position(|p| p.kind == ParamKind::List)
         && pos + 1 != inbox_params.len()
     {
-        problems.push("an inbox parameter of kind \"list\" must be the last inbox parameter".into());
+        problems
+            .push("an inbox parameter of kind \"list\" must be the last inbox parameter".into());
     }
     let template = match level.floor_template() {
         Ok(t) => t,
@@ -227,7 +259,10 @@ pub fn check_layout(level: &Level, tests: &[TestCase]) -> Vec<String> {
                 Err(e) => problems.push(format!("test {}: {e}", i + 1)),
                 Ok((inbox, floor)) => {
                     if inbox != t.inbox || floor != t.floor {
-                        problems.push(format!("test {}: arguments do not rebuild the original input", i + 1));
+                        problems.push(format!(
+                            "test {}: arguments do not rebuild the original input",
+                            i + 1
+                        ));
                     }
                 }
             },

@@ -34,7 +34,12 @@ fn every_shipped_level_validates_without_errors() {
         let r = validate_level(l);
         assert!(r.ok(), "{}: {:?}", l.id, r.errors);
         assert!(r.warnings.is_empty(), "{}: {:?}", l.id, r.warnings);
-        assert!(r.test_count >= 8, "{} has only {} tests", l.id, r.test_count);
+        assert!(
+            r.test_count >= 8,
+            "{} has only {} tests",
+            l.id,
+            r.test_count
+        );
     }
 }
 
@@ -45,8 +50,18 @@ fn reference_solutions_pass_and_meet_targets() {
         let judge = Judge::new(l).unwrap();
         let v = judge.judge(&l.reference_program().unwrap());
         assert!(v.passed, "{}: {:?}", l.id, v.first_failure());
-        assert!(v.size <= l.targets.size_par as usize, "{}: size {}", l.id, v.size);
-        assert!(v.avg_steps <= f64::from(l.targets.speed_par), "{}: avg {}", l.id, v.avg_steps);
+        assert!(
+            v.size <= l.targets.size_par as usize,
+            "{}: size {}",
+            l.id,
+            v.size
+        );
+        assert!(
+            v.avg_steps <= f64::from(l.targets.speed_par),
+            "{}: avg {}",
+            l.id,
+            v.avg_steps
+        );
         assert!(v.medals.size >= Some(Medal::Staple), "{}", l.id);
         assert!(v.medals.speed >= Some(Medal::Staple), "{}", l.id);
     }
@@ -84,11 +99,41 @@ fn curriculum_covers_the_required_topics() {
     let c = Campaign::shipped();
     let ids: HashSet<&str> = c.all_levels().map(|l| l.id.as_str()).collect();
     for needed in [
-        "echo", "sum-list", "max-of", "min-and-max", "reverse-list", "running-sum", "pair-sum", "find-duplicate",
-        "count-matches", "palindrome-check", "fizz-buzz", "fibonacci", "factorial", "gcd", "is-prime", "power",
-        "absolute-value", "sign-of", "insertion-sort", "selection-sort", "bubble-sort", "merge-sorted",
-        "binary-search", "missing-number", "remove-duplicates", "kadane", "majority-vote", "valid-brackets",
-        "ring-buffer", "list-walk", "list-reverse", "climbing-stairs", "coin-change", "knapsack-tiny", "bit-count",
+        "echo",
+        "sum-list",
+        "max-of",
+        "min-and-max",
+        "reverse-list",
+        "running-sum",
+        "pair-sum",
+        "find-duplicate",
+        "count-matches",
+        "palindrome-check",
+        "fizz-buzz",
+        "fibonacci",
+        "factorial",
+        "gcd",
+        "is-prime",
+        "power",
+        "absolute-value",
+        "sign-of",
+        "insertion-sort",
+        "selection-sort",
+        "bubble-sort",
+        "merge-sorted",
+        "binary-search",
+        "missing-number",
+        "remove-duplicates",
+        "kadane",
+        "majority-vote",
+        "valid-brackets",
+        "ring-buffer",
+        "list-walk",
+        "list-reverse",
+        "climbing-stairs",
+        "coin-change",
+        "knapsack-tiny",
+        "bit-count",
         "sieve",
     ] {
         assert!(ids.contains(needed), "missing level {needed}");

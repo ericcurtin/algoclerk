@@ -6,6 +6,8 @@
 //! jump pattern allows it; otherwise a goto (C, C++) or `pc` state machine (Rust) form is used.
 //! Both forms are always correct for programs that run without errors. See `docs/CODEGEN.md`.
 
+#[cfg(feature = "compile-tests")]
+pub mod compile;
 pub mod harness;
 pub mod highlight;
 pub mod meta;
@@ -88,6 +90,8 @@ pub struct Options {
     pub floor_len: Option<usize>,
     /// Ignore the level's `[code]` metadata and emit the generic inbox/outbox form.
     pub force_generic: bool,
+    /// Initial floor values when no level is given (for example in sandbox mode).
+    pub floor_init: Option<Vec<i32>>,
     /// Never use structured control flow (used by tests to exercise the fallback).
     pub force_fallback: bool,
     /// Statistics for the header comment.

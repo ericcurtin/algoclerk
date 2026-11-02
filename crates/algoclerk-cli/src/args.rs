@@ -29,7 +29,9 @@ impl Args {
                     a.opts.insert(k.to_string(), v.to_string());
                 } else if value_opts.contains(&name) {
                     i += 1;
-                    let v = argv.get(i).ok_or_else(|| format!("option --{name} needs a value"))?;
+                    let v = argv
+                        .get(i)
+                        .ok_or_else(|| format!("option --{name} needs a value"))?;
                     a.opts.insert(name.to_string(), v.clone());
                 } else {
                     a.flags.push(name.to_string());
@@ -63,7 +65,11 @@ mod tests {
 
     #[test]
     fn parses_mixed() {
-        let a = Args::parse(&v(&["x", "--level", "echo", "--json", "--lang=c", "y"]), &["level", "lang"]).unwrap();
+        let a = Args::parse(
+            &v(&["x", "--level", "echo", "--json", "--lang=c", "y"]),
+            &["level", "lang"],
+        )
+        .unwrap();
         assert_eq!(a.opt("level"), Some("echo"));
         assert_eq!(a.opt("lang"), Some("c"));
         assert!(a.flag("json"));

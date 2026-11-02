@@ -64,7 +64,8 @@ impl Campaign {
             let dir = parts.next().unwrap_or_default();
             let stem = file.strip_suffix(".toml").unwrap_or(file);
             if dir.is_empty() {
-                self.load_errors.push(format!("{path}: files must live in a pack directory"));
+                self.load_errors
+                    .push(format!("{path}: files must live in a pack directory"));
                 continue;
             }
             if stem == "pack" {
@@ -76,8 +77,10 @@ impl Campaign {
                 match Level::from_toml(text, dir) {
                     Ok(l) => {
                         if l.id != stem {
-                            self.load_errors
-                                .push(format!("{path}: id \"{}\" must equal the file name \"{stem}\"", l.id));
+                            self.load_errors.push(format!(
+                                "{path}: id \"{}\" must equal the file name \"{stem}\"",
+                                l.id
+                            ));
                         } else {
                             levels.push(l);
                         }
@@ -88,7 +91,8 @@ impl Campaign {
         }
         for info in infos {
             if self.packs.iter().any(|p| p.info.id == info.id) {
-                self.load_errors.push(format!("pack \"{}\" defined twice", info.id));
+                self.load_errors
+                    .push(format!("pack \"{}\" defined twice", info.id));
                 continue;
             }
             self.packs.push(Pack {
@@ -98,20 +102,23 @@ impl Campaign {
         }
         for l in levels {
             if self.find(&l.id).is_some() {
-                self.load_errors.push(format!("level id \"{}\" is not unique", l.id));
+                self.load_errors
+                    .push(format!("level id \"{}\" is not unique", l.id));
                 continue;
             }
             match self.packs.iter_mut().find(|p| p.info.id == l.pack) {
                 Some(p) => p.levels.push(l),
-                None => self
-                    .load_errors
-                    .push(format!("level \"{}\": pack \"{}\" has no pack.toml", l.id, l.pack)),
+                None => self.load_errors.push(format!(
+                    "level \"{}\": pack \"{}\" has no pack.toml",
+                    l.id, l.pack
+                )),
             }
         }
         self.packs
             .sort_by(|a, b| (a.info.order, &a.info.id).cmp(&(b.info.order, &b.info.id)));
         for p in &mut self.packs {
-            p.levels.sort_by(|a, b| (a.order, &a.id).cmp(&(b.order, &b.id)));
+            p.levels
+                .sort_by(|a, b| (a.order, &a.id).cmp(&(b.order, &b.id)));
         }
     }
 
@@ -135,7 +142,8 @@ impl Campaign {
                 let fp = f.path();
                 if fp.extension().is_some_and(|e| e == "toml") {
                     match std::fs::read_to_string(&fp) {
-                        Ok(text) => files.push((format!("{pname}/{}", f.file_name().to_string_lossy()), text)),
+                        Ok(text) => files
+                            .push((format!("{pname}/{}", f.file_name().to_string_lossy()), text)),
                         Err(e) => self.load_errors.push(format!("{}: {e}", fp.display())),
                     }
                 }
@@ -176,7 +184,11 @@ impl Campaign {
         let Some(prev) = self.packs.get(pack_idx - 1) else {
             return false;
         };
-        let solved = prev.levels.iter().filter(|l| progress.record(&l.id).solved).count();
+        let solved = prev
+            .levels
+            .iter()
+            .filter(|l| progress.record(&l.id).solved)
+            .count();
         solved * 100 >= prev.levels.len() * PACK_UNLOCK_PERCENT
     }
 
@@ -203,14 +215,23 @@ mod tests {
     fn lvl(id: &str, order: u32) -> String {
         include_str!("../../algoclerk-core/tests/data/echo.toml")
             .replace("echo-test", id)
-            .replace("title = \"Echo\"", &format!("title = \"Echo\"\norder = {order}"))
+            .replace(
+                "title = \"Echo\"",
+                &format!("title = \"Echo\"\norder = {order}"),
+            )
     }
 
     #[test]
     fn loads_and_orders() {
         let files = vec![
-            ("b/pack.toml".to_string(), "title=\"B\"\nblurb=\"b\"\norder=2".to_string()),
-            ("a/pack.toml".to_string(), "title=\"A\"\nblurb=\"a\"\norder=1".to_string()),
+            (
+                "b/pack.toml".to_string(),
+                "title=\"B\"\nblurb=\"b\"\norder=2".to_string(),
+            ),
+            (
+                "a/pack.toml".to_string(),
+                "title=\"A\"\nblurb=\"a\"\norder=1".to_string(),
+            ),
             ("a/two.toml".to_string(), lvl("two", 2)),
             ("a/one.toml".to_string(), lvl("one", 1)),
             ("b/three.toml".to_string(), lvl("three", 1)),
@@ -226,7 +247,10 @@ mod tests {
     #[test]
     fn reports_bad_files_without_failing() {
         let files = vec![
-            ("a/pack.toml".to_string(), "title=\"A\"\nblurb=\"a\"\norder=1".to_string()),
+            (
+                "a/pack.toml".to_string(),
+                "title=\"A\"\nblurb=\"a\"\norder=1".to_string(),
+            ),
             ("a/x.toml".to_string(), lvl("y", 1)),
             ("a/z.toml".to_string(), "garbage".to_string()),
             ("lonely.toml".to_string(), "x".to_string()),
@@ -240,8 +264,14 @@ mod tests {
     #[test]
     fn unlock_rules() {
         let files = vec![
-            ("a/pack.toml".to_string(), "title=\"A\"\nblurb=\"a\"\norder=1".to_string()),
-            ("b/pack.toml".to_string(), "title=\"B\"\nblurb=\"b\"\norder=2".to_string()),
+            (
+                "a/pack.toml".to_string(),
+                "title=\"A\"\nblurb=\"a\"\norder=1".to_string(),
+            ),
+            (
+                "b/pack.toml".to_string(),
+                "title=\"B\"\nblurb=\"b\"\norder=2".to_string(),
+            ),
             ("a/one.toml".to_string(), lvl("one", 1)),
             ("a/two.toml".to_string(), lvl("two", 2)),
             ("b/three.toml".to_string(), lvl("three", 1)),
@@ -253,7 +283,10 @@ mod tests {
         assert!(!c.pack_unlocked(&p, 1));
         p.record_mut("one").solved = true;
         assert!(c.level_unlocked(&p, 0, 1));
-        assert!(!c.pack_unlocked(&p, 1), "one of two levels is below the 60% threshold");
+        assert!(
+            !c.pack_unlocked(&p, 1),
+            "one of two levels is below the 60% threshold"
+        );
         p.record_mut("two").solved = true;
         assert!(c.pack_unlocked(&p, 1));
         p.settings.unlock_all = true;

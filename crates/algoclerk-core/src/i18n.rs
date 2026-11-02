@@ -62,10 +62,7 @@ impl Strings {
 
     /// Format a message, substituting `{name}` placeholders. Falls back to English, then to the key.
     pub fn format(&self, key: &str, args: &[(&str, String)]) -> String {
-        let template = self
-            .get(key)
-            .or_else(|| english().get(key))
-            .unwrap_or(key);
+        let template = self.get(key).or_else(|| english().get(key)).unwrap_or(key);
         let mut out = template.to_string();
         for (k, v) in args {
             out = out.replace(&format!("{{{k}}}"), v);
@@ -132,7 +129,10 @@ mod tests {
     fn format_substitutes_and_falls_back() {
         let s = Strings::from_toml("[a]\nb = \"x {n} y\"").unwrap();
         assert_eq!(s.format("a.b", &[("n", "5".into())]), "x 5 y");
-        assert_eq!(s.format("run.empty_tile", &[("slot", "3".into())]).contains('3'), true);
+        assert!(
+            s.format("run.empty_tile", &[("slot", "3".into())])
+                .contains('3')
+        );
         assert_eq!(s.format("no.such.key", &[]), "no.such.key");
     }
 }

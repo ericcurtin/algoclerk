@@ -40,7 +40,10 @@ pub fn validate_level(level: &Level) -> Report {
     let mut errors = Vec::new();
     let mut warnings = Vec::new();
     if !valid_id(&level.id) {
-        errors.push(format!("id \"{}\" must be lowercase letters, digits and dashes", level.id));
+        errors.push(format!(
+            "id \"{}\" must be lowercase letters, digits and dashes",
+            level.id
+        ));
     }
     for (name, text) in [
         ("title", &level.title),
@@ -82,7 +85,12 @@ pub fn validate_level(level: &Level) -> Report {
     if level.examples.is_empty() {
         errors.push("at least one example is required".into());
     }
-    let explicit = level.tests.fixed.iter().filter(|c| c.output.is_some()).count();
+    let explicit = level
+        .tests
+        .fixed
+        .iter()
+        .filter(|c| c.output.is_some())
+        .count();
     if explicit < 3 {
         errors.push(format!(
             "at least 3 hand-written test cases with explicit output are required (found {explicit})"
@@ -105,7 +113,9 @@ pub fn validate_level(level: &Level) -> Report {
         warnings.push("no [explain] section (the victory screen shows it)".into());
     }
     if level.code.is_none() {
-        warnings.push("no [code] metadata: generated code will use the generic inbox/outbox form".into());
+        warnings.push(
+            "no [code] metadata: generated code will use the generic inbox/outbox form".into(),
+        );
     }
     for (i, ex) in level.examples.iter().enumerate() {
         if matches!(&ex.input, Seq::Ints(v) if v.len() > 40) {
@@ -122,7 +132,9 @@ pub fn validate_level(level: &Level) -> Report {
             Ok(judge) => {
                 test_count = judge.tests().len();
                 if test_count < 8 {
-                    errors.push(format!("at least 8 tests are required (found {test_count})"));
+                    errors.push(format!(
+                        "at least 8 tests are required (found {test_count})"
+                    ));
                 }
                 match level.reference_program() {
                     Err(e) => errors.push(e.to_string()),
@@ -145,7 +157,10 @@ pub fn validate_level(level: &Level) -> Report {
                                 ));
                             }
                             if v.size > t.size_ace as usize {
-                                warnings.push(format!("reference size {} is above size_ace {}", v.size, t.size_ace));
+                                warnings.push(format!(
+                                    "reference size {} is above size_ace {}",
+                                    v.size, t.size_ace
+                                ));
                             }
                             if v.avg_steps > f64::from(t.speed_ace) {
                                 warnings.push(format!(

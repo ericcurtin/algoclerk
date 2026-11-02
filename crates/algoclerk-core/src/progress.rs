@@ -124,7 +124,12 @@ impl Progress {
     }
 
     /// Record a verdict. Returns true if something improved (new solve or better score).
-    pub fn record_verdict(&mut self, level: &Level, verdict: &Verdict, solution_text: &str) -> bool {
+    pub fn record_verdict(
+        &mut self,
+        level: &Level,
+        verdict: &Verdict,
+        solution_text: &str,
+    ) -> bool {
         if !verdict.passed {
             return false;
         }

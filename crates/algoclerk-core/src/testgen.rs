@@ -287,9 +287,9 @@ fn gen_seg(rng: &mut Rng, seg: &Seg, pool: &[SegOut]) -> Result<SegOut, String> 
         }
         SegKind::Const => Ok(finish(seg, seg.values.clone(), None)),
         SegKind::Pick => {
-            let src = pool
-                .get(seg.of)
-                .ok_or_else(|| format!("pick refers to segment {} which does not exist yet", seg.of))?;
+            let src = pool.get(seg.of).ok_or_else(|| {
+                format!("pick refers to segment {} which does not exist yet", seg.of)
+            })?;
             let v = if !src.raw.is_empty() && rng.chance(seg.chance) {
                 src.raw[rng.below(src.raw.len() as u64) as usize]
             } else {
@@ -356,15 +356,33 @@ fn gen_seg(rng: &mut Rng, seg: &Seg, pool: &[SegOut]) -> Result<SegOut, String> 
         }
         SegKind::Majority => {
             let n = pick_len_multiple(rng, seg.len, seg.len_multiple).max(1);
-            let major = random_list(rng, &Seg { distinct: false, ..seg.clone() }, 1)[0];
+            let major = random_list(
+                rng,
+                &Seg {
+                    distinct: false,
+                    ..seg.clone()
+                },
+                1,
+            )[0];
             let k = n / 2 + 1;
             let mut v = vec![major; k];
-            v.extend(random_list(rng, &Seg { distinct: false, ..seg.clone() }, n - k));
+            v.extend(random_list(
+                rng,
+                &Seg {
+                    distinct: false,
+                    ..seg.clone()
+                },
+                n - k,
+            ));
             rng.shuffle(&mut v);
             Ok(finish(seg, v, Some(major)))
         }
         SegKind::Linked => {
-            let stride = if seg.stride == 0 { 2 } else { seg.stride as usize };
+            let stride = if seg.stride == 0 {
+                2
+            } else {
+                seg.stride as usize
+            };
             let nodes = pick_len(rng, seg.len).max(1);
             // Node order along the list, and where each node lives.
             let mut places: Vec<usize> = (0..nodes).collect();
@@ -387,21 +405,31 @@ fn gen_seg(rng: &mut Rng, seg: &Seg, pool: &[SegOut]) -> Result<SegOut, String> 
             })
         }
         SegKind::Copy => {
-            let src = pool
-                .get(seg.of)
-                .ok_or_else(|| format!("copy refers to segment {} which does not exist yet", seg.of))?;
-            Ok(finish(&Seg { sort: None, ..seg.clone() }, src.raw.clone(), None))
+            let src = pool.get(seg.of).ok_or_else(|| {
+                format!("copy refers to segment {} which does not exist yet", seg.of)
+            })?;
+            Ok(finish(
+                &Seg {
+                    sort: None,
+                    ..seg.clone()
+                },
+                src.raw.clone(),
+                None,
+            ))
         }
         SegKind::Len => {
-            let src = pool
-                .get(seg.of)
-                .ok_or_else(|| format!("len refers to segment {} which does not exist yet", seg.of))?;
+            let src = pool.get(seg.of).ok_or_else(|| {
+                format!("len refers to segment {} which does not exist yet", seg.of)
+            })?;
             Ok(finish(seg, vec![src.raw.len() as i32], None))
         }
         SegKind::PairSum => {
-            let src = pool
-                .get(seg.of)
-                .ok_or_else(|| format!("pairsum refers to segment {} which does not exist yet", seg.of))?;
+            let src = pool.get(seg.of).ok_or_else(|| {
+                format!(
+                    "pairsum refers to segment {} which does not exist yet",
+                    seg.of
+                )
+            })?;
             let v = if src.raw.len() >= 2 && rng.chance(seg.chance) {
                 let i = rng.below(src.raw.len() as u64) as usize;
                 let mut j = rng.below(src.raw.len() as u64 - 1) as usize;
@@ -415,9 +443,9 @@ fn gen_seg(rng: &mut Rng, seg: &Seg, pool: &[SegOut]) -> Result<SegOut, String> 
             Ok(finish(seg, vec![v], None))
         }
         SegKind::Aux => {
-            let src = pool
-                .get(seg.of)
-                .ok_or_else(|| format!("aux refers to segment {} which does not exist yet", seg.of))?;
+            let src = pool.get(seg.of).ok_or_else(|| {
+                format!("aux refers to segment {} which does not exist yet", seg.of)
+            })?;
             let a = src
                 .aux
                 .ok_or_else(|| format!("segment {} has no auxiliary value", seg.of))?;
