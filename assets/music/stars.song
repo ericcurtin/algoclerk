@@ -1,0 +1,6 @@
+# Stars arriving one by one.
+name: stars
+bpm: 220
+loop: no
+lead = square 0.4 : C5:1 E5:1 G5:1 C6:2 E6:2 G6:2 C7:6
+bass = triangle 0.5 : C3:4 G3:4 C4:6

@@ -5,6 +5,9 @@ members = [
     "crates/algoclerk-media",
     "crates/algoclerk-levels",
     "crates/algoclerk-cli",
+    "crates/algoclerk-game",
+    "crates/algoclerk-tools",
+    "crates/algoclerk-app",
 ]
 
 [workspace.package]

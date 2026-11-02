@@ -3,20 +3,19 @@
 //! Everything runs through the real [`Game`] (no GPU, no window): the scenarios build a game state, tick it
 //! a number of frames and draw.
 
+use crate::editor::Tab;
 use crate::input::{Input, Key};
-use crate::layout::{Display, Viewport};
-use crate::play::Mode;
+use crate::layout::Display;
 use crate::result::Stage;
 use crate::storage::MemoryStorage;
 use crate::ui::{GameConfig, Nav};
 use crate::Game;
-use algoclerk_core::asm;
 use algoclerk_media::{Assets, Canvas};
 
 /// All scenario names, in documentation order.
-pub const NAMES: [&str; 16] = [
-    "title", "select", "brief", "play", "play-error", "play-text", "play-palette", "victory", "code-c", "code-cpp",
-    "code-rust", "sandbox", "settings", "about", "play-keyboard", "select-locked",
+pub const NAMES: [&str; 20] = [
+    "title", "select", "select-locked", "brief", "brief-examples", "brief-tools", "play", "play-grid", "play-error", "play-text", "play-card", "play-palette",
+    "play-keyboard", "victory", "code-c", "code-cpp", "code-rust", "sandbox", "settings", "about",
 ];
 
 /// What to render.
@@ -39,14 +38,7 @@ pub struct Spec {
 impl Spec {
     /// A landscape scenario with default settings.
     pub fn new(name: &str) -> Spec {
-        Spec {
-            name: name.to_string(),
-            portrait: false,
-            palette: "warm".into(),
-            text_size: 1,
-            reduce_motion: false,
-            touch: false,
-        }
+        Spec { name: name.to_string(), portrait: false, palette: "warm".into(), text_size: 1, reduce_motion: false, touch: false }
     }
 }
 
@@ -57,11 +49,6 @@ fn tick_n(g: &mut Game, n: u32) {
     }
 }
 
-fn press(g: &mut Game, k: Key) {
-    let i = Input { keys: vec![k], ..Input::default() };
-    g.tick(&i);
-}
-
 fn click(g: &mut Game, x: i32, y: i32) {
     let down = Input { pointer: Some((x, y)), down: true, pressed: true, ..Input::default() };
     g.tick(&down);
@@ -69,15 +56,9 @@ fn click(g: &mut Game, x: i32, y: i32) {
     g.tick(&up);
 }
 
-/// Load the reference solution of the current level into the play screen.
-fn load_solution(g: &mut Game) -> Result<(), String> {
-    let p = g.play_mut().ok_or("not on the play screen")?;
-    let text = p.st.level.as_ref().and_then(|l| l.solution.as_ref()).map(|s| s.asm.clone()).ok_or("no solution")?;
-    p.st.listing = asm::parse(&text).map_err(|e| e[0].to_string())?;
-    p.st.after_edit(true);
-    p.st.reset_machine();
-    p.text.set_text(&p.st.text);
-    Ok(())
+fn press(g: &mut Game, k: Key) {
+    let i = Input { keys: vec![k], ..Input::default() };
+    g.tick(&i);
 }
 
 /// Build a game in a scenario and return it (before the final draw).
@@ -95,13 +76,12 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
     g.set_display(&d);
     // a believable mid-game save for the map screens
     let ids: Vec<String> = g.campaign.all_levels().map(|l| l.id.clone()).collect();
-    for (i, id) in ids.iter().enumerate().take(11) {
+    for (i, id) in ids.iter().enumerate().take(24) {
         let r = g.progress.record_mut(id);
         r.solved = true;
         r.stars = [3, 2, 3, 1, 2, 3, 3, 2][i % 8];
     }
-    g.progress.last_level = ids.get(11).cloned().unwrap_or_default();
-    let level_id = "sum-pairs";
+    g.progress.last_level = ids.get(24).cloned().unwrap_or_default();
     match spec.name.as_str() {
         "title" => tick_n(&mut g, 90),
         "select" => {
@@ -114,131 +94,133 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
             g.goto(Nav::Select);
             tick_n(&mut g, 10);
         }
-        "brief" => {
-            g.goto(Nav::Brief("running-sum".into()));
+        "brief" | "brief-examples" | "brief-tools" => {
+            g.goto(Nav::Brief("two-sum".into()));
             tick_n(&mut g, 6);
+            let page = match spec.name.as_str() {
+                "brief" => 0,
+                "brief-examples" => 1,
+                _ => 2,
+            };
             if let Some(p) = g.play_mut() {
-                p.st.hints_shown = 1;
+                if let Some(m) = &mut p.memo {
+                    m.page = page;
+                }
             }
+            if page == 2 {
+                g.goto(Nav::Brief("sum-the-bills".into()));
+                if let Some(p) = g.play_mut() {
+                    if let Some(m) = &mut p.memo {
+                        m.page = 2;
+                    }
+                    p.show_hints(2);
+                }
+            }
+            tick_n(&mut g, 4);
         }
-        "play" | "play-error" | "play-text" | "play-palette" | "play-keyboard" | "victory" | "code-c" | "code-cpp" | "code-rust" => {
-            g.goto(Nav::Play(level_id.into()));
-            load_solution(&mut g)?;
-            match spec.name.as_str() {
-                "play" | "play-palette" | "play-text" | "play-keyboard" => {
-                    if let Some(p) = g.play_mut() {
-                        p.st.set_speed(0);
-                        p.st.toggle_run();
-                    }
-                    // run until the clerk is walking with a crate overhead, a few instructions in
-                    for _ in 0..1500 {
-                        tick_n(&mut g, 1);
-                        let ok = g.play_mut().is_some_and(|p| {
-                            p.st.machine.as_ref().is_some_and(|m| m.steps >= 6) && p.st.office.vis.hand.is_some() && p.st.office.clerk.walking
-                        });
-                        if ok {
-                            break;
-                        }
-                    }
-                    if spec.name == "play-text" || spec.name == "play-keyboard" {
-                        if let Some(p) = g.play_mut() {
-                            p.mode = Mode::Text;
-                            p.text.set_text(&p.st.text);
-                            p.text.focused = spec.name == "play-keyboard";
-                            p.kbd_open = spec.name == "play-keyboard";
-                        }
-                    }
-                    if spec.name == "play-palette" {
-                        if let Some(p) = g.play_mut() {
-                            p.ed.sel = Some(3);
-                            p.ed.palette_open = true;
-                            p.ed.pal_focus = 4;
-                        }
-                    } else if spec.name == "play" {
-                        if let Some(p) = g.play_mut() {
-                            p.ed.sel = Some(2);
-                        }
-                    }
+        "play" => {
+            g.goto(Nav::Play("two-sum".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.load_reference();
+            p.session.case = 0;
+            p.jump(24);
+            tick_n(&mut g, 30);
+            if let Some(p) = g.play_mut() {
+                p.jump(26);
+            }
+            tick_n(&mut g, 14);
+        }
+        "play-grid" => {
+            g.goto(Nav::Play("count-islands".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.load_reference();
+            p.jump(60);
+            tick_n(&mut g, 40);
+        }
+        "play-error" => {
+            g.goto(Nav::Play("sum-the-bills".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.session.set_text("fn sum_the_bills(bills: vec<int>) -> int {\n    let total = 0;\n    for i in range(len(bills) + 1) {\n        total += bills[i];\n    }\n    return total;\n}\n");
+            p.run_to_end();
+            tick_n(&mut g, 30);
+        }
+        "play-text" => {
+            g.goto(Nav::Play("sum-the-bills".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.panel.tab = Tab::Text;
+            p.session.set_text("fn sum_the_bills(bills: vec<int>) -> int {\n    let total = 0;\n    for bill in bills {\n        total += \"1\";\n    }\n    return total;\n}\n");
+            tick_n(&mut g, 4);
+        }
+        "play-keyboard" => {
+            g.goto(Nav::Play("sum-the-bills".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.panel.tab = Tab::Text;
+            p.panel.kb_open = true;
+            p.load_reference();
+            tick_n(&mut g, 4);
+        }
+        "play-card" | "play-palette" => {
+            g.goto(Nav::Play("count-vowels".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.load_reference();
+            p.panel.sel = Some(4);
+            tick_n(&mut g, 2);
+            if let Some(p) = g.play_mut() {
+                if spec.name == "play-card" {
+                    p.open_card_editor();
+                } else {
+                    p.panel.palette = Some(false);
                 }
-                "play-error" => {
-                    let p = g.play_mut().ok_or("no play")?;
-                    p.st.listing = asm::parse("    OUTBOX\n").map_err(|e| e[0].to_string())?;
-                    p.st.after_edit(true);
-                    p.st.reset_machine();
-                    p.st.set_speed(1);
-                    p.text.set_text(&p.st.text);
-                    p.st.toggle_run();
-                    tick_n(&mut g, 400);
+            }
+            tick_n(&mut g, 4);
+        }
+        "victory" | "code-c" | "code-cpp" | "code-rust" => {
+            g.goto(Nav::Play("two-sum".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.load_reference();
+            p.solve_now();
+            g.goto(Nav::Victory);
+            tick_n(&mut g, if spec.name == "victory" { 80 } else { 4 });
+            if spec.name != "victory" {
+                if let Some(r) = g.result_mut() {
+                    r.stage = Stage::Code;
+                    r.lang = match spec.name.as_str() {
+                        "code-c" => 0,
+                        "code-cpp" => 1,
+                        _ => 2,
+                    };
+                    r.show_prelude = spec.name == "code-c" && false;
                 }
-                _ => {
-                    // solve it: Check, then the victory screen (and the code tabs)
-                    let ok = g.play_mut().is_some_and(|p| p.st.check());
-                    if !ok {
-                        return Err("the reference solution does not pass".into());
-                    }
-                    let level = g.play_mut().and_then(|p| p.st.level.clone()).ok_or("no level")?;
-                    let verdict = g.play_mut().and_then(|p| p.st.verdict.clone()).ok_or("no verdict")?;
-                    let text = g.play_mut().map(|p| p.st.listing.to_text()).ok_or("no play")?;
-                    g.progress.record_verdict(&level, &verdict, &text);
-                    g.goto(Nav::Victory);
-                    if spec.name == "victory" {
-                        tick_n(&mut g, 150);
-                    } else {
-                        tick_n(&mut g, 4);
-                        g.goto(Nav::Code);
-                        let idx = match spec.name.as_str() {
-                            "code-c" => 0,
-                            "code-cpp" => 1,
-                            _ => 2,
-                        };
-                        if let Some(r) = g.result_mut() {
-                            r.lang = idx;
-                            r.stage = Stage::Code;
-                        }
-                        tick_n(&mut g, 24);
-                    }
-                }
+                tick_n(&mut g, 2);
             }
         }
         "sandbox" => {
             g.goto(Nav::Sandbox);
-            if let Some(p) = g.play_mut() {
-                p.st.listing = asm::parse("again:\n    INBOX\n    COPYTO 0\n    ADD 0\n    OUTBOX\n    JUMP again\n").map_err(|e| e[0].to_string())?;
-                p.st.after_edit(true);
-                p.st.reset_machine();
-                p.text.set_text(&p.st.text);
-                p.st.set_speed(0);
-                p.st.toggle_run();
-            }
-            for _ in 0..800 {
-                tick_n(&mut g, 1);
-                if g.play_mut().is_some_and(|p| p.st.machine.as_ref().is_some_and(|m| m.steps >= 9) && p.st.office.vis.hand.is_some()) {
-                    break;
-                }
-            }
+            let p = g.play_mut().ok_or("no play")?;
+            p.jump(8);
+            tick_n(&mut g, 30);
         }
         "settings" => {
             g.goto(Nav::Settings);
-            tick_n(&mut g, 10);
+            tick_n(&mut g, 6);
         }
         "about" => {
             g.goto(Nav::About);
-            tick_n(&mut g, 10);
+            tick_n(&mut g, 6);
         }
-        other => return Err(format!("unknown scenario `{other}`")),
+        other => return Err(format!("unknown scenario {other}")),
     }
-    let _ = (press as fn(&mut Game, Key), click as fn(&mut Game, i32, i32));
+    let _ = (click as fn(&mut Game, i32, i32), press as fn(&mut Game, Key));
     Ok(g)
 }
 
-/// Render a scenario to a canvas of the virtual screen size.
+/// Render a scenario to a canvas.
 ///
 /// # Errors
-/// See [`build`].
+/// A message when the scenario cannot be set up.
 pub fn render(spec: &Spec) -> Result<Canvas, String> {
     let g = build(spec)?;
-    let vp: Viewport = g.vp;
-    let mut c = Canvas::new(vp.w as usize, vp.h as usize);
+    let mut c = Canvas::new(g.vp.w as usize, g.vp.h as usize);
     g.draw(&mut c);
     Ok(c)
 }

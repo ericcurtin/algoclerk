@@ -1,0 +1,7 @@
+# Office loop: steady, thinking music.
+name: office
+bpm: 108
+loop: yes
+lead = triangle 0.45 : A4:2 C5:2 E5:2 C5:2 D5:2 F5:2 A5:2 F5:2 E5:2 G5:2 B5:2 G5:2 A5:4 -:4
+bass = square 0.28 : A2:4 A2:4 D3:4 D3:4 E3:4 E3:4 A2:4 E3:4
+perc = noise 0.12 : h:2 .:2 h:2 .:2 x:2 .:2 h:2 .:2

@@ -3,7 +3,7 @@
 
 use super::ast::Ty;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::rc::Rc;
+use std::sync::Arc as Rc;
 
 /// A runtime value. Collections are copy-on-write; the cost model charges logical copies.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]

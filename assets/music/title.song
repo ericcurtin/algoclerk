@@ -1,0 +1,7 @@
+# Title: a bouncy office waltz in C.
+name: title
+bpm: 132
+loop: yes
+lead = square 0.35 : E5:2 G5:2 C6:4 B5:2 G5:2 E5:4 D5:2 F5:2 A5:4 G5:2 E5:2 C5:4
+bass = triangle 0.7 : C3:4 G3:4 C3:4 G3:4 F3:4 C4:4 G3:4 C3:4
+perc = noise 0.18 : x:2 h:2 h:2 h:2 x:2 h:2 h:2 h:2

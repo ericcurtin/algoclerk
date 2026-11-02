@@ -9,7 +9,7 @@ use super::ast::*;
 use super::check::{TypeInfo, is_mutating};
 use super::value::*;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
-use std::rc::Rc;
+use std::sync::Arc as Rc;
 
 /// Resource limits for one run.
 #[derive(Clone, Debug)]

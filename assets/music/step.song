@@ -1,0 +1,5 @@
+# One step of the program.
+name: step
+bpm: 400
+loop: no
+lead = square 0.25 : A5:1

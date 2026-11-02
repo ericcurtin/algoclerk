@@ -643,8 +643,25 @@ impl<'a> Gen<'a> {
     }
 
     fn block(&mut self, b: &Block) {
+        self.body_block(b, false);
+    }
+
+    /// A block; `tail` lets a final `return x;` become the idiomatic tail expression.
+    fn body_block(&mut self, b: &Block, tail: bool) {
         self.ind += 1;
-        for s in &b.stmts {
+        let n = b.stmts.len();
+        for (i, s) in b.stmts.iter().enumerate() {
+            if tail && i + 1 == n && let StmtKind::Return(Some(e)) = &s.kind {
+                let v = if let ExprKind::Var(_) = e.kind
+                    && self.var_kind(e) == Kind::Owned
+                {
+                    self.expr(e).s
+                } else {
+                    self.owned(e)
+                };
+                self.line(&v);
+                continue;
+            }
             self.stmt(s);
         }
         self.ind -= 1;
@@ -873,7 +890,7 @@ pub fn generate(prog: &Program, info: &TypeInfo, entry: &str) -> Generated {
         g.out.clear();
         g.ind = 0;
         g.line(&format!("{head} {{"));
-        g.block(&prog.fns[i].body);
+        g.body_block(&prog.fns[i].body, true);
         g.line("}");
         if !code.is_empty() {
             code.push('\n');

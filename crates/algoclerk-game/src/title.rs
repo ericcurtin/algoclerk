@@ -104,10 +104,10 @@ impl Title {
         let before = self.menu.focus;
         let chosen = self.menu.update(cx, &rows);
         if self.menu.focus != before {
-            cx.sfx("sfx_step");
+            cx.sfx("step");
         }
         let item = items[chosen?];
-        cx.sfx("sfx_button");
+        cx.sfx("button");
         Some(match item {
             Item::Start => {
                 let id = next_level_id(cx);

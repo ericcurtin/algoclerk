@@ -14,8 +14,8 @@
 #![allow(missing_docs, missing_debug_implementations, clippy::too_many_lines, clippy::too_many_arguments)]
 
 pub mod about;
+pub mod blocks;
 pub mod brief;
-pub mod choreo;
 pub mod clerk;
 pub mod editor;
 pub mod gfx;
@@ -34,6 +34,7 @@ pub mod textedit;
 pub mod title;
 pub mod transition;
 pub mod ui;
+pub mod value_view;
 
 pub use input::{Input, Key};
 pub use storage::{FileStorage, MemoryStorage, Storage, default_data_dir};

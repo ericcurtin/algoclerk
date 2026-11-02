@@ -1,0 +1,6 @@
+# Putting something down.
+name: put
+bpm: 280
+loop: no
+lead = triangle 0.7 : C5>G4:2
+perc = noise 0.2 : h:1

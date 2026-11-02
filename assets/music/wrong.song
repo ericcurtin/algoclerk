@@ -1,0 +1,6 @@
+# Something went wrong: two low notes.
+name: wrong
+bpm: 200
+loop: no
+lead = saw 0.35 : E3:2 C3:4
+perc = noise 0.25 : x:1

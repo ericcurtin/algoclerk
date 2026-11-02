@@ -1,0 +1,7 @@
+# Victory jingle.
+name: victory
+bpm: 150
+loop: no
+lead = square 0.4 : C5:2 C5:2 C5:2 G5:4 E5:2 G5:2 C6:8
+bass = triangle 0.7 : C3:4 C3:4 G3:4 C4:8
+perc = noise 0.15 : x:4 h:2 h:2 x:4 h:2 h:2

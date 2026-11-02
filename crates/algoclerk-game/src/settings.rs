@@ -236,7 +236,7 @@ impl Settings {
         cx.touch_progress();
         let outfit = outfit_of(cx.progress, cx.bank);
         self.art.set_outfit(cx.bank, &outfit);
-        cx.sfx("sfx_button");
+        cx.sfx("button");
     }
 
     /// Handle input.
@@ -257,14 +257,14 @@ impl Settings {
                     *cx.progress = algoclerk_core::progress::Progress::default();
                     cx.progress.settings = settings;
                     cx.touch_progress();
-                    cx.sfx("sfx_wrong");
+                    cx.sfx("wrong");
                 }
             }
             return None;
         }
         let min = vp.hit_min();
         if ptr.tapped_in(&tap_rect(Rect::new(vp.safe.x + 3, vp.safe.y + 2, 26, 16), min, vp.screen())) || cx.input.key(Key::Escape) {
-            cx.sfx("sfx_button");
+            cx.sfx("button");
             return Some(Nav::Title);
         }
         if ptr.over(&area) {
@@ -289,7 +289,7 @@ impl Settings {
                     self.scroll = p.rect.bottom() - area.h + 4;
                 }
             }
-            cx.sfx("sfx_step");
+            cx.sfx("step");
         }
         let row = rows[self.focus.min(rows.len() - 1)];
         if cx.input.key(Key::Left) {
@@ -300,7 +300,7 @@ impl Settings {
         }
         if cx.input.key(Key::Enter) || cx.input.key(Key::Space) {
             if row == Row::Back {
-                cx.sfx("sfx_button");
+                cx.sfx("button");
                 return Some(Nav::Title);
             }
             if matches!(row, Row::TextSize | Row::Reduce | Row::Fullscreen | Row::Unlock) {
@@ -326,7 +326,7 @@ impl Settings {
             } else if ptr.tapped_in(&r) {
                 self.focus = i;
                 if p.row == Row::Back {
-                    cx.sfx("sfx_button");
+                    cx.sfx("button");
                     return Some(Nav::Title);
                 }
                 if matches!(p.row, Row::TextSize | Row::Reduce | Row::Fullscreen | Row::Unlock) {

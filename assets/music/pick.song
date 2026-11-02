@@ -1,0 +1,6 @@
+# Picking up a card or a crate.
+name: pick
+bpm: 280
+loop: no
+lead = square 0.4 : G5>C6:2
+bass = triangle 0.4 : C4:2

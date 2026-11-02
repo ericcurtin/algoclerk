@@ -305,34 +305,59 @@ impl TextEdit {
     }
 }
 
-/// Assembly colouring of one line: `(text, colour letter)` spans.
-pub fn asm_spans(line: &str) -> Vec<(String, char)> {
-    let (code, comment) = match line.find("--") {
-        Some(i) => (&line[..i], Some(&line[i..])),
-        None => (line, None),
-    };
-    let mut spans = Vec::new();
-    let trimmed = code.trim_end();
-    let indent = code.len() - code.trim_start().len();
-    if indent > 0 {
-        spans.push((" ".repeat(indent), 'K'));
-    }
-    let body = trimmed.trim_start();
-    if body.ends_with(':') {
-        spans.push((body.to_string(), 'u'));
-    } else if let Some((op, rest)) = body.split_once(' ') {
-        spans.push((op.to_string(), 'b'));
-        spans.push((format!(" {rest}"), 'K'));
-    } else if !body.is_empty() {
-        spans.push((body.to_string(), 'b'));
-    }
-    let used: usize = spans.iter().map(|(s, _)| s.chars().count()).sum();
-    let total = code.chars().count();
-    if total > used {
-        spans.push((" ".repeat(total - used), 'K'));
-    }
-    if let Some(c) = comment {
-        spans.push((c.to_string(), 'a'));
+const KEYWORDS: &[&str] = &["fn", "let", "if", "else", "while", "for", "in", "break", "continue", "return", "and", "or", "not", "mut"];
+const CONSTS: &[&str] = &["true", "false", "null", "none"];
+const TYPES: &[&str] = &["int", "bool", "char", "string", "vec", "set", "map", "option", "stack", "queue", "deque", "heap", "lnode", "tnode"];
+
+/// ClerkScript colouring of one line: `(text, colour letter)` spans covering the whole line.
+pub fn cs_spans(line: &str) -> Vec<(String, char)> {
+    let chars: Vec<char> = line.chars().collect();
+    let mut spans: Vec<(String, char)> = Vec::new();
+    let mut i = 0;
+    let mut push = |s: String, c: char, spans: &mut Vec<(String, char)>| spans.push((s, c));
+    while i < chars.len() {
+        let c = chars[i];
+        let start = i;
+        if c == '/' && chars.get(i + 1) == Some(&'/') || c == '#' {
+            push(chars[i..].iter().collect(), 'a', &mut spans);
+            break;
+        }
+        if c.is_ascii_alphabetic() || c == '_' {
+            while i < chars.len() && (chars[i].is_ascii_alphanumeric() || chars[i] == '_') {
+                i += 1;
+            }
+            let w: String = chars[start..i].iter().collect();
+            let col = if KEYWORDS.contains(&w.as_str()) {
+                'b'
+            } else if TYPES.contains(&w.as_str()) {
+                'u'
+            } else if CONSTS.contains(&w.as_str()) {
+                'o'
+            } else if chars.get(i) == Some(&'(') || (start > 0 && chars[start - 1] == '.') {
+                'G'
+            } else {
+                'K'
+            };
+            push(w, col, &mut spans);
+        } else if c.is_ascii_digit() {
+            while i < chars.len() && chars[i].is_ascii_alphanumeric() {
+                i += 1;
+            }
+            push(chars[start..i].iter().collect(), 'o', &mut spans);
+        } else if c == '"' || c == '\'' {
+            i += 1;
+            while i < chars.len() && chars[i] != c {
+                if chars[i] == '\\' {
+                    i += 1;
+                }
+                i += 1;
+            }
+            i = (i + 1).min(chars.len());
+            push(chars[start..i].iter().collect(), 'r', &mut spans);
+        } else {
+            i += 1;
+            push(c.to_string(), if "{}()[];,".contains(c) { 'k' } else { 'K' }, &mut spans);
+        }
     }
     spans
 }
@@ -347,6 +372,7 @@ pub fn draw_editor(
     line_h: i32,
     error_lines: &[usize],
     highlight_line: Option<usize>,
+    squiggles: &[(usize, usize, usize)],
     tick: u64,
 ) {
     g.rect(r, 'W');
@@ -380,9 +406,18 @@ pub fn draw_editor(
                 }
             }
             let mut x = inner.x + 1 - ed.scroll_col as i32 * 6 * scale;
-            for (s, col) in asm_spans(line) {
+            for (s, col) in cs_spans(line) {
                 g.text_s(x, y, &s, col, scale);
                 x += s.chars().count() as i32 * 6 * scale;
+            }
+            for (sl, c0, c1) in squiggles {
+                if *sl == ln + 1 {
+                    let sx = inner.x + 1 + (*c0 as i32 - ed.scroll_col as i32) * 6 * scale;
+                    let ex = inner.x + 1 + (*c1 as i32 - ed.scroll_col as i32) * 6 * scale;
+                    for px in (sx..ex.max(sx + 3)).step_by(1) {
+                        g.px(px, y + 8 * scale + if (px / 2) % 2 == 0 { 0 } else { 1 }, 'R');
+                    }
+                }
             }
         }
         idx += len + 1;
@@ -423,6 +458,8 @@ pub enum Layer {
     Lower,
     /// Upper-case letters.
     Upper,
+    /// Digits and the symbols code needs.
+    Sym,
 }
 
 /// A key on the grid.
@@ -432,8 +469,10 @@ pub struct KeySpec {
     pub label: String,
     /// What it does.
     pub action: Option<KbAction>,
-    /// Layer toggle key.
+    /// Layer toggle key (shift).
     pub shift: bool,
+    /// Layer toggle key (symbols).
+    pub sym: bool,
     /// Width in columns.
     pub span: i32,
 }
@@ -447,40 +486,36 @@ pub struct Keyboard {
     pressed: Option<usize>,
 }
 
-const ROWS: [&str; 4] = ["1234567890", "qwertyuiop", "asdfghjkl:", "zxcvbnm_,-"];
+const ROWS: [&str; 4] = ["1234567890", "qwertyuiop", "asdfghjkl_", "zxcvbnm,.:"];
+const SYM_ROWS: [&str; 4] = ["(){}[]<>;:", "+-*/%=&|^~", "!'\".,_#?@`", "1234567890"];
 
 impl Keyboard {
     /// Key specs row by row.
     pub fn keys(&self) -> Vec<Vec<KeySpec>> {
         let up = self.layer == Layer::Upper;
+        let sym = self.layer == Layer::Sym;
         let mut rows: Vec<Vec<KeySpec>> = Vec::new();
-        for (ri, r) in ROWS.iter().enumerate() {
+        for r in if sym { SYM_ROWS } else { ROWS } {
             let mut row = Vec::new();
             for c in r.chars() {
                 let ch = if up && c.is_ascii_lowercase() { c.to_ascii_uppercase() } else { c };
-                row.push(KeySpec {
-                    label: ch.to_string(),
-                    action: Some(KbAction::Char(ch)),
-                    shift: false,
-                    span: 1,
-                });
+                row.push(KeySpec { label: ch.to_string(), action: Some(KbAction::Char(ch)), shift: false, sym: false, span: 1 });
             }
-            let _ = ri;
             rows.push(row);
         }
-        let mk = |label: &str, action: Option<KbAction>, shift: bool, span: i32| KeySpec {
+        let mk = |label: &str, action: Option<KbAction>, shift: bool, symk: bool, span: i32| KeySpec {
             label: label.to_string(),
             action,
             shift,
+            sym: symk,
             span,
         };
         rows.push(vec![
-            mk("Aa", None, true, 2),
-            mk("[", Some(KbAction::Char('[')), false, 1),
-            mk("]", Some(KbAction::Char(']')), false, 1),
-            mk("space", Some(KbAction::Char(' ')), false, 3),
-            mk("<-", Some(KbAction::Backspace), false, 1),
-            mk("Enter", Some(KbAction::Enter), false, 2),
+            if sym { mk("abc", None, true, false, 2) } else { mk("Aa", None, true, false, 2) },
+            if sym { mk("", Some(KbAction::Char('\t')), false, false, 0) } else { mk("#+=", None, false, true, 2) },
+            mk("space", Some(KbAction::Char(' ')), false, false, if sym { 4 } else { 3 }),
+            mk("<-", Some(KbAction::Backspace), false, false, if sym { 2 } else { 1 }),
+            mk("Enter", Some(KbAction::Enter), false, false, 2),
         ]);
         rows
     }
@@ -508,8 +543,15 @@ impl Keyboard {
         let rects = self.rects(area);
         self.pressed = rects.iter().position(|(r, _)| ptr.held_in(r) && ptr.over(r));
         for (r, k) in &rects {
+            if k.span == 0 {
+                continue;
+            }
             if ptr.tapped_in(r) {
-                if k.shift {
+                if k.sym {
+                    self.layer = Layer::Sym;
+                } else if k.shift && self.layer == Layer::Sym {
+                    self.layer = Layer::Lower;
+                } else if k.shift {
                     self.layer = if self.layer == Layer::Lower { Layer::Upper } else { Layer::Lower };
                 } else if let Some(a) = &k.action {
                     out.push(a.clone());
@@ -526,6 +568,9 @@ impl Keyboard {
     pub fn draw(&self, g: &mut Gfx<'_>, area: Rect, ptr: &Pointer) {
         g.rect(area.grow(2), 'k');
         for (i, (r, k)) in self.rects(area).iter().enumerate() {
+            if k.span == 0 {
+                continue;
+            }
             let r = r.inset(1);
             let kind = if k.shift && self.layer == Layer::Upper {
                 Kind::On
@@ -637,13 +682,6 @@ mod tests {
         assert_eq!(e.index_at_pixel(r, 1, 10, 7, 12), 4 + 1);
     }
 
-    #[test]
-    fn asm_colouring() {
-        let s = asm_spans("    COPYTO 3  -- note");
-        assert_eq!(s[1].1, 'b');
-        assert_eq!(s.last().unwrap().1, 'a');
-        assert_eq!(asm_spans("loop:")[0].1, 'u');
-    }
 
     #[test]
     fn keyboard_layers_and_actions() {

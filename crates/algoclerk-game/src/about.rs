@@ -69,7 +69,7 @@ impl About {
         }
         self.scroll = self.scroll.max(0);
         if cx.ptr.tapped_in(&About::back_rect(&cx.vp)) || cx.input.key(Key::Escape) || cx.input.key(Key::Enter) {
-            cx.sfx("sfx_button");
+            cx.sfx("button");
             return Some(Nav::Title);
         }
         None

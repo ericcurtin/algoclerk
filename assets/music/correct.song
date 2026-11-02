@@ -1,0 +1,6 @@
+# The answer matches: a short happy rise.
+name: correct
+bpm: 240
+loop: no
+lead = square 0.4 : C5:1 E5:1 G5:1 C6:3
+bass = triangle 0.5 : C3:3 G3:3

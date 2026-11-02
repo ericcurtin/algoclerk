@@ -1,80 +1,85 @@
 // SPDX-License-Identifier: Apache-2.0
-//! The play screen: the office scene, run controls, status line, the program editor (slips, palette, text
-//! mode with an on-screen keyboard) and the memo overlay. Works in landscape and portrait.
+//! The play screen: the office scene, run controls and the program editor.
 
-use crate::brief::{Memo, MemoAction};
-use crate::editor::{Editor, EditorRects};
+use crate::brief::{Memo, MemoOut};
+use crate::editor::{EditorPanel, Tab};
 use crate::gfx::{Gfx, Kind, State, clip};
 use crate::input::Key;
 use crate::layout::{Hit, Viewport};
 use crate::modal::{Answer, Modal, Purpose};
-use crate::office::{SCENE_H, SCENE_W};
+use crate::office::{Office, SCENE_H, SCENE_W};
 use crate::session::Session;
-use crate::textedit::{Keyboard, TextEdit, asm_spans, draw_editor};
 use crate::ui::{Ctx, GameEvent, Nav, View, widget_state};
-use algoclerk_core::asm;
-use algoclerk_core::judge::Outcome;
-use algoclerk_media::{ArtBank, Outfit, Rect};
+use algoclerk_core::judge::{FailKind, Verdict};
+use algoclerk_media::{ArtBank, Font, Outfit, Rect};
 
-/// Which editing mode the side panel shows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Mode {
-    /// Slips and palette.
-    Program,
-    /// Plain assembly text.
-    Text,
+/// Ticks per recorded step at each speed level (0 means instant).
+pub const STEP_TICKS: [u32; 5] = [48, 28, 16, 7, 0];
+
+/// The screen.
+pub struct Play {
+    /// Program and run state.
+    pub session: Session,
+    /// The animated scene.
+    pub office: Office,
+    /// The editor panel.
+    pub panel: EditorPanel,
+    /// Playing automatically.
+    pub playing: bool,
+    timer: u32,
+    /// The memo overlay.
+    pub memo: Option<Memo>,
+    /// A confirm dialog.
+    pub modal: Option<Modal>,
+    /// The last Check improved the record.
+    pub improved: bool,
+    /// Solved by the latest Check.
+    pub solved: bool,
+    /// Status line under the controls: text and whether it is a problem.
+    pub status: Option<(String, bool)>,
+    memo_starting: bool,
+    shown_hints: usize,
 }
 
-/// All rectangles of the play screen.
-#[derive(Debug, Clone)]
+/// Screen rectangles.
+#[derive(Debug, Clone, Copy)]
 pub struct PlayRects {
     /// Top bar.
     pub top: Rect,
-    /// Home button.
-    pub home: Rect,
-    /// Memo button.
-    pub memo: Rect,
-    /// Code peek button.
-    pub code: Rect,
-    /// Title text area.
-    pub title: Rect,
-    /// Office scene.
+    /// Scene.
     pub scene: Rect,
-    /// Back.
-    pub back: Rect,
-    /// Run / pause.
-    pub run: Rect,
-    /// Step.
-    pub step: Rect,
-    /// Reset.
-    pub reset: Rect,
-    /// Speed.
-    pub speed: Rect,
-    /// Check.
-    pub check: Rect,
-    /// Status panel.
-    pub status: Rect,
-    /// Previous test.
-    pub t_prev: Rect,
-    /// Next test.
-    pub t_next: Rect,
-    /// Side panel (editor).
-    pub side: Rect,
-    /// Text editor area.
-    pub text: Rect,
-    /// On-screen keyboard.
-    pub kbd: Option<Rect>,
-    /// Sandbox inbox field.
-    pub sb_inbox: Rect,
-    /// Sandbox floor minus.
-    pub sb_minus: Rect,
-    /// Sandbox floor plus.
-    pub sb_plus: Rect,
-    /// Layout is the full-screen text-with-keyboard variant.
-    pub typing: bool,
+    /// Run controls and status.
+    pub controls: Rect,
+    /// Editor panel.
+    pub editor: Rect,
 }
 
-/// Expand a rectangle around its centre to at least `min` in both directions (touch targets), within `bounds`.
+impl PlayRects {
+    /// Lay the screen out.
+    pub fn new(vp: &Viewport) -> PlayRects {
+        let top = Rect::new(0, 0, vp.w, 18);
+        if vp.portrait {
+            let bh = vp.btn_h();
+            let ch = bh * 2 + 8 + if vp.touch { 4 } else { 14 };
+            let scene = Rect::new((vp.w - SCENE_W) / 2, 20, SCENE_W, SCENE_H);
+            let controls = Rect::new(2, scene.bottom() + 2, vp.w - 4, ch);
+            let editor = Rect::new(2, controls.bottom() + 2, vp.w - 4, vp.h - controls.bottom() - 4);
+            PlayRects { top, scene, controls, editor }
+        } else {
+            let scene = Rect::new(2, 20, SCENE_W, SCENE_H);
+            let controls = Rect::new(2, scene.bottom() + 3, SCENE_W, vp.h - scene.bottom() - 5);
+            let editor = Rect::new(SCENE_W + 6, 20, vp.w - SCENE_W - 8, vp.h - 22);
+            PlayRects { top, scene, controls, editor }
+        }
+    }
+}
+
+/// The outfit chosen in settings.
+pub fn outfit_of(p: &algoclerk_core::progress::Progress, bank: &ArtBank) -> Outfit {
+    Outfit::from_code(&p.settings.outfit).filter(|o| bank.has_template(&format!("clerk/body_{}", o.body))).unwrap_or_default()
+}
+
+/// A tap rectangle at least `min` big, kept inside `bounds`.
 pub fn tap_rect(r: Rect, min: i32, bounds: Rect) -> Rect {
     let w = r.w.max(min);
     let h = r.h.max(min);
@@ -83,719 +88,520 @@ pub fn tap_rect(r: Rect, min: i32, bounds: Rect) -> Rect {
     Rect::new(x, y, w, h)
 }
 
-impl PlayRects {
-    /// Lay out the screen.
-    pub fn new(vp: &Viewport, mode: Mode, kbd_open: bool) -> PlayRects {
-        let s = vp.safe;
-        let bh = vp.btn_h();
-        let top_h = if vp.portrait { 20 } else { 18 };
-        let top = Rect::new(s.x, s.y, s.w, top_h);
-        let home = Rect::new(s.x + 3, s.y + 2, 26, top_h - 4);
-        let memo = Rect::new(s.right() - 29, s.y + 2, 26, top_h - 4);
-        let code = Rect::new(memo.x - 28, s.y + 2, 26, top_h - 4);
-        let title = Rect::new(home.right() + 4, s.y, code.x - home.right() - 8, top_h);
-        let typing = vp.touch && mode == Mode::Text && kbd_open;
-        let scene_x = s.x + (if vp.portrait { (s.w - SCENE_W) / 2 } else { 1 });
-        let scene = Rect::new(scene_x, s.y + top_h, SCENE_W, SCENE_H);
-        let ctl_y = scene.bottom() + 3;
-        let left_w = if vp.portrait { s.w } else { 272 };
-        let widths: [i32; 6] = if vp.touch { [34, 42, 34, 34, 54, 52] } else { [28, 34, 28, 28, 42, 48] };
-        let gap = 3;
-        let total: i32 = widths.iter().sum::<i32>() + gap * 5;
-        let mut x = s.x + (left_w - total.min(left_w)) / 2;
-        let mut next = |w: i32| {
-            let r = Rect::new(x, ctl_y, w, bh);
-            x += w + gap;
-            r
-        };
-        let back = next(widths[0]);
-        let run = next(widths[1]);
-        let step = next(widths[2]);
-        let reset = next(widths[3]);
-        let speed = next(widths[4]);
-        let check = next(widths[5]);
-        let status_y = ctl_y + bh + 3;
-        let status = Rect::new(s.x + 2, status_y, left_w - 4, (s.bottom() - status_y - 2).min(if vp.portrait { 40 } else { 200 }));
-        let tb = vp.hit_min().min(status.h).max(18);
-        let t_next = Rect::new(status.right() - 4 - tb, status.y + (status.h - tb) / 2, tb, tb);
-        let t_prev = Rect::new(t_next.x - tb - 2, t_next.y, tb, tb);
-        let side = if vp.portrait {
-            let y = status.bottom() + 2;
-            Rect::new(s.x, y, s.w, s.bottom() - y)
-        } else {
-            Rect::new(s.x + 272, s.y + top_h, s.w - 272, s.h - top_h)
-        };
-        let kbd_h = if vp.portrait { 5 * 33 } else { 5 * 30 };
-        let (text, kbd) = if typing {
-            let kb = Rect::new(s.x, s.bottom() - kbd_h, s.w, kbd_h);
-            (Rect::new(s.x + 2, s.y + top_h + bh + 4, s.w - 4, kb.y - (s.y + top_h + bh + 4) - 2), Some(kb))
-        } else {
-            let y = side.y + 4 + bh + 4;
-            (Rect::new(side.x + 4, y, side.w - 8, side.bottom() - y - 4), None)
-        };
-        let sb_inbox = Rect::new(status.x + 4, status.y + 2, (status.w - 8) / 2, bh.min(20));
-        let sb_minus = Rect::new(sb_inbox.right() + 10, status.y + 2, bh.min(20).max(vp.hit_min().min(20)), bh.min(20));
-        let sb_plus = Rect::new(sb_minus.right() + 30, status.y + 2, sb_minus.w, sb_minus.h);
-        PlayRects {
-            top, home, memo, code, title, scene, back, run, step, reset, speed, check, status, t_prev, t_next, side, text, kbd,
-            sb_inbox, sb_minus, sb_plus, typing,
-        }
-    }
-
-    /// Hit rectangles for layout tests.
-    pub fn hits(&self, vp: &Viewport, mode: Mode, palette_open: bool) -> Vec<Hit> {
-        let b = vp.screen();
-        let m = vp.hit_min();
-        let mut v = vec![Hit::area("scene", self.scene), Hit::area("status", self.status), Hit::area("side", self.side)];
-        if self.typing {
-            v = vec![Hit::area("text", self.text)];
-            if let Some(k) = self.kbd {
-                v.push(Hit::area("keyboard", k));
-            }
-        }
-        for (n, r) in [("home", self.home), ("memo", self.memo), ("code", self.code)] {
-            v.push(Hit::tap(n, tap_rect(r, m, b)));
-        }
-        if !self.typing {
-            for (n, r) in [("back", self.back), ("run", self.run), ("step", self.step), ("reset", self.reset), ("speed", self.speed), ("check", self.check)] {
-                v.push(Hit::tap(n, r));
-            }
-            v.push(Hit::tap("test prev", self.t_prev));
-            v.push(Hit::tap("test next", self.t_next));
-            if mode == Mode::Program {
-                v.extend(EditorRects::new(self.side, vp, palette_open, 15).hits(vp.touch));
-            } else {
-                v.push(Hit::area("text", self.text));
-            }
-        }
-        v
-    }
+/// The memo panel rectangle.
+pub fn memo_rect(vp: &Viewport) -> Rect {
+    Memo::panel(vp)
 }
 
-/// The play screen state.
-#[derive(Debug)]
-pub struct Play {
-    /// The session (program, machine, office).
-    pub st: Session,
-    /// Program editor state.
-    pub ed: Editor,
-    /// Text editor.
-    pub text: TextEdit,
-    /// Sandbox inbox field.
-    pub inbox_field: TextEdit,
-    /// Keyboard.
-    pub kbd: Keyboard,
-    /// Keyboard is open (touch).
-    pub kbd_open: bool,
-    /// Mode of the side panel.
-    pub mode: Mode,
-    /// Memo overlay.
-    pub memo: Option<Memo>,
-    /// Confirmation dialog.
-    pub modal: Option<Modal>,
-    /// Toast text and ticks left.
-    pub toast: Option<(String, u32)>,
-    /// Level order number (for the memo title).
-    pub order: usize,
-    /// Pending navigation requested by a dialog.
-    pending: Option<Nav>,
-    /// The memo was opened as the level brief (primary button says "Start shift").
-    pub intro: bool,
-    /// The last Check improved the stored result.
-    pub improved: bool,
+struct Controls {
+    reset: Rect,
+    back: Rect,
+    play: Rect,
+    step: Rect,
+    speed: Rect,
+    check: Rect,
+    cases: Vec<Rect>,
+    status: Rect,
+}
+
+fn controls(vp: &Viewport, c: Rect, ncases: usize) -> Controls {
+    let bh = vp.btn_h();
+    let row = Rect::new(c.x, c.y, c.w, bh);
+    let cols = crate::layout::columns(row, 6, 2);
+    let cases_y = c.y + bh + 3;
+    let chip_h = if vp.touch { 24 } else { 14 };
+    let cw = if vp.touch { 40 } else { 34 };
+    let cases = (0..ncases.min(5)).map(|i| Rect::new(c.x + i as i32 * (cw + 2), cases_y, cw, chip_h)).collect();
+    let status = Rect::new(c.x, cases_y + chip_h + 3, c.w, (c.bottom() - cases_y - chip_h - 3).max(8));
+    Controls { reset: cols[0], back: cols[1], play: cols[2], step: cols[3], speed: cols[4], check: cols[5], cases, status }
 }
 
 impl Play {
-    /// Start a level.
+    /// Start a level; `brief` opens the memo first.
     ///
     /// # Errors
-    /// A message when the level cannot start.
-    pub fn level(cx: &mut Ctx<'_>, id: &str, show_memo: bool) -> Result<Play, String> {
+    /// The level could not be prepared (broken level file).
+    pub fn level(cx: &mut Ctx<'_>, id: &str, brief: bool) -> Result<Play, String> {
         let level = cx.campaign.find(id).ok_or_else(|| format!("no level {id}"))?.clone();
         let rec = cx.progress.record(id);
+        let session = Session::for_level(&level, &rec.draft)?;
         let outfit = outfit_of(cx.progress, cx.bank);
-        let st = Session::for_level(&level, &rec.draft, rec.hints_used, cx.bank, &outfit, cx.progress.settings.speed_level)?;
         cx.progress.last_level = id.to_string();
-        let order = cx.campaign.all_levels().position(|l| l.id == id).map_or(1, |i| i + 1);
-        let mut p = Play::from_session(st, order);
-        p.memo = show_memo.then(Memo::default);
-        p.intro = show_memo;
-        p.st.office.reduce_motion = cx.progress.settings.reduce_motion;
+        cx.touch_progress();
+        let mut p = Play::from_session(cx, session, &outfit);
+        p.shown_hints = usize::from(rec.hints_used).min(level.hints.len());
+        if brief {
+            p.memo = Some(Memo::default());
+            p.memo_starting = true;
+        }
         Ok(p)
     }
 
-    /// Start the sandbox.
+    /// The sandbox.
     pub fn sandbox(cx: &mut Ctx<'_>) -> Play {
+        let session = Session::sandbox(&cx.progress.sandbox);
         let outfit = outfit_of(cx.progress, cx.bank);
-        let st = Session::sandbox(&cx.progress.sandbox, cx.bank, &outfit, cx.progress.settings.speed_level);
-        let mut p = Play::from_session(st, 0);
-        p.mode = Mode::Text;
-        p.text.set_text(&p.st.text);
-        p.st.office.reduce_motion = cx.progress.settings.reduce_motion;
-        p
+        Play::from_session(cx, session, &outfit)
     }
 
-    fn from_session(st: Session, order: usize) -> Play {
-        let text = TextEdit::new(&st.text, true);
-        let inbox = TextEdit::new(&st.sandbox_input, false);
+    fn from_session(cx: &Ctx<'_>, session: Session, outfit: &Outfit) -> Play {
+        let mut office = Office::new(cx.bank, outfit);
+        office.reduce_motion = cx.progress.settings.reduce_motion;
         Play {
-            st,
-            ed: Editor::default(),
-            text,
-            inbox_field: inbox,
-            kbd: Keyboard::default(),
-            kbd_open: false,
-            mode: Mode::Program,
+            session,
+            office,
+            panel: EditorPanel::default(),
+            playing: false,
+            timer: 0,
             memo: None,
             modal: None,
-            toast: None,
-            order,
-            pending: None,
-            intro: false,
             improved: false,
+            solved: false,
+            status: None,
+            memo_starting: false,
+            shown_hints: 0,
         }
-    }
-
-    fn rects(&self, vp: &Viewport) -> PlayRects {
-        PlayRects::new(vp, self.mode, self.kbd_open)
     }
 
     /// Hit rectangles for layout tests.
     pub fn hits(&self, vp: &Viewport) -> Vec<Hit> {
-        self.rects(vp).hits(vp, self.mode, self.ed.palette_open)
+        let r = PlayRects::new(vp);
+        let c = controls(vp, r.controls, self.session.case_count());
+        let mut v = vec![Hit::area("scene", r.scene), Hit::area("controls", r.controls), Hit::tap("reset", c.reset), Hit::tap("back", c.back), Hit::tap("play", c.play), Hit::tap("step", c.step), Hit::tap("speed", c.speed), Hit::tap("check", c.check)];
+        v.extend(self.panel.hits(vp, r.editor));
+        v.push(Hit::tap("brief", Rect::new(vp.w - 50, 0, 50, 18)));
+        v
     }
 
-    fn remember_draft(&self, cx: &mut Ctx<'_>) {
-        if self.st.is_sandbox() {
-            cx.progress.sandbox = self.st.text.clone();
+    fn speed_level(cx: &Ctx<'_>) -> usize {
+        usize::from(cx.progress.settings.speed_level.min(4))
+    }
+
+    /// Jump to a recorded step and let the clerk arrive (screenshots and tests).
+    pub fn jump(&mut self, pos: usize) {
+        if self.ensure_run() {
+            if let Some(r) = &mut self.session.run {
+                r.pos = pos.min(r.frames.len().saturating_sub(1));
+            }
+            self.show();
+            self.office.settle();
+        }
+    }
+
+    /// Reveal this many hints (screenshots).
+    pub fn show_hints(&mut self, n: usize) {
+        self.shown_hints = n;
+    }
+
+    /// Run to the end instantly (screenshots and tests).
+    pub fn run_to_end(&mut self) {
+        if self.ensure_run() {
+            if let Some(run) = &mut self.session.run {
+                run.pos = run.frames.len().saturating_sub(1);
+            }
+            self.show();
+            self.office.settle();
+            if let Some(r) = &self.session.run {
+                if let Err(e) = &r.result {
+                    let m = e.msg.clone();
+                    self.status = Some((m.clone(), true));
+                    self.office.oops(&m);
+                }
+            }
+        }
+    }
+
+    /// Judge the program as if Check was pressed; marks the level solved when it passes.
+    pub fn solve_now(&mut self) {
+        if let Some(v) = self.session.check() {
+            self.solved = v.passed;
+        }
+    }
+
+    /// Open the card editor on the selected card.
+    pub fn open_card_editor(&mut self) {
+        let rows = self.session.rows();
+        if let (Some(i), Some(p)) = (self.panel.sel, &self.session.good) {
+            if let Some(row) = rows.get(i) {
+                let mut found = None;
+                for f in &p.fns {
+                    algoclerk_core::lang::ast::walk_stmts(&f.body, &mut |s| {
+                        if s.id == row.node {
+                            found = Some(crate::blocks::header_text(s));
+                        }
+                    });
+                }
+                if let Some(t) = found {
+                    self.panel.card = Some(crate::editor::CardEdit { node: row.node, line: crate::textedit::TextEdit::new(&t, false), pad: crate::editor::Pad::Names, last_var: None, msg: None });
+                }
+            }
+        }
+    }
+
+    /// Load the level's reference solution into the editor.
+    pub fn load_reference(&mut self) {
+        if let Some(l) = &self.session.level {
+            let t = l.reference.clone();
+            self.session.set_text(&t);
+        }
+    }
+
+    fn rewind(&mut self) {
+        self.playing = false;
+        self.timer = 0;
+        if let Some(r) = &mut self.session.run {
+            r.pos = 0;
+        }
+        self.office.clear();
+        self.status = None;
+    }
+
+    fn show(&mut self) {
+        let Some(r) = &self.session.run else { return };
+        let Some(f) = r.frames.get(r.pos) else { return };
+        let nparams = self.session.level.as_ref().map_or_else(|| self.session.good.as_ref().and_then(|p| p.fns.last().map(|f| f.params.len())).unwrap_or(0), |l| l.signature.params.len());
+        let exp = (!r.expected.is_empty()).then_some((r.expected.as_str(), &r.ret));
+        let got = match &r.result {
+            Ok(t) => t.clone(),
+            Err(_) => String::new(),
+        };
+        let nodes = r.nodes.clone();
+        let f = f.clone();
+        match exp {
+            Some((text, ty)) => self.office.show(&f, &nodes, nparams, Some((text, ty, &nodes, &got))),
+            None => self.office.show(&f, &nodes, nparams, None),
+        }
+    }
+
+    fn ensure_run(&mut self) -> bool {
+        if self.session.run.as_ref().is_some_and(|r| r.case == self.session.case) {
+            return true;
+        }
+        match self.session.start_run() {
+            Ok(()) => {
+                self.office.clear();
+                self.show();
+                true
+            }
+            Err(msg) => {
+                self.status = Some((msg.clone(), true));
+                self.office.oops(&friendly(&msg));
+                false
+            }
+        }
+    }
+
+    fn step_forward(&mut self, cx: &mut Ctx<'_>) {
+        if !self.ensure_run() {
+            return;
+        }
+        let Some(r) = &mut self.session.run else { return };
+        if r.pos + 1 < r.frames.len() {
+            r.pos += 1;
+            self.show();
+            cx.sfx("step");
         } else {
-            cx.progress.record_mut(&self.st.id()).draft = self.st.text.clone();
+            self.finish_run(cx);
+        }
+    }
+
+    fn finish_run(&mut self, cx: &mut Ctx<'_>) {
+        self.playing = false;
+        let Some(r) = &self.session.run else { return };
+        match &r.result {
+            Err(e) => {
+                let msg = e.msg.clone();
+                self.status = Some((msg.clone(), true));
+                self.office.oops(&msg);
+                cx.sfx("wrong");
+            }
+            Ok(out) => {
+                let ok = r.expected.is_empty() || *out == r.expected;
+                self.status = Some((if ok { format!("Returned {out}. It matches the expected answer.") } else { format!("Returned {out}, but {} was expected.", r.expected) }, !ok));
+                if ok {
+                    cx.sfx("correct");
+                } else {
+                    cx.sfx("wrong");
+                    self.office.oops("That is not what the memo asked for.");
+                }
+            }
+        }
+    }
+
+    fn save_draft(&self, cx: &mut Ctx<'_>) {
+        match &self.session.level {
+            Some(l) => {
+                let id = l.id.clone();
+                let rec = cx.progress.record_mut(&id);
+                rec.draft = self.session.text();
+                rec.hints_used = self.shown_hints as u8;
+            }
+            None => cx.progress.sandbox = self.session.text(),
         }
         cx.touch_progress();
     }
 
-    fn set_mode(&mut self, mode: Mode, cx: &mut Ctx<'_>) {
-        if self.mode == mode {
-            return;
-        }
-        if mode == Mode::Text {
-            self.text.set_text(&self.st.text);
-        } else {
-            self.kbd_open = false;
-            self.text.focused = false;
-            self.inbox_field.focused = false;
-        }
-        self.mode = mode;
-        cx.sfx("sfx_button");
-    }
-
-    fn toast(&mut self, s: String) {
-        self.toast = Some((s, 120));
-    }
-
-    /// Handle one tick.
+    /// Handle one tick of input.
     pub fn update(&mut self, cx: &mut Ctx<'_>) -> Option<Nav> {
         let vp = cx.vp;
-        let r = self.rects(&vp);
-        self.st.office.reduce_motion = cx.progress.settings.reduce_motion;
-        self.st.tick(cx.tr);
-        if let Some((_, t)) = &mut self.toast {
-            *t = t.saturating_sub(1);
-            if *t == 0 {
-                self.toast = None;
-            }
-        }
-        if let Some(a) = self.pending.take() {
-            return Some(a);
-        }
-        // dialogs first
+        let r = PlayRects::new(&vp);
+        self.office.reduce_motion = cx.progress.settings.reduce_motion;
+        let speed = Self::speed_level(cx);
+        self.office.speed = [0.5, 0.8, 1.2, 2.0, 6.0][speed];
+        self.office.tick();
+        // overlays first
         if let Some(m) = &mut self.modal {
             match m.update(cx) {
-                Answer::Open => {}
-                Answer::No => self.modal = None,
                 Answer::Yes => {
                     let purpose = m.purpose;
                     self.modal = None;
-                    return self.confirmed(cx, purpose);
-                }
-            }
-            return None;
-        }
-        if self.memo.is_some() {
-            return self.update_memo(cx);
-        }
-        let b = vp.screen();
-        let min = vp.hit_min();
-        let ptr = cx.ptr;
-        // top bar
-        if ptr.tapped_in(&tap_rect(r.home, min, b)) || (cx.input.key(Key::Escape) && !self.text.focused && !self.inbox_field.focused && !self.kbd_open) {
-            cx.sfx("sfx_button");
-            self.remember_draft(cx);
-            return Some(if self.st.is_sandbox() { Nav::Title } else { Nav::Select });
-        }
-        if cx.input.key(Key::Escape) {
-            self.text.focused = false;
-            self.inbox_field.focused = false;
-            self.kbd_open = false;
-        }
-        if ptr.tapped_in(&tap_rect(r.memo, min, b)) && !self.st.is_sandbox() || (cx.input.ch('b') && !self.typing_focus()) && !self.st.is_sandbox() {
-            self.memo = Some(Memo::default());
-            cx.sfx("sfx_button");
-            return None;
-        }
-        if ptr.tapped_in(&tap_rect(r.code, min, b)) {
-            cx.sfx("sfx_button");
-            return self.peek_code(cx);
-        }
-        if r.typing {
-            self.update_typing(cx, &r);
-            return None;
-        }
-        // controls
-        self.update_controls(cx, &r);
-        // scene: tap a tile to set the operand of the selected instruction
-        if ptr.tapped_in(&r.scene) && self.mode == Mode::Program && self.ed.wants_tile(&self.st) {
-            if let Some((x, y)) = ptr.pos {
-                if let Some(slot) = self.st.office.geom.slot_at(x - r.scene.x, y - r.scene.y) {
-                    self.ed.set_slot(&mut self.st, slot);
-                    cx.sfx("sfx_step");
-                    self.after_program_change(cx);
-                }
-            }
-        }
-        self.st.office.pickable = self.mode == Mode::Program && self.ed.wants_tile(&self.st);
-        self.st.office.operand_focus = None;
-        // status: test selector / sandbox fields
-        if self.st.is_sandbox() {
-            self.update_sandbox(cx, &r);
-        } else if self.st.tests.len() > 1 {
-            if ptr.tapped_in(&r.t_prev) {
-                self.st.cycle_test(-1);
-            }
-            if ptr.tapped_in(&r.t_next) {
-                self.st.cycle_test(1);
-            }
-        }
-        // the side panel
-        match self.mode {
-            Mode::Program => {
-                let er = EditorRects::new(r.side, &vp, self.ed.palette_open, crate::editor::palette_items(&self.st).len());
-                if ptr.tapped_in(&er.mode_text) {
-                    self.set_mode(Mode::Text, cx);
-                } else if self.ed.update(cx, &mut self.st, &er) {
-                    self.after_program_change(cx);
-                }
-            }
-            Mode::Text => self.update_text(cx, &r),
-        }
-        // shortcuts
-        self.shortcuts(cx);
-        None
-    }
-
-    fn typing_focus(&self) -> bool {
-        self.text.focused || self.inbox_field.focused
-    }
-
-    fn after_program_change(&mut self, cx: &mut Ctx<'_>) {
-        self.remember_draft(cx);
-        if self.mode == Mode::Text {
-            self.text.set_text(&self.st.text);
-        }
-    }
-
-    fn shortcuts(&mut self, cx: &mut Ctx<'_>) {
-        if self.typing_focus() || self.ed.pane_palette {
-            return;
-        }
-        let i = cx.input;
-        if i.key(Key::Space) || i.ch('r') && false {
-            self.toggle_run(cx);
-        }
-        if i.ch('.') || i.ch('s') {
-            self.do_step(cx);
-        }
-        if i.ch(',') || i.ch('z') {
-            self.st.step_back();
-            cx.sfx("sfx_step");
-        }
-        if i.ch('r') {
-            self.st.reset_machine();
-            cx.sfx("sfx_button");
-        }
-        for (k, lvl) in [('1', 0u8), ('2', 1), ('3', 2), ('4', 3), ('5', 4)] {
-            if i.ch(k) {
-                self.set_speed(cx, lvl);
-            }
-        }
-        if i.ch('t') {
-            let m = if self.mode == Mode::Program { Mode::Text } else { Mode::Program };
-            self.set_mode(m, cx);
-        }
-    }
-
-    fn set_speed(&mut self, cx: &mut Ctx<'_>, lvl: u8) {
-        self.st.set_speed(lvl);
-        cx.progress.settings.speed_level = lvl;
-        cx.touch_progress();
-    }
-
-    fn toggle_run(&mut self, cx: &mut Ctx<'_>) {
-        if !self.st.runnable() {
-            let msg = self.problem_text(cx);
-            self.toast(msg);
-            cx.sfx("sfx_wrong");
-            return;
-        }
-        self.st.toggle_run();
-        cx.sfx("sfx_button");
-    }
-
-    fn do_step(&mut self, cx: &mut Ctx<'_>) {
-        if !self.st.runnable() {
-            let msg = self.problem_text(cx);
-            self.toast(msg);
-            cx.sfx("sfx_wrong");
-            return;
-        }
-        self.st.running = false;
-        self.st.step(cx.tr);
-        cx.sfx("sfx_step");
-    }
-
-    fn problem_text(&self, cx: &Ctx<'_>) -> String {
-        if let Some(p) = self.st.problems_text(cx.tr).first() {
-            p.clone()
-        } else if self.st.listing.instruction_count() == 0 {
-            cx.tr.t("play.empty_program")
-        } else {
-            cx.tr.t("play.cannot_run")
-        }
-    }
-
-    fn update_controls(&mut self, cx: &mut Ctx<'_>, r: &PlayRects) {
-        let ptr = cx.ptr;
-        if ptr.tapped_in(&r.run) {
-            self.toggle_run(cx);
-        }
-        if ptr.tapped_in(&r.step) {
-            self.do_step(cx);
-        }
-        if ptr.tapped_in(&r.back) {
-            self.st.step_back();
-            cx.sfx("sfx_step");
-        }
-        if ptr.tapped_in(&r.reset) {
-            self.st.reset_machine();
-            cx.sfx("sfx_button");
-        }
-        if ptr.tapped_in(&r.speed) {
-            let next = (self.st.speed_level + 1) % 5;
-            self.set_speed(cx, next);
-            cx.sfx("sfx_button");
-        }
-        if ptr.tapped_in(&r.check) {
-            if !self.st.runnable() {
-                let msg = self.problem_text(cx);
-                self.toast(msg);
-                cx.sfx("sfx_wrong");
-            } else if self.st.is_sandbox() {
-                let t = self.st.text.clone();
-                cx.events.push(GameEvent::Copy(t));
-                self.toast(cx.tr.t("play.copied_solution"));
-                cx.sfx("sfx_button");
-            } else {
-                self.check(cx);
-            }
-        }
-    }
-
-    /// Judge the program; on success remember the result and ask to show the victory screen.
-    fn check(&mut self, cx: &mut Ctx<'_>) {
-        let passed = self.st.check();
-        let Some(level) = self.st.level.clone() else { return };
-        let Some(verdict) = self.st.verdict.clone() else { return };
-        if passed {
-            let text = self.st.listing.to_text();
-            self.improved = cx.progress.record_verdict(&level, &verdict, &text);
-            cx.touch_progress();
-            self.pending = Some(Nav::Victory);
-        } else {
-            cx.sfx("sfx_wrong");
-            let msg = verdict.headline(cx.tr);
-            self.st.message = Some(msg.clone());
-            // show the first failing test in the office
-            if let Some(f) = verdict.first_failure() {
-                self.st.test_idx = f.index.min(self.st.tests.len().saturating_sub(1));
-                self.st.reset_machine();
-                self.st.message = Some(msg);
-            }
-        }
-    }
-
-    fn update_sandbox(&mut self, cx: &mut Ctx<'_>, r: &PlayRects) {
-        let ptr = cx.ptr;
-        let mut apply = false;
-        if ptr.tapped_in(&r.sb_minus) && self.st.sandbox_floor > 1 {
-            self.st.sandbox_floor -= 1;
-            apply = true;
-        }
-        if ptr.tapped_in(&r.sb_plus) && self.st.sandbox_floor < crate::session::SANDBOX_MAX_FLOOR {
-            self.st.sandbox_floor += 1;
-            apply = true;
-        }
-        self.inbox_field.pointer(ptr, r.sb_inbox.inset(2), 1, 9);
-        if ptr.pressed && ptr.over(&r.sb_inbox) {
-            self.text.focused = false;
-        }
-        if self.inbox_field.focused {
-            let out = self.inbox_field.handle(cx.input);
-            if out.changed {
-                self.st.sandbox_input = self.inbox_field.text();
-                apply = true;
-            }
-            if cx.input.key(Key::Enter) {
-                self.inbox_field.focused = false;
-            }
-        }
-        if apply {
-            let outfit = outfit_of(cx.progress, cx.bank);
-            self.st.apply_sandbox_settings(cx.bank, &outfit);
-        }
-    }
-
-    fn update_text(&mut self, cx: &mut Ctx<'_>, r: &PlayRects) {
-        let ptr = cx.ptr;
-        let vp = cx.vp;
-        let er = EditorRects::new(r.side, &vp, false, 15);
-        if ptr.tapped_in(&er.mode_list) {
-            self.set_mode(Mode::Program, cx);
-            return;
-        }
-        let scale = cx.text_scale();
-        let line_h = 9 * scale + 2;
-        let area = text_area(r, &vp);
-        let was = self.text.focused;
-        self.text.pointer(ptr, area, scale, line_h);
-        if ptr.pressed && !ptr.over(&area) && !ptr.over(&r.sb_inbox) {
-            self.text.focused = false;
-        }
-        if self.text.focused && !was && vp.touch {
-            self.kbd_open = true;
-        }
-        if self.text.focused {
-            self.inbox_field.focused = false;
-            let out = self.text.handle(cx.input);
-            self.apply_text_outcome(cx, out);
-            let rows = (area.h / line_h).max(1) as usize;
-            let cols = ((area.w - 8) / (6 * scale)).max(1) as usize;
-            self.text.scroll_to_cursor(rows, cols);
-            if ptr.over(&area) {
-                self.text.scroll_by(-(ptr.wheel * 3.0) as i32, rows);
-            }
-        } else if ptr.over(&area) {
-            let rows = (area.h / line_h).max(1) as usize;
-            self.text.scroll_by(-(ptr.wheel * 3.0) as i32, rows);
-        }
-        // toolbar buttons of the text mode: tidy, copy, paste
-        let [tidy, copy, paste] = text_buttons(&er, &vp);
-        if ptr.tapped_in(&tidy) {
-            self.text.set_text(&self.st.listing.to_text());
-            cx.sfx("sfx_button");
-        }
-        if ptr.tapped_in(&copy) {
-            cx.events.push(GameEvent::Copy(self.text.text()));
-            self.toast(cx.tr.t("play.copied_solution"));
-            cx.sfx("sfx_button");
-        }
-        if ptr.tapped_in(&paste) {
-            cx.events.push(GameEvent::PasteRequest);
-            self.text.focused = true;
-        }
-    }
-
-    fn apply_text_outcome(&mut self, cx: &mut Ctx<'_>, out: crate::textedit::EditOutcome) {
-        if let Some(c) = out.copy {
-            cx.events.push(GameEvent::Copy(c));
-        }
-        if out.want_paste {
-            cx.events.push(GameEvent::PasteRequest);
-        }
-        if out.changed {
-            self.st.text = self.text.text();
-            self.st.set_text(cx.tr);
-            self.remember_draft(cx);
-            self.ed.sel = None;
-        }
-    }
-
-    fn update_typing(&mut self, cx: &mut Ctx<'_>, r: &PlayRects) {
-        let ptr = cx.ptr;
-        let scale = cx.text_scale();
-        let line_h = 9 * scale + 2;
-        self.text.pointer(ptr, r.text, scale, line_h);
-        self.text.focused = true;
-        let out = self.text.handle(cx.input);
-        self.apply_text_outcome(cx, out);
-        if let Some(k) = r.kbd {
-            for a in self.kbd.update(ptr, k) {
-                let mut input = crate::input::Input::default();
-                match a {
-                    crate::textedit::KbAction::Char(c) => input.typed = c.to_string(),
-                    crate::textedit::KbAction::Backspace => input.keys.push(Key::Backspace),
-                    crate::textedit::KbAction::Enter => input.keys.push(Key::Enter),
-                    crate::textedit::KbAction::Hide => {
-                        self.kbd_open = false;
-                        continue;
+                    if purpose == Purpose::Reference {
+                        if let Some(l) = &self.session.level {
+                            let t = l.reference.clone();
+                            self.session.set_text(&t);
+                            self.save_draft(cx);
+                        }
                     }
                 }
-                let out = self.text.handle(&input);
-                self.apply_text_outcome(cx, out);
-                cx.sfx("sfx_step");
+                Answer::No => self.modal = None,
+                Answer::Open => {}
             }
-        }
-        // done button (hide keyboard): the home-like button in the toolbar row
-        let done = typing_done_rect(r, &cx.vp);
-        if ptr.tapped_in(&done) {
-            self.kbd_open = false;
-            self.text.focused = false;
-        }
-        let rows = (r.text.h / line_h).max(1) as usize;
-        let cols = ((r.text.w - 8) / (6 * scale)).max(1) as usize;
-        self.text.scroll_to_cursor(rows, cols);
-    }
-
-    fn update_memo(&mut self, cx: &mut Ctx<'_>) -> Option<Nav> {
-        let vp = cx.vp;
-        let rect = memo_rect(&vp);
-        let hints_total = self.st.level.as_ref().map_or(0, |l| l.hints.len());
-        let can_reveal = self.st.level.as_ref().is_some_and(|l| l.solution.is_some());
-        let hints_left = self.st.hints_shown < hints_total;
-        let mut memo = self.memo.take().unwrap_or_default();
-        let act = memo.update(cx, rect, hints_left, can_reveal);
-        let esc = cx.input.key(Key::Escape);
-        self.memo = Some(memo);
-        match act {
-            MemoAction::Primary => {
-                self.memo = None;
-                self.intro = false;
-                cx.sfx("sfx_button");
-            }
-            MemoAction::Hint => {
-                self.st.hints_shown += 1;
-                let id = self.st.id();
-                cx.progress.record_mut(&id).hints_used = self.st.hints_shown.min(255) as u8;
-                cx.touch_progress();
-                cx.sfx("sfx_button");
-            }
-            MemoAction::Reveal => {
-                self.modal = Some(Modal {
-                    purpose: Purpose::Reference,
-                    title: cx.tr.t("brief.reference"),
-                    body: cx.tr.t("brief.reference_warning"),
-                    yes: cx.tr.t("brief.reference_yes"),
-                    no: cx.tr.t("common.cancel"),
-                    focus_yes: false,
-                });
-            }
-            MemoAction::None => {}
-        }
-        if esc || (cx.ptr.pressed && !cx.ptr.over(&rect)) {
-            self.memo = None;
-        }
-        None
-    }
-
-    fn peek_code(&mut self, cx: &mut Ctx<'_>) -> Option<Nav> {
-        if self.st.program.is_none() || !self.st.problems.is_empty() {
-            let msg = cx.tr.t("result.no_code");
-            self.toast(msg);
             return None;
         }
-        let solved = self.st.level.as_ref().is_none_or(|l| cx.progress.record(&l.id).solved);
-        if solved {
-            return Some(Nav::Code);
+        if let Some(memo) = &mut self.memo {
+            let nh = self.session.level.as_ref().map_or(0, |l| l.hints.len());
+            match memo.update(cx, nh, self.shown_hints) {
+                MemoOut::Close => {
+                    self.memo = None;
+                    self.memo_starting = false;
+                    cx.sfx("button");
+                }
+                MemoOut::Hint => {
+                    self.shown_hints += 1;
+                    cx.sfx("pick");
+                    self.save_draft(cx);
+                }
+                MemoOut::None => {}
+            }
+            return None;
         }
-        self.modal = Some(Modal {
-            purpose: Purpose::PeekCode,
-            title: cx.tr.t("play.peek"),
-            body: cx.tr.t("play.peek_warning"),
-            yes: cx.tr.t("play.peek_yes"),
-            no: cx.tr.t("common.cancel"),
-            focus_yes: false,
-        });
+        // top bar
+        let back = Rect::new(0, 0, 40.max(vp.hit_min()), 18);
+        let brief = Rect::new(vp.w - 50, 0, 50, 18);
+        if cx.ptr.tapped_in(&back) || (cx.input.key(Key::Escape) && self.panel.card.is_none() && self.panel.palette.is_none()) {
+            self.save_draft(cx);
+            return Some(if self.session.level.is_some() { Nav::Select } else { Nav::Title });
+        }
+        if cx.ptr.tapped_in(&brief) && self.session.level.is_some() {
+            self.memo = Some(Memo::default());
+            self.memo_starting = false;
+        }
+        // editor
+        let out = self.panel.update(cx, &mut self.session, r.editor);
+        if out.changed {
+            self.playing = false;
+            self.office.clear();
+            self.status = None;
+            self.save_draft(cx);
+        } else if self.panel.tab == Tab::Text {
+            // typing flows through update_text, which already synced
+        }
+        if self.session.sync() {
+            self.playing = false;
+            self.office.clear();
+            self.save_draft(cx);
+        }
+        // controls
+        let c = controls(&vp, r.controls, self.session.case_count());
+        let typing = self.panel.tab == Tab::Text || self.panel.card.is_some();
+        if cx.ptr.tapped_in(&c.reset) || (!typing && cx.input.ch('r')) {
+            self.rewind();
+            if self.ensure_run() {
+                self.rewind();
+                self.show();
+            }
+            cx.sfx("button");
+        }
+        if cx.ptr.tapped_in(&c.back) || (!typing && cx.input.key(Key::Left)) {
+            if self.session.run.is_some() {
+                self.playing = false;
+                if let Some(run) = &mut self.session.run {
+                    run.pos = run.pos.saturating_sub(1);
+                }
+                self.office.settle();
+                self.show();
+                cx.sfx("step");
+            }
+        }
+        if cx.ptr.tapped_in(&c.step) || (!typing && cx.input.key(Key::Right)) {
+            self.playing = false;
+            self.step_forward(cx);
+        }
+        if cx.ptr.tapped_in(&c.play) || (!typing && cx.input.key(Key::Space)) {
+            if self.ensure_run() {
+                self.playing = !self.playing;
+                if let Some(run) = &mut self.session.run {
+                    if self.playing && run.pos + 1 >= run.frames.len() {
+                        run.pos = 0;
+                        self.office.clear();
+                    }
+                }
+                cx.sfx("button");
+                if Self::speed_level(cx) == 4 && self.playing {
+                    if let Some(run) = &mut self.session.run {
+                        run.pos = run.frames.len() - 1;
+                    }
+                    self.show();
+                    self.office.settle();
+                    self.finish_run(cx);
+                }
+            }
+        }
+        if cx.ptr.tapped_in(&c.speed) {
+            let s = (Self::speed_level(cx) + 1) % 5;
+            cx.progress.settings.speed_level = s as u8;
+            cx.touch_progress();
+            cx.events.push(GameEvent::SettingsChanged);
+            cx.sfx("button");
+        }
+        for (i, cr) in c.cases.iter().enumerate() {
+            if cx.ptr.tapped_in(cr) && self.session.case != i {
+                self.session.case = i;
+                self.rewind();
+                self.session.run = None;
+                if self.ensure_run() {
+                    self.show();
+                }
+                cx.sfx("pick");
+            }
+        }
+        if cx.ptr.tapped_in(&c.check) || (cx.input.key(Key::Enter) && cx.input.ctrl) {
+            return self.check(cx);
+        }
+        // playback
+        if self.playing {
+            let ticks = STEP_TICKS[speed].max(1);
+            self.timer += 1;
+            if self.timer >= ticks && !self.office.busy() {
+                self.timer = 0;
+                self.step_forward(cx);
+            }
+        }
         None
     }
 
-    fn confirmed(&mut self, cx: &mut Ctx<'_>, purpose: Purpose) -> Option<Nav> {
-        match purpose {
-            Purpose::Reference => {
-                let text = self.st.level.as_ref().and_then(|l| l.solution.as_ref()).map(|s| s.asm.clone())?;
-                if let Ok(l) = asm::parse(&text) {
-                    self.st.listing = l;
-                    self.st.after_edit(true);
-                    let id = self.st.id();
-                    cx.progress.record_mut(&id).reference_revealed = true;
-                    self.remember_draft(cx);
-                    self.text.set_text(&self.st.text);
-                    self.ed.sel = None;
-                    self.memo = None;
+    fn check(&mut self, cx: &mut Ctx<'_>) -> Option<Nav> {
+        self.playing = false;
+        self.save_draft(cx);
+        let Some(level) = self.session.level.clone() else {
+            // sandbox: just run it
+            if self.ensure_run() {
+                if let Some(run) = &mut self.session.run {
+                    run.pos = run.frames.len() - 1;
                 }
-                None
+                self.show();
+                self.office.settle();
+                self.finish_run(cx);
             }
-            Purpose::Reset => None,
-            Purpose::PeekCode => {
-                let id = self.st.id();
-                cx.progress.record_mut(&id).code_revealed = true;
-                cx.touch_progress();
-                Some(Nav::Code)
-            }
-        }
+            return None;
+        };
+        let verdict = self.session.check()?.clone();
+        self.report(cx, &level, &verdict)
     }
 
-    // ------------------------------------------------------------------ drawing
+    fn report(&mut self, cx: &mut Ctx<'_>, level: &algoclerk_core::level::Level, v: &Verdict) -> Option<Nav> {
+        if v.passed {
+            let text = self.session.text();
+            self.improved = cx.progress.record_verdict(level, v, &text);
+            self.solved = true;
+            cx.touch_progress();
+            cx.sfx("stars");
+            return Some(Nav::Victory);
+        }
+        cx.sfx("wrong");
+        let (msg, bubble) = if let Some(d) = v.diags.first() {
+            (d.msg.clone(), friendly(&d.msg))
+        } else if let Some(f) = &v.failure {
+            let args = f.case.args.join(", ");
+            let args = clip(&args, 60);
+            match f.kind {
+                FailKind::Wrong => (format!("For ({args}) I expected {} but got {}.", f.case.expect, f.got.clone().unwrap_or_default()), "My answer does not match the memo!".to_string()),
+                FailKind::TimeLimit => (
+                    format!("The clock ran out on {} test. {}", if f.case.large { "a big" } else { "a" }, level.technique_hint()),
+                    "Too slow! The big job is still unfinished.".to_string(),
+                ),
+                FailKind::MemoryLimit => ("Too much shelf space used.".to_string(), "The shelves are full!".to_string()),
+                FailKind::Error => {
+                    let m = f.error.as_ref().map(|e| e.msg.clone()).unwrap_or_default();
+                    (format!("For ({args}): {m}"), m)
+                }
+            }
+        } else {
+            ("Something is not right.".to_string(), "Hmm.".to_string())
+        };
+        self.status = Some((msg, true));
+        self.office.oops(&bubble);
+        None
+    }
 
     /// Draw the screen.
     pub fn draw(&self, g: &mut Gfx<'_>, v: &View<'_>) {
         let vp = v.vp;
-        let r = self.rects(&vp);
+        let r = PlayRects::new(&vp);
         g.rect(vp.screen(), 'k');
-        self.draw_top(g, v, &r);
-        if r.typing {
-            self.draw_typing(g, v, &r);
-        } else {
-            self.st.office.draw(g, (r.scene.x, r.scene.y));
-            g.frame(r.scene.grow(1), 'K');
-            self.draw_controls(g, v, &r);
-            self.draw_status(g, v, &r);
-            match self.mode {
-                Mode::Program => {
-                    let er = EditorRects::new(r.side, &vp, self.ed.palette_open, crate::editor::palette_items(&self.st).len());
-                    self.ed.draw(g, v, &self.st, &er, false);
-                }
-                Mode::Text => self.draw_text_panel(g, v, &r),
-            }
+        // top bar
+        g.rect(r.top, 'K');
+        let title = self.session.level.as_ref().map_or("Sandbox".to_string(), |l| l.title.clone());
+        let back = Rect::new(0, 0, 40.max(vp.hit_min()), 18);
+        g.icon("back", 4, 4, 'W');
+        g.text(16, 5, "Back", 'W');
+        let _ = back;
+        g.text_c(vp.w / 2, 5, &clip(&title, ((vp.w - 110) / 6) as usize), 'y', 1);
+        if self.session.level.is_some() {
+            g.icon("memo", vp.w - 46, 4, 'y');
+            g.text(vp.w - 34, 5, "Memo", 'W');
         }
-        if let Some((t, _)) = &self.toast {
-            let cols = ((vp.safe.w - 40) / 6) as usize;
-            let lines = algoclerk_media::Font::wrap(t, cols);
-            let h = lines.len() as i32 * 10 + 8;
-            let w = lines.iter().map(|l| l.chars().count()).max().unwrap_or(1) as i32 * 6 + 12;
-            let x = vp.safe.x + (vp.safe.w - w) / 2;
-            let y = r.scene.bottom() - h - 4;
-            g.panel_with(Rect::new(x, y, w, h), 'y', 'K', true);
-            for (i, l) in lines.iter().enumerate() {
-                g.text(x + 6, y + 4 + i as i32 * 10, l, 'K');
-            }
+        self.office.draw(g, (r.scene.x, r.scene.y));
+        g.frame(r.scene.grow(1), 'K');
+        // controls
+        let c = controls(&vp, r.controls, self.session.case_count());
+        let st = |rect: &Rect| widget_state(v.ptr, rect, false, false);
+        let has_run = self.session.run.is_some();
+        g.icon_button(c.reset, "reset", Kind::Normal, st(&c.reset));
+        g.icon_button(c.back, "left", Kind::Normal, State { disabled: !has_run, ..st(&c.back) });
+        g.icon_button(c.play, if self.playing { "pause" } else { "play" }, Kind::Primary, st(&c.play));
+        g.icon_button(c.step, "step", Kind::Normal, st(&c.step));
+        let sp = usize::from(v.progress.settings.speed_level.min(4));
+        g.button(c.speed, ["x1", "x2", "x4", "x8", "max"][sp], Kind::Normal, st(&c.speed));
+        let can_check = self.session.compiled.is_ok() || self.session.level.is_none();
+        g.button(c.check, if self.session.level.is_some() { "Check" } else { "Run" }, Kind::Good, State { disabled: !can_check, ..st(&c.check) });
+        for (i, cr) in c.cases.iter().enumerate() {
+            g.button(*cr, &format!("Ex{}", i + 1), if self.session.case == i { Kind::On } else { Kind::Normal }, st(cr));
         }
+        // status
+        let sr = c.status;
+        let (text, bad) = match (&self.status, self.session.problem()) {
+            (Some((t, b)), _) => (t.clone(), *b),
+            (None, Some(d)) => (d.msg, true),
+            (None, None) => (self.hint_line(), false),
+        };
+        let lines = Font::wrap(&text, (sr.w / 6).max(8) as usize);
+        let max_lines = (sr.h / 9).max(1) as usize;
+        for (i, l) in lines.iter().take(max_lines).enumerate() {
+            g.text(sr.x + 1, sr.y + i as i32 * 9, l, if bad { 'p' } else { 'A' });
+        }
+        // cost line next to the cases
+        if let Some(run) = &self.session.run {
+            let f = run.frames.get(run.pos);
+            let label = format!("step {}/{}  cost {}", run.pos, run.frames.len().saturating_sub(1), f.map_or(0, |f| f.cost));
+            g.text_r(r.controls.right() - 2, c.cases.first().map_or(sr.y - 12, |c| c.y + 4), &label, 'A', 1);
+        }
+        let exec = self.session.current_node();
+        self.panel.draw(g, v, &self.session, r.editor, exec);
         if let Some(m) = &self.memo {
-            g.shade(vp.screen());
-            let mut mm = m.clone();
-            let level = self.st.level.as_ref();
-            if let Some(level) = level {
-                let rec = v.progress.record(&level.id);
-                let label = if self.intro { v.tr.t("brief.start") } else { v.tr.t("brief.close") };
-                mm.draw(g, v, memo_rect(&vp), level, self.order, self.st.hints_shown, &label, &rec);
+            if let Some(l) = &self.session.level {
+                let rec = v.progress.record(&l.id);
+                m.draw(g, v, l, &rec, self.shown_hints, self.memo_starting);
             }
         }
         if let Some(m) = &self.modal {
@@ -803,219 +609,30 @@ impl Play {
         }
     }
 
-    fn draw_top(&self, g: &mut Gfx<'_>, v: &View<'_>, r: &PlayRects) {
-        let ptr = v.ptr;
-        g.rect(r.top, 'K');
-        g.hline(r.top.x, r.top.bottom() - 1, r.top.w, 'm');
-        g.icon_button(r.home, "home", Kind::Normal, widget_state(ptr, &tap_rect(r.home, v.vp.hit_min(), v.vp.screen()), false, false));
-        if !self.st.is_sandbox() {
-            g.icon_button(r.memo, "memo", Kind::Normal, widget_state(ptr, &tap_rect(r.memo, v.vp.hit_min(), v.vp.screen()), false, false));
-        }
-        g.icon_button(r.code, "code", Kind::Normal, widget_state(ptr, &tap_rect(r.code, v.vp.hit_min(), v.vp.screen()), false, false));
-        let title = match &self.st.level {
-            Some(l) => format!("{:02} {}", self.order, l.title),
-            None => v.tr.t("sandbox.title"),
-        };
-        let max = (r.title.w / 6).max(4) as usize;
-        let ty = r.title.y + (r.title.h - 7) / 2;
-        g.text(r.title.x, ty, &clip(&title, max), 'W');
-        // size and steps
-        if !v.vp.portrait {
-            let size = self.st.listing.instruction_count();
-            let steps = self.st.machine.as_ref().map_or(0, |m| m.steps);
-            let s = format!("{} {}  {} {}", v.tr.t("editor.size"), size, v.tr.t("play.steps"), steps);
-            let x = r.title.right() - g.text_w(&s, 1);
-            if x > r.title.x + 6 * (title.chars().count() as i32 + 2) {
-                g.text(x, ty, &s, 'y');
-            }
-        }
-    }
-
-    fn draw_controls(&self, g: &mut Gfx<'_>, v: &View<'_>, r: &PlayRects) {
-        let ptr = v.ptr;
-        let runnable = self.st.runnable();
-        let done = self.st.machine.as_ref().is_some_and(algoclerk_core::vm::Machine::is_done);
-        let can_back = self.st.machine.as_ref().is_some_and(algoclerk_core::vm::Machine::can_step_back);
-        g.icon_button(r.back, "back", Kind::Normal, widget_state(ptr, &r.back, false, !can_back));
-        let run_icon = if self.st.running { "pause" } else { "play" };
-        g.icon_button(r.run, run_icon, if self.st.running { Kind::On } else { Kind::Good }, widget_state(ptr, &r.run, false, !runnable));
-        g.icon_button(r.step, "step", Kind::Normal, widget_state(ptr, &r.step, false, !runnable || (done && false)));
-        g.icon_button(r.reset, "reset", Kind::Normal, widget_state(ptr, &r.reset, false, false));
-        let label = ["1x", "2x", "4x", "8x", "MAX"][usize::from(self.st.speed_level.min(4))];
-        let sb = g.button_box(r.speed, Kind::Normal, widget_state(ptr, &r.speed, false, false));
-        g.icon("fast", sb.x + 3, sb.y + (sb.h - 10) / 2, 'K');
-        g.text(sb.x + 15, sb.y + (sb.h - 7) / 2, label, 'K');
-        let (label, kind) = if self.st.is_sandbox() {
-            (v.tr.t("play.share_short"), Kind::Normal)
-        } else {
-            (v.tr.t("play.check"), Kind::Primary)
-        };
-        g.button(r.check, &label, kind, widget_state(ptr, &r.check, false, !runnable));
-    }
-
-    fn draw_status(&self, g: &mut Gfx<'_>, v: &View<'_>, r: &PlayRects) {
-        let st = &self.st;
-        g.panel(r.status, 'W');
-        let inner = Rect::new(r.status.x + 5, r.status.y + 3, r.status.w - 10, r.status.h - 6);
-        if st.is_sandbox() {
-            self.draw_sandbox_fields(g, v, r);
-            return;
-        }
-        let ptr = v.ptr;
-        let multi = st.tests.len() > 1;
-        let text_w = inner.w - if multi { r.t_prev.w * 2 + 10 } else { 0 };
-        let cols = (text_w / 6).max(8) as usize;
-        let (msg, ink) = if let Some(p) = st.problems_text(v.tr).first() {
-            (p.clone(), 'r')
-        } else if let Some(e) = st.text_errors.first() {
-            (e.clone(), 'r')
-        } else if let Some(m) = &st.message {
-            (m.clone(), if st.finished_ok == Some(true) { 'G' } else { 'r' })
-        } else if st.machine.as_ref().is_some_and(|m| m.steps > 0) {
-            (v.tr.t("play.running"), 'k')
-        } else {
-            (v.tr.t("play.ready"), 'k')
-        };
-        let lines = algoclerk_media::Font::wrap(&msg, cols);
-        let max_lines = ((inner.h - 12) / 9).max(1) as usize;
-        for (i, l) in lines.iter().take(max_lines).enumerate() {
-            let text = if i + 1 == max_lines && lines.len() > max_lines { clip(l, cols) } else { l.clone() };
-            g.text(inner.x, inner.y + i as i32 * 9, &text, ink);
-        }
-        // verdict chips
-        let cy = inner.bottom() - 8;
-        if let Some(verdict) = &st.verdict {
-            for (i, t) in verdict.tests.iter().take(((text_w - 2) / 11).max(1) as usize).enumerate() {
-                let ok = t.outcome == Outcome::Pass;
-                g.sprite(if ok { "icons/stamp_ok" } else { "icons/stamp_bad" }, 0, inner.x + i as i32 * 11, cy - 1);
-                if i == st.test_idx {
-                    g.hline(inner.x + i as i32 * 11, cy + 9, 9, 'K');
-                }
-            }
-        } else if multi {
-            for i in 0..st.tests.len().min(((text_w - 2) / 11).max(1) as usize) {
-                let on = i == st.test_idx;
-                let c = Rect::new(inner.x + i as i32 * 11, cy, 9, 7);
-                g.round_rect(c, if on { 'y' } else { 'w' }, 'K');
-            }
-        }
-        if multi {
-            g.icon_button(r.t_prev, "left", Kind::Normal, widget_state(ptr, &r.t_prev, false, false));
-            g.icon_button(r.t_next, "right", Kind::Normal, widget_state(ptr, &r.t_next, false, false));
-            let label = format!("{}/{}", st.test_idx + 1, st.tests.len());
-            g.text_r(r.t_prev.x - 4, r.t_prev.y + (r.t_prev.h - 7) / 2, &label, 'k', 1);
-        }
-    }
-
-    fn draw_sandbox_fields(&self, g: &mut Gfx<'_>, v: &View<'_>, r: &PlayRects) {
-        let ptr = v.ptr;
-        g.text(r.sb_inbox.x, r.sb_inbox.y - 0, &v.tr.t("sandbox.inbox_short"), 'k');
-        let field = Rect::new(r.sb_inbox.x, r.sb_inbox.y + 9, r.sb_inbox.w, r.sb_inbox.h.min(16));
-        let focus = self.inbox_field.focused;
-        g.rect(field, 'W');
-        g.frame(field, if focus { 'B' } else { 'K' });
-        g.text(field.x + 3, field.y + (field.h - 7) / 2, &clip(&self.inbox_field.text(), ((field.w - 6) / 6) as usize), 'K');
-        if focus && (v.tick / 30) % 2 == 0 {
-            let x = field.x + 3 + (self.inbox_field.cursor.min(((field.w - 8) / 6) as usize) as i32) * 6;
-            g.rect(Rect::new(x, field.y + 2, 1, field.h - 4), 'R');
-        }
-        g.text(r.sb_minus.x - 2, r.sb_minus.y, &v.tr.t("sandbox.tiles"), 'k');
-        let (m, p) = (Rect::new(r.sb_minus.x, r.sb_minus.y + 9, r.sb_minus.w, field.h), Rect::new(r.sb_plus.x, r.sb_minus.y + 9, r.sb_plus.w, field.h));
-        g.icon_button(m, "minus", Kind::Normal, widget_state(ptr, &m, false, false));
-        g.icon_button(p, "plus", Kind::Normal, widget_state(ptr, &p, false, false));
-        g.text_in(Rect::new(m.right(), m.y, p.x - m.right(), m.h), &self.st.sandbox_floor.to_string(), 'K', 1);
-    }
-
-    fn draw_text_panel(&self, g: &mut Gfx<'_>, v: &View<'_>, r: &PlayRects) {
-        let vp = v.vp;
-        let er = EditorRects::new(r.side, &vp, false, 15);
-        let ptr = v.ptr;
-        g.panel(r.side, 'w');
-        g.icon_button(er.mode_list, "list", Kind::Normal, widget_state(ptr, &er.mode_list, false, false));
-        g.icon_button(er.mode_text, "text", Kind::On, widget_state(ptr, &er.mode_text, false, false));
-        let [tidy, copy, paste] = text_buttons(&er, &vp);
-        g.icon_button(tidy, "list", Kind::Normal, widget_state(ptr, &tidy, false, false));
-        g.icon_button(copy, "copy", Kind::Normal, widget_state(ptr, &copy, false, false));
-        g.icon_button(paste, "note", Kind::Normal, widget_state(ptr, &paste, false, false));
-        let scale = v.text_scale();
-        let line_h = 9 * scale + 2;
-        let area = text_area(r, &vp);
-        let errs: Vec<usize> = self.st.text_errors.iter().filter_map(|e| error_line_of(e)).collect();
-        let exec = self.st.executing_line().and_then(|i| self.st.program.as_ref().and_then(|p| p.text_line.get(self.exec_instr()).copied().filter(|_| i < usize::MAX)));
-        draw_editor(g, &self.text, area, scale, line_h, &errs, exec, v.tick);
-        if let Some(e) = self.st.text_errors.first() {
-            let y = area.bottom() + 2;
-            let cols = (r.side.w / 6 - 3) as usize;
-            if y + 9 < r.side.bottom() {
-                g.text(r.side.x + 6, y, &clip(e, cols), 'r');
-            }
-        }
-        let _ = asm_spans;
-    }
-
-    fn exec_instr(&self) -> usize {
-        self.st.machine.as_ref().map_or(0, |m| m.pc)
-    }
-
-    fn draw_typing(&self, g: &mut Gfx<'_>, v: &View<'_>, r: &PlayRects) {
-        let vp = v.vp;
-        let ptr = v.ptr;
-        let scale = v.text_scale();
-        let line_h = 9 * scale + 2;
-        let done = typing_done_rect(r, &vp);
-        g.button(done, &v.tr.t("common.done"), Kind::Good, widget_state(ptr, &done, false, false));
-        let errs: Vec<usize> = self.st.text_errors.iter().filter_map(|e| error_line_of(e)).collect();
-        draw_editor(g, &self.text, r.text, scale, line_h, &errs, None, v.tick);
-        if let Some(e) = self.st.text_errors.first() {
-            g.text(r.text.x + 4, r.text.bottom() - 10, &clip(e, ((r.text.w - 8) / 6) as usize), 'r');
-        }
-        if let Some(k) = r.kbd {
-            self.kbd.draw(g, k, ptr);
+    fn hint_line(&self) -> String {
+        match &self.session.run {
+            None => "Press play to watch the clerk run your program, or Check to judge it.".to_string(),
+            Some(r) => match r.frames.get(r.pos) {
+                Some(f) if f.node != 0 => "The highlighted card is the step the clerk just finished.".to_string(),
+                _ => "The arguments are on the desk. Step through to follow the clerk.".to_string(),
+            },
         }
     }
 }
 
-fn typing_done_rect(r: &PlayRects, vp: &Viewport) -> Rect {
-    let bh = vp.btn_h();
-    Rect::new(r.top.right() - 80 - 4, r.top.bottom() + 2, 80, bh)
+/// A short, friendly bubble for a problem message.
+pub fn friendly(msg: &str) -> String {
+    let first = msg.split(['.', '!']).next().unwrap_or(msg);
+    let t: String = first.chars().take(60).collect();
+    format!("{t}!")
 }
 
-fn text_buttons(er: &EditorRects, vp: &Viewport) -> [Rect; 3] {
-    let bh = vp.btn_h();
-    let mut x = er.panel.right() - 4 - bh;
-    let paste = Rect::new(x, er.mode_list.y, bh, bh);
-    x -= bh + 2;
-    let copy = Rect::new(x, er.mode_list.y, bh, bh);
-    x -= bh + 2;
-    let tidy = Rect::new(x, er.mode_list.y, bh, bh);
-    [tidy, copy, paste]
+trait TechniqueHint {
+    fn technique_hint(&self) -> String;
 }
 
-fn text_area(r: &PlayRects, vp: &Viewport) -> Rect {
-    let _ = vp;
-    r.text
-}
-
-fn error_line_of(e: &str) -> Option<usize> {
-    let rest = e.strip_prefix("Line ")?;
-    rest.split(':').next()?.trim().parse().ok()
-}
-
-/// The memo overlay rectangle.
-pub fn memo_rect(vp: &Viewport) -> Rect {
-    if vp.portrait {
-        Rect::new(vp.safe.x + 8, vp.safe.y + 14, vp.safe.w - 16, vp.safe.h - 28)
-    } else {
-        Rect::new(vp.safe.x + 40, vp.safe.y + 10, vp.safe.w - 80, vp.safe.h - 20)
+impl TechniqueHint for algoclerk_core::level::Level {
+    fn technique_hint(&self) -> String {
+        format!("The memo hints at: {}.", self.technique)
     }
 }
-
-/// The outfit chosen in settings (the default one when unset or invalid).
-pub fn outfit_of(p: &algoclerk_core::progress::Progress, bank: &ArtBank) -> Outfit {
-    Outfit::from_code(&p.settings.outfit)
-        .filter(|o| bank.has_template(&format!("clerk/body_{}", o.body)))
-        .unwrap_or_default()
-}
-
-/// Unused state accessor kept for tests.
-pub fn state_of(_s: State) {}

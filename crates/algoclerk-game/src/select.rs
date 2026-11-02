@@ -126,7 +126,7 @@ impl Select {
         let home = Rect::new(vp.safe.x + 3, vp.safe.y + 2, 26, 16);
         let min = vp.hit_min();
         if ptr.tapped_in(&crate::play::tap_rect(home, min, vp.screen())) || cx.input.key(Key::Escape) {
-            cx.sfx("sfx_button");
+            cx.sfx("button");
             return Some(Nav::Title);
         }
         // scrolling
@@ -192,7 +192,7 @@ impl Select {
         if moved {
             self.focus = (pi, li);
             self.jump_to_focus = true;
-            cx.sfx("sfx_step");
+            cx.sfx("step");
         }
         if self.jump_to_focus {
             if let Some(f) = floors.get(self.focus.0) {
@@ -213,11 +213,11 @@ impl Select {
             let unlocked = cx.campaign.level_unlocked(cx.progress, pi, li);
             if unlocked {
                 if let Some(l) = cx.campaign.packs.get(pi).and_then(|p| p.levels.get(li)) {
-                    cx.sfx("sfx_button");
+                    cx.sfx("button");
                     return Some(Nav::Brief(l.id.clone()));
                 }
             } else {
-                cx.sfx("sfx_wrong");
+                cx.sfx("wrong");
                 self.toast = Some((cx.tr.t("packs.locked"), 150));
             }
         }

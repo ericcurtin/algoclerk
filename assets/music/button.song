@@ -1,0 +1,5 @@
+# A small desk-bell tick for buttons.
+name: button
+bpm: 300
+loop: no
+lead = square 0.35 : C6:1 E6:1
