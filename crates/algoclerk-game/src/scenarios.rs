@@ -13,7 +13,7 @@ use crate::ui::{GameConfig, Nav};
 use algoclerk_media::{Assets, Canvas};
 
 /// All scenario names, in documentation order.
-pub const NAMES: [&str; 20] = [
+pub const NAMES: [&str; 22] = [
     "title",
     "select",
     "select-locked",
@@ -27,6 +27,8 @@ pub const NAMES: [&str; 20] = [
     "play-card",
     "play-palette",
     "play-keyboard",
+    "play-complete",
+    "migrated",
     "victory",
     "code-c",
     "code-cpp",
@@ -108,7 +110,14 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
         touch: spec.portrait || spec.touch,
         system_clipboard: false,
     };
-    let mut g = Game::new(&Assets::embedded(), Box::new(MemoryStorage::default()), cfg)?;
+    let mut storage = MemoryStorage::default();
+    if spec.name == "migrated" {
+        // a save written by the ClerkScript era game: version 1, a solved level and a draft in the old syntax
+        use crate::storage::Storage;
+        let old = r#"{"version":1,"levels":{"two-sum":{"solved":true,"stars":3,"draft":"fn two_sum(nums: vec<int>) -> int { return 0; }"}},"sandbox":"fn main() -> int { return 1; }"}"#;
+        let _ = storage.write(crate::PROGRESS_FILE, old);
+    }
+    let mut g = Game::new(&Assets::embedded(), Box::new(storage), cfg)?;
     g.progress.settings.palette.clone_from(&spec.palette);
     g.progress.settings.text_size = spec.text_size;
     g.progress.settings.reduce_motion = spec.reduce_motion;
@@ -203,6 +212,25 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
             p.panel.kb_open = true;
             p.load_reference();
             tick_n(&mut g, 4);
+        }
+        "migrated" => {
+            tick_n(&mut g, 4);
+            return Ok(g);
+        }
+        "play-complete" => {
+            g.goto(Nav::Play("two-sum".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.panel.tab = Tab::Text;
+            p.session.set_text("std::vector<int> twoSum(const std::vector<int>& nums, int target) {\n    std::unordered_map<int, int> seen;\n    seen.\n}\n");
+            tick_n(&mut g, 2);
+            // put the cursor after `seen.` and let the popup open
+            if let Some(p) = g.play_mut() {
+                let at = p.session.text().find("seen.").map_or(0, |i| i + 5);
+                p.session.edit.cursor = at;
+                p.session.edit.anchor = None;
+                p.panel.suggest_now(&p.session);
+            }
+            tick_n(&mut g, 2);
         }
         "play-card" | "play-palette" => {
             g.goto(Nav::Play("count-vowels".into()));

@@ -19,6 +19,8 @@ const FLOOR_TOP: i32 = 52;
 #[derive(Debug, Clone)]
 struct Tray {
     name: String,
+    /// C++ type of the variable without the `std::` prefix (`vector<int>`), shown when there is room.
+    ty: String,
     rect: Rect,
     w: W,
     changed: bool,
@@ -105,7 +107,7 @@ impl Office {
         self.cost = f.cost;
         self.nparams = nparams;
         let width_budget = SCENE_W - 16;
-        let mut items: Vec<(String, W, bool, bool)> = Vec::new();
+        let mut items: Vec<(String, String, W, bool, bool)> = Vec::new();
         let texts: Vec<String> = f
             .vars
             .iter()
@@ -124,6 +126,7 @@ impl Office {
             };
             items.push((
                 name.clone(),
+                ty.to_string().replace("std::", ""),
                 value_view::build(v, ty, &f.heap, budget),
                 changed,
                 i < nparams,
@@ -133,9 +136,16 @@ impl Office {
         let mut trays = Vec::new();
         let (mut x, mut y, mut row_h) = (6, FLOOR_TOP + 4, 0);
         let mut hidden = 0;
-        for (name, w, changed, param) in items {
+        for (name, ty, w, changed, param) in items {
+            let tyw = ty.chars().count() as i32;
+            let with_ty = if tyw <= 18 {
+                name.chars().count() as i32 * 4 + 18 + tyw * 6
+            } else {
+                0
+            };
             let tw = (w.w + 8)
                 .max(name.chars().count() as i32 * 4 + 12)
+                .max(with_ty.min(112))
                 .min(width_budget);
             let th = w.h + 11;
             if x + tw > SCENE_W - 6 {
@@ -154,6 +164,7 @@ impl Office {
             }
             trays.push(Tray {
                 name,
+                ty,
                 rect: Rect::new(x, y, tw, th),
                 w,
                 changed,
@@ -398,6 +409,12 @@ impl Office {
             g.tiny(t.rect.x + 3, t.rect.y + 2, &label.to_uppercase(), 'W');
             if t.param {
                 g.px(t.rect.right() - 4, t.rect.y + 3, 'y');
+            }
+            let used = label.chars().count() as i32 * 4 + 8;
+            let room = ((t.rect.w - used - 8) / 6).max(0) as usize;
+            let tyw = t.ty.chars().count();
+            if tyw > 0 && tyw <= room {
+                g.text_r(t.rect.right() - 7, t.rect.y + 1, &t.ty, 'E', 1);
             }
             t.w.draw(
                 g,

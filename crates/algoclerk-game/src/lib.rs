@@ -138,6 +138,8 @@ pub struct Game {
     clipboard: String,
     pending_paste: Option<String>,
     music: Option<&'static str>,
+    /// A one-time notice over every screen (after an old save was converted).
+    notice: Option<modal::Modal>,
     last_pointer: (i32, i32),
 }
 
@@ -209,8 +211,17 @@ impl Game {
             clipboard: String::new(),
             pending_paste: None,
             music: None,
+            notice: None,
             last_pointer: (240, 135),
         };
+        g.notice = (!g.progress.migration_note.is_empty()).then(|| modal::Modal {
+            purpose: modal::Purpose::Notice,
+            title: words::MIGRATION_TITLE.to_string(),
+            body: g.progress.migration_note.clone(),
+            yes: words::GOT_IT.to_string(),
+            no: words::GOT_IT.to_string(),
+            focus_yes: true,
+        });
         g.set_music();
         Ok(g)
     }
@@ -274,6 +285,9 @@ impl Game {
     /// Hit rectangles of the active screen (layout tests).
     pub fn hits(&self) -> Vec<Hit> {
         let vp = self.vp;
+        if self.notice.is_some() {
+            return modal::Modal::hits(&vp);
+        }
         match &self.scene {
             Scene::Title(_) => title::Title::hits(&vp, self.config.can_quit),
             Scene::Select(_) => {
@@ -326,6 +340,9 @@ impl Game {
             }
             return;
         }
+        if self.update_notice(&inp) {
+            return;
+        }
         let nav = self.update_scene(&inp);
         if let Some(n) = nav {
             self.start_nav(n);
@@ -361,6 +378,33 @@ impl Game {
             self.save();
         }
         self.set_music();
+    }
+
+    /// The one-time notice swallows input until it is dismissed; dismissing saves so it never returns.
+    fn update_notice(&mut self, input: &Input) -> bool {
+        let Some(m) = &mut self.notice else {
+            return false;
+        };
+        let cx = Ctx {
+            input,
+            ptr: &self.ptr,
+            vp: self.vp,
+            tr: &self.tr,
+            progress: &mut self.progress,
+            campaign: &self.campaign,
+            bank: &self.bank,
+            events: &mut self.events,
+            tick: self.tick,
+            config: &self.config,
+            dirty: &mut self.dirty,
+        };
+        if m.update(&cx) != modal::Answer::Open {
+            self.notice = None;
+            self.progress.migration_note.clear();
+            self.dirty = true;
+            self.save();
+        }
+        true
     }
 
     fn update_scene(&mut self, input: &Input) -> Option<Nav> {
@@ -513,6 +557,27 @@ impl Game {
                 Scene::About(s) => s.draw(&mut g, &v),
                 Scene::Blank => {}
             }
+        }
+        canvas.reset_clip();
+        if let Some(m) = &self.notice {
+            let mut g = Gfx {
+                c: canvas,
+                bank: &self.bank,
+                pal,
+                tick: self.tick,
+                reduce_motion: self.progress.settings.reduce_motion,
+                off: (0, 0),
+            };
+            let v = View {
+                vp,
+                tr: &self.tr,
+                progress: &self.progress,
+                campaign: &self.campaign,
+                ptr: &self.ptr,
+                tick: self.tick,
+                config: &self.config,
+            };
+            m.draw(&mut g, &v);
         }
         canvas.reset_clip();
         if let Some((iris, _)) = &self.iris {

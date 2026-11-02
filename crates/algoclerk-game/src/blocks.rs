@@ -682,3 +682,142 @@ pub const PALETTE: &[(&str, &str)] = &[
     ("break", "break;"),
     ("continue", "continue;"),
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::session::parse_with_prelude;
+
+    const PRE: &str = "#include <vector>\n";
+    const SRC: &str = "int f(const std::vector<int>& a) {\n    int t = 0;\n    for (int x : a) {\n        if (x > 2) {\n            t += x;\n        } else if (x < 0) {\n            t -= 1;\n        } else {\n            t += 1;\n        }\n    }\n    return t;\n}\n";
+
+    fn prog(src: &str) -> Program {
+        parse_with_prelude(PRE, src).unwrap()
+    }
+
+    fn texts(p: &Program) -> Vec<(usize, String)> {
+        rows(p).into_iter().map(|r| (r.depth, r.text)).collect()
+    }
+
+    fn id_of(p: &Program, text: &str) -> NodeId {
+        rows(p).into_iter().find(|r| r.text == text).unwrap().node
+    }
+
+    #[test]
+    fn rows_follow_the_text() {
+        let p = prog(SRC);
+        let r = rows(&p);
+        assert_eq!(r[0].kind, CardKind::Header);
+        assert_eq!(r[0].text, "int f(const std::vector<int>& a)");
+        assert!(
+            r.iter()
+                .any(|x| x.text == "else" && x.kind == CardKind::Else)
+        );
+        let t = texts(&p);
+        assert!(t.contains(&(1, "for (int x : a)".to_string())));
+        assert!(t.contains(&(3, "t += x;".to_string())));
+        let chained = r.iter().find(|x| x.text == "else if (x < 0)").unwrap();
+        assert!(chained.chained && chained.kind == CardKind::Compound);
+        assert_eq!(chained.depth, 2, "an else-if sits at the depth of its if");
+        assert!(!chained.movable() && chained.editable());
+    }
+
+    #[test]
+    fn unexpressible_statements_are_raw_cards_and_round_trip() {
+        let src = "int g(int n) {\n    switch (n) {\n        case 1:\n            return 1;\n        default:\n            break;\n    }\n    do {\n        --n;\n    } while (n > 0);\n    return n;\n}\n";
+        let mut p = prog(src);
+        let r = rows(&p);
+        let raws = r.iter().filter(|x| x.kind == CardKind::Raw).count();
+        assert_eq!(raws, 2, "{r:?}");
+        assert!(r.iter().all(|x| !x.text.contains('\n')));
+        let id = id_of(&p, "return n;");
+        let text = move_stmt(&mut p, id, true).unwrap();
+        assert!(text.contains("switch (n)") && text.contains("} while (n > 0);"));
+        assert!(text.find("return n;").unwrap() < text.find("} while").unwrap());
+        assert!(parse_with_prelude(PRE, &text).is_ok());
+    }
+
+    #[test]
+    fn structural_edits_round_trip_through_text() {
+        let mut p = prog(SRC);
+        let ret = id_of(&p, "return t;");
+        let text = move_stmt(&mut p, ret, true).unwrap();
+        assert!(text.find("return t;").unwrap() < text.find("for (int x").unwrap());
+        let mut p = prog(&text);
+        let t0 = id_of(&p, "int t = 0;");
+        let text = edit_stmt(&mut p, t0, "int total = 1;").unwrap();
+        assert!(text.contains("int total = 1;"));
+        let mut p = prog(&text);
+        let lp = id_of(&p, "for (int x : a)");
+        let text = edit_stmt(&mut p, lp, "for (int y : a)").unwrap();
+        assert!(
+            text.contains("for (int y : a) {") && text.contains("else {"),
+            "{text}"
+        );
+        let mut p = prog(&text);
+        let first = id_of(&p, "int total = 1;");
+        let text = insert_stmt(&mut p, "f", Some(first), false, "int n = 5;").unwrap();
+        assert!(parse_with_prelude(PRE, &text).is_ok() && text.contains("int n = 5;"));
+        let mut p = prog(&text);
+        let id = id_of(&p, "int n = 5;");
+        let text = delete_stmt(&mut p, id).unwrap();
+        assert!(!text.contains("int n"));
+    }
+
+    #[test]
+    fn single_statement_bodies_get_braces_when_edited() {
+        let mut p = prog("int f(int n) {\n    if (n > 0) return 1;\n    return 0;\n}\n");
+        let id = id_of(&p, "if (n > 0)");
+        let text = insert_stmt(&mut p, "f", Some(id), true, "n = 3;").unwrap();
+        assert!(
+            text.contains("if (n > 0) {\n        n = 3;\n        return 1;\n    }"),
+            "{text}"
+        );
+    }
+
+    #[test]
+    fn else_if_cards_can_be_edited_but_not_moved() {
+        let mut p = prog(SRC);
+        let id = id_of(&p, "else if (x < 0)");
+        assert!(move_stmt(&mut p, id, true).is_none());
+        assert!(delete_stmt(&mut p, id).is_none());
+        let text = edit_stmt(&mut p, id, "else if (x < 5)").unwrap();
+        assert!(
+            text.contains("else if (x < 5)") && text.contains("t -= 1;"),
+            "{text}"
+        );
+        let text2 = insert_stmt(&mut p, "f", Some(id), true, "t = 9;").unwrap();
+        assert!(text2.contains("t = 9;"));
+    }
+
+    #[test]
+    fn card_text_is_one_line_and_bad_text_is_reported() {
+        let mut p = prog(SRC);
+        let lp = id_of(&p, "for (int x : a)");
+        assert_eq!(card_text(&p, lp).as_deref(), Some("for (int x : a)"));
+        let id = id_of(&p, "int t = 0;");
+        assert!(edit_stmt(&mut p, id, "int = ;").is_err());
+        assert!(parse_stmt(&mut p, "a; b;").is_err());
+        assert!(parse_stmt(&mut p, "  ").is_err());
+        // a statement written without its semicolon is reported by the parser, not applied
+        assert!(edit_stmt(&mut p, id, "int t = 1").is_err());
+    }
+
+    #[test]
+    fn palette_templates_use_the_function_names() {
+        let p = prog(SRC);
+        let f = p.find("f");
+        let fill = Fill::for_function("v1".into(), f);
+        assert_eq!(fill.apply("{c}.push_back(0);"), "a.push_back(0);");
+        assert_eq!(fill.apply("return {ret};"), "return 0;");
+        assert!(
+            fill.apply("for (int i = 0; i < {len}; ++i)")
+                .contains("a.size()")
+        );
+        for (_, t) in PALETTE {
+            let mut p = prog(SRC);
+            let text = fill.apply(t);
+            assert!(parse_stmt(&mut p, &text).is_ok(), "{t} -> {text}");
+        }
+    }
+}

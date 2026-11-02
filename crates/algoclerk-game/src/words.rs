@@ -16,7 +16,7 @@ pub const MIGRATION_TITLE: &str = "The office moved";
 /// Label of the OK button of the notice.
 pub const GOT_IT: &str = "Got it";
 /// Editor: the read-only prelude line shown above the editable text.
-pub const PRELUDE_BAR: &str = "level prelude (read only)";
+pub const PRELUDE_BAR: &str = "prelude";
 /// Result screen: a translation is not available yet.
 pub const TRANSLATION_COMING: &str =
     "Translation coming: this tab will show your solution as idiomatic code in this language.";

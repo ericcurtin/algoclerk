@@ -284,8 +284,10 @@ impl EditorPanel {
                 }
             }
         }
-        if let (Some(i), Some(pop)) = (accept, self.ac.take()) {
-            if let Some(item) = pop.items.get(i) {
+        if let Some(i) = accept {
+            if let Some(pop) = self.ac.take()
+                && let Some(item) = pop.items.get(i)
+            {
                 s.edit.anchor = Some(pop.start);
                 s.edit.insert(&item.insert);
                 changed = true;
@@ -346,6 +348,11 @@ impl EditorPanel {
         let typed_now = s.edit.text() != before || changed;
         self.refresh_popup(s, typed_now);
         changed
+    }
+
+    /// Open the popup for the cursor right now (screenshots and tests).
+    pub fn suggest_now(&mut self, s: &Session) {
+        self.refresh_popup(s, true);
     }
 
     /// Recompute the suggestions for the cursor (only when the text just changed or the popup is open).
@@ -653,7 +660,7 @@ impl EditorPanel {
     /// The variables (name, type) a card at `node` can use.
     fn card_names(&self, s: &Session, node: u32) -> Vec<(String, Ty)> {
         let line = s.node_line(node).unwrap_or(usize::MAX);
-        let mut names = complete::names_at(s, line);
+        let mut names = complete::names_at(s, line, None);
         if names.is_empty()
             && let Some(p) = &s.good
         {

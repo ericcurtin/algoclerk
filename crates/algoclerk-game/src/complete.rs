@@ -4,8 +4,8 @@
 //! offering what the level locks. The receiver type of `x.` / `p->` comes from the checker's type
 //! information of the last program that compiled (`check::scope_at` and the declarator types).
 
-use crate::session::Session;
-use algoclerk_core::cpp::ast::{ItemKind, NodeId, Program, StmtKind, Ty, walk_stmts};
+use crate::session::{Session, parse_with_prelude};
+use algoclerk_core::cpp::ast::{ItemKind, NodeId, Program, StmtKind, StructDecl, Ty, walk_stmts};
 use algoclerk_core::cpp::check::{TypeInfo, scope_at};
 use algoclerk_core::cpp::diag::line_col;
 use algoclerk_core::cpp::stdlib::{MEMBERS, Member, members_of};
@@ -206,7 +206,6 @@ pub fn std_items(s: &Session, prefix: &str) -> Vec<Item> {
 
 /// Members of a value of type `ty` that start with `prefix` (`arrow`: reached through `->`).
 pub fn member_items(s: &Session, ty: &Ty, arrow: bool, prefix: &str) -> Vec<Item> {
-    let allowed = allowed_headers(s);
     let mut out: Vec<Item> = Vec::new();
     // `p->x` on a pointer to a struct, `x.f` on a struct: its data members
     let struct_name = match ty {
@@ -217,9 +216,7 @@ pub fn member_items(s: &Session, ty: &Ty, arrow: bool, prefix: &str) -> Vec<Item
         Ty::Struct(n) if !arrow => Some(n.as_str()),
         _ => None,
     };
-    if let (Some(n), Some(p)) = (struct_name, &s.good)
-        && let Some(st) = p.find_struct(n)
-    {
+    if let Some(st) = struct_name.and_then(|n| find_struct(s, n)) {
         for f in &st.fields {
             if f.name.starts_with(prefix) {
                 out.push(Item {
@@ -241,10 +238,8 @@ pub fn member_items(s: &Session, ty: &Ty, arrow: bool, prefix: &str) -> Vec<Item
         if m.name == "ctor" || m.name.starts_with("operator") || !m.name.starts_with(prefix) {
             continue;
         }
-        if !header_ok(&allowed, m.header)
-            || is_locked(s, m)
-            || out.iter().any(|o| o.label == m.name)
-        {
+        // a member needs no header of its own: the receiver exists, so its type's header is in reach
+        if is_locked(s, m) || out.iter().any(|o| o.label == m.name) {
             continue;
         }
         let call = m.sig.contains('(');
@@ -260,6 +255,17 @@ pub fn member_items(s: &Session, ty: &Ty, arrow: bool, prefix: &str) -> Vec<Item
     }
     out.sort_by(|a, b| a.label.cmp(&b.label));
     out
+}
+
+/// A struct of the prelude or of the player's program.
+fn find_struct(s: &Session, name: &str) -> Option<StructDecl> {
+    if let Some(st) = s.good.as_ref().and_then(|p| p.find_struct(name)) {
+        return Some(st.clone());
+    }
+    parse_with_prelude(s.prelude(), "")
+        .ok()?
+        .find_struct(name)
+        .cloned()
 }
 
 /// What `*x` or `x->` reaches.
@@ -297,22 +303,103 @@ fn index_of(c: &Ty) -> Option<Ty> {
     })
 }
 
-/// Variables visible around a line of the last program that compiled, with their types: the checker's
-/// `scope_at` of the last statement that starts on or before the line, plus the parameters.
-pub fn names_at(s: &Session, line: usize) -> Vec<(String, Ty)> {
-    let Some(c) = &s.last_ok else {
-        return Vec::new();
-    };
-    let text = s.edit.text();
-    let mut best: Option<NodeId> = None;
+/// The text with the completion site cut out (`seen.pu` becomes `seen;`) so that it parses even while the
+/// player is half way through typing, parsed together with the prelude.
+type Probe = (Program, String);
+
+fn probe(s: &Session, text: &str, keep_to: usize, cursor: usize) -> Option<Probe> {
+    // the rest of the word under the cursor would break the statement
+    let rest = &text[cursor..];
+    let skip = rest
+        .bytes()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == b'_')
+        .count();
+    let t = format!("{};{}", &text[..keep_to], &rest[skip..]);
+    let p = parse_with_prelude(s.prelude(), &t).ok()?;
+    Some((p, t))
+}
+
+/// Variables with a spelled type (`std::unordered_map<int, int> seen;`, parameters, `for (int x : v)`,
+/// `for (auto x : v)` over a known container) declared on or before `line` in a parsed program.
+fn spelled_names(p: &Program, text: &str, line: usize) -> Vec<(String, Ty)> {
     let mut out: Vec<(String, Ty)> = Vec::new();
+    let put = |out: &mut Vec<(String, Ty)>, n: &str, t: Ty| {
+        out.retain(|(m, _)| m != n);
+        out.push((n.to_string(), t));
+    };
+    for it in p.player_items() {
+        let ItemKind::Func(f) = &it.kind else {
+            continue;
+        };
+        let Some(body) = &f.body else { continue };
+        for pa in &f.params {
+            put(&mut out, &pa.name, pa.spec.ty.clone());
+        }
+        walk_stmts(body, &mut |st| {
+            let at = p.span(st.id).map(|sp| line_col(text, sp.start).0);
+            if !at.is_some_and(|l| l <= line) {
+                return;
+            }
+            match &st.kind {
+                StmtKind::Decl { spec, vars } if spec.ty != Ty::Auto => {
+                    for v in vars {
+                        let t = if v.array.is_some() {
+                            Ty::Array(Box::new(spec.ty.clone()), 0)
+                        } else {
+                            spec.ty.clone()
+                        };
+                        put(&mut out, &v.name, t);
+                    }
+                }
+                StmtKind::RangeFor {
+                    spec,
+                    names,
+                    structured: false,
+                    range,
+                    ..
+                } if names.len() == 1 => {
+                    let t = if spec.ty == Ty::Auto {
+                        let key = algoclerk_core::cpp::print::print_expr(range);
+                        out.iter()
+                            .find(|(n, _)| *n == key)
+                            .and_then(|(_, t)| value_of(t))
+                    } else {
+                        Some(spec.ty.clone())
+                    };
+                    if let Some(t) = t {
+                        put(&mut out, &names[0], t);
+                    }
+                }
+                _ => {}
+            }
+        });
+    }
+    out
+}
+
+/// Variables visible around a line, with their types. Spelled types come from `spelled` (the probe or the
+/// parsed program); `auto` variables and everything else from the checker's `scope_at` of the last program
+/// that compiled.
+pub fn names_at(s: &Session, line: usize, probe: Option<&Probe>) -> Vec<(String, Ty)> {
+    let text = s.edit.text();
+    let mut out: Vec<(String, Ty)> = Vec::new();
+    if let Some((p, t)) = probe {
+        out = spelled_names(p, t, line);
+    } else if let Some(p) = &s.good {
+        out = spelled_names(p, &text, line);
+    }
+    let Some(c) = &s.last_ok else {
+        return out;
+    };
+    let mut best: Option<NodeId> = None;
+    let mut checked: Vec<(String, Ty)> = Vec::new();
     for it in c.program.player_items() {
         let ItemKind::Func(f) = &it.kind else {
             continue;
         };
         let Some(body) = &f.body else { continue };
         for p in &f.params {
-            out.push((p.name.clone(), c.info.decl_ty(p.id).clone()));
+            checked.push((p.name.clone(), c.info.decl_ty(p.id).clone()));
         }
         walk_stmts(body, &mut |st| {
             let at = c.program.span(st.id).map(|sp| line_col(&text, sp.start).0);
@@ -323,11 +410,15 @@ pub fn names_at(s: &Session, line: usize) -> Vec<(String, Ty)> {
     }
     if let Some(id) = best {
         for (n, t) in scope_at(&c.program, &c.info, id) {
-            out.retain(|(m, _)| *m != n);
+            checked.retain(|(m, _)| *m != n);
+            checked.push((n, t));
+        }
+        declared_by(&c.program, &c.info, id, &mut checked);
+    }
+    for (n, t) in checked {
+        if !out.iter().any(|(m, _)| *m == n) {
             out.push((n, t));
         }
-        // names the chosen statement itself declares
-        declared_by(&c.program, &c.info, id, &mut out);
     }
     out
 }
@@ -363,8 +454,8 @@ fn declared_by(p: &Program, info: &TypeInfo, id: NodeId, out: &mut Vec<(String, 
 
 /// The static type of a receiver expression written as text (`seen`, `grid[i]`, `it->second`, `m.find(k)`),
 /// or `None` when it cannot be worked out.
-pub fn receiver_type(s: &Session, recv: &str, line: usize) -> Option<Ty> {
-    let names = names_at(s, line);
+pub fn receiver_type(s: &Session, recv: &str, line: usize, probe: Option<&Probe>) -> Option<Ty> {
+    let names = names_at(s, line, probe);
     let b = recv.as_bytes();
     let mut i = 0;
     while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
@@ -450,7 +541,7 @@ fn call_result(t: &Ty, name: &str) -> Option<Ty> {
 }
 
 /// Words offered for a plain prefix: variables in scope, keywords and the `std::` entry.
-pub fn word_items(s: &Session, prefix: &str, line: usize) -> Vec<Item> {
+pub fn word_items(s: &Session, prefix: &str, line: usize, probe: Option<&Probe>) -> Vec<Item> {
     const KEYWORDS: &[&str] = &[
         "auto",
         "bool",
@@ -474,7 +565,7 @@ pub fn word_items(s: &Session, prefix: &str, line: usize) -> Vec<Item> {
     if prefix.is_empty() {
         return out;
     }
-    for (n, t) in names_at(s, line).into_iter().rev() {
+    for (n, t) in names_at(s, line, probe).into_iter().rev() {
         if n.starts_with(prefix) && n != prefix && !out.iter().any(|o| o.label == n) {
             out.push(Item {
                 insert: n.clone(),
@@ -509,10 +600,17 @@ pub fn suggest(s: &Session, text: &str, cursor: usize) -> (Vec<Item>, usize) {
     let line = line_col(text, cursor as u32).0;
     let items = match ctx {
         Ctx::Std => std_items(s, &prefix),
-        Ctx::Member { recv, arrow } => receiver_type(s, &recv, line)
-            .map(|t| member_items(s, &t, arrow, &prefix))
-            .unwrap_or_default(),
-        Ctx::Word => word_items(s, &prefix, line),
+        Ctx::Member { recv, arrow } => {
+            let op = if arrow { 2 } else { 1 };
+            let pr = probe(s, text, start - op, cursor);
+            receiver_type(s, &recv, line, pr.as_ref())
+                .map(|t| member_items(s, &t, arrow, &prefix))
+                .unwrap_or_default()
+        }
+        Ctx::Word => {
+            let pr = probe(s, text, cursor, cursor);
+            word_items(s, &prefix, line, pr.as_ref())
+        }
     };
     (items, start)
 }
@@ -555,5 +653,132 @@ mod tests {
             }
         );
         assert_eq!(context("ret", 3).0, Ctx::Word);
+    }
+
+    use algoclerk_levels::Campaign;
+
+    fn session(id: &str, text: &str) -> Session {
+        let campaign = Campaign::shipped();
+        let level = campaign.find(id).expect("level").clone();
+        Session::for_level(&level, text).expect("session")
+    }
+
+    fn labels(items: &[Item]) -> Vec<&str> {
+        items.iter().map(|i| i.label.as_str()).collect()
+    }
+
+    const FIRST_UNIQUE: &str = "#include <unordered_map>\n\nint firstUnique(const std::string& s) {\n    std::unordered_map<char, int> counts;\n    for (char c : s) {\n        ++counts[c];\n    }\n    COMMENT\n    return -1;\n}\n";
+
+    #[test]
+    fn members_of_a_declared_variable_even_when_the_line_does_not_parse() {
+        let text = FIRST_UNIQUE.replace("COMMENT", "counts.fi");
+        let s = session(
+            "first-unique-char",
+            &text.replace("counts.fi", "counts.fi\n"),
+        );
+        // the whole text is broken (no `;`), the type still comes from the declaration
+        let text = s.text();
+        let cursor = text.find("counts.fi").unwrap() + "counts.fi".len();
+        let (items, start) = suggest(&s, &text, cursor);
+        assert_eq!(labels(&items), ["find"], "{items:?}");
+        assert_eq!(&text[start..cursor], "fi");
+        let (items, _) = suggest(&s, &text, text.find("counts.fi").unwrap() + "counts.".len());
+        let l = labels(&items);
+        assert!(
+            l.contains(&"insert") && l.contains(&"erase") && l.contains(&"size"),
+            "{l:?}"
+        );
+        assert!(!l.contains(&"ctor") && !l.iter().any(|x| x.starts_with("operator")));
+        assert_eq!(
+            items.iter().find(|i| i.label == "size").unwrap().insert,
+            "size("
+        );
+    }
+
+    #[test]
+    fn string_and_vector_members_and_element_access() {
+        let text = "int countVowels(const std::string& s) {\n    int n = 0;\n    n = s.\n}\n";
+        let s = session("count-vowels", text);
+        let (items, _) = suggest(&s, &s.text(), s.text().find("s.").unwrap() + 2);
+        assert!(labels(&items).contains(&"substr") || labels(&items).contains(&"size"));
+        // `grid[i].` is a vector
+        let text = "int countIslands(const std::vector<std::vector<char>>& grid) {\n    int n = grid[0].\n}\n";
+        let s = session("count-islands", text);
+        let (items, _) = suggest(&s, &s.text(), s.text().find("].").unwrap() + 2);
+        assert!(labels(&items).contains(&"size"), "{:?}", labels(&items));
+    }
+
+    #[test]
+    fn iterator_arrow_uses_the_checkers_types() {
+        let ok = FIRST_UNIQUE.replace("COMMENT", "auto it = counts.find('a');");
+        let mut s = session("first-unique-char", &ok);
+        assert!(s.last_ok.is_some(), "{:?}", s.problem());
+        let broken = ok.replace("return -1;", "it->\n    return -1;");
+        s.set_text(&broken);
+        assert!(s.problem().is_some());
+        let at = broken.find("it->").unwrap() + 4;
+        let (items, start) = suggest(&s, &broken, at);
+        assert!(labels(&items).contains(&"first") && labels(&items).contains(&"second"));
+        assert_eq!(start, at);
+    }
+
+    #[test]
+    fn std_names_follow_the_unlocked_headers_and_the_locks() {
+        // sum-the-bills unlocks nothing and locks std::accumulate
+        let s = session(
+            "sum-the-bills",
+            "int sumTheBills(const std::vector<int>& bills) {\n    std::so\n}\n",
+        );
+        let (items, _) = suggest(&s, &s.text(), s.text().find("std::so").unwrap() + 7);
+        assert!(items.is_empty(), "sort needs <algorithm>: {items:?}");
+        let s = session(
+            "sum-the-bills",
+            "int sumTheBills(const std::vector<int>& bills) {\n    std::acc\n}\n",
+        );
+        let (items, _) = suggest(&s, &s.text(), s.text().find("std::acc").unwrap() + 8);
+        assert!(items.is_empty(), "accumulate is locked: {items:?}");
+        let s = session(
+            "sum-the-bills",
+            "int sumTheBills(const std::vector<int>& bills) {\n    std::\n}\n",
+        );
+        let (items, _) = suggest(&s, &s.text(), s.text().find("std::").unwrap() + 5);
+        assert!(labels(&items).contains(&"vector"));
+        assert!(!labels(&items).contains(&"unordered_map") && !labels(&items).contains(&"sort"));
+        // first-unique-char unlocks <algorithm> and <unordered_map>
+        let s = session(
+            "first-unique-char",
+            "int firstUnique(const std::string& s) {\n    std::so\n}\n",
+        );
+        let (items, _) = suggest(&s, &s.text(), s.text().find("std::so").unwrap() + 7);
+        assert_eq!(labels(&items), ["sort"]);
+        assert_eq!(items[0].insert, "sort(");
+        let text = s.text();
+        let (items, _) = suggest(&s, &text, text.find("std::so").unwrap() + 5);
+        assert!(labels(&items).contains(&"unordered_map") && labels(&items).contains(&"max"));
+    }
+
+    #[test]
+    fn words_offer_variables_and_keywords() {
+        let s = session(
+            "sum-the-bills",
+            "int sumTheBills(const std::vector<int>& bills) {\n    int total = 0;\n    to\n}\n",
+        );
+        let text = s.text();
+        let (items, start) = suggest(&s, &text, text.find("    to\n").unwrap() + 6);
+        assert_eq!(labels(&items), ["total"], "{items:?}");
+        assert_eq!(items[0].detail, "int");
+        assert_eq!(&text[start..start + 2], "to");
+        let (items, _) = suggest(&s, &text, text.find("    to\n").unwrap() + 4);
+        assert!(items.is_empty(), "an empty prefix offers nothing");
+    }
+
+    #[test]
+    fn struct_fields_through_a_pointer() {
+        let text =
+            "ListNode* reverseList(ListNode* head) {\n    ListNode* cur = head;\n    cur->\n}\n";
+        let s = session("reverse-list", text);
+        let t = s.text();
+        let (items, _) = suggest(&s, &t, t.find("cur->").unwrap() + 5);
+        assert_eq!(labels(&items), ["val", "next"], "{items:?}");
     }
 }

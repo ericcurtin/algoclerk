@@ -16,6 +16,8 @@ pub enum Purpose {
     PeekCode,
     /// Delete all progress.
     Reset,
+    /// A one-time notice (either button dismisses it).
+    Notice,
 }
 
 /// A yes/no dialog.
