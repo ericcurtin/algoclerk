@@ -1,0 +1,83 @@
+title = "Three Flag Colours"
+order = 9
+story = "A flag factory has bolts of red (0), white (1) and blue (2) cloth mixed together. Put them in flag order without using the sorting machine."
+statement = "nums only holds 0, 1 and 2. Return it sorted ascending. The `sorted` and `sort` tools are locked: use the fact that there are only three values."
+signature = "fn sort_colors(nums: vec<int>) -> vec<int>"
+constraints = ["0 <= len(nums) <= 20000", "nums[i] is 0, 1 or 2"]
+technique = "Counting sort"
+big_o = "O(n) time, O(n) space"
+types = ["vec"]
+builtins = ["len", "push", "swap"]
+locked = [{ name = "sorted", why = "The point is to exploit having only three values." }, { name = "sort", why = "Same reason." }]
+hints = [
+  "Count how many 0s, 1s and 2s there are.",
+  "A shelf of three counters is enough: `let counts = [0; 3];`.",
+  "Rebuild the answer: first all the 0s, then 1s, then 2s.",
+]
+reference = '''
+fn sort_colors(nums: vec<int>) -> vec<int> {
+    let counts = [0; 3];
+    for x in nums {
+        counts[x] += 1;
+    }
+    let out: vec<int> = [];
+    for c in range(3) {
+        for i in range(counts[c]) {
+            out.push(c);
+        }
+    }
+    return out;
+}
+'''
+naive = '''
+fn sort_colors(nums: vec<int>) -> vec<int> {
+    let out = nums;
+    for i in range(len(out)) {
+        for j in range(len(out) - 1 - i) {
+            if out[j] > out[j + 1] {
+                out.swap(j, j + 1);
+            }
+        }
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 2500000
+
+[medals]
+size = [40, 32, 25]
+speed = [162, 87, 61]
+
+[[examples]]
+args = ["[2, 0, 2, 1, 1, 0]"]
+expect = "[0, 0, 1, 1, 2, 2]"
+
+[[examples]]
+args = ["[1]"]
+expect = "[1]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[tests]]
+args = ["[2, 2, 2]"]
+expect = "[2, 2, 2]"
+
+[[generate]]
+seed = 481
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 12], range = [0, 2] },
+]
+
+[[generate]]
+seed = 482
+count = 1
+large = true
+n = 5000
+args = [
+  { kind = "vec_int", len = "n", range = [0, 2] },
+]

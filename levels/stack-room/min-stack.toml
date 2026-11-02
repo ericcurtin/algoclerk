@@ -1,0 +1,103 @@
+title = "The Cheapest Item on Top"
+order = 4
+story = "The supply cupboard is a stack of boxes, and the manager keeps asking: what is the cheapest item in the cupboard right now?"
+statement = "Process ops in order: a positive number pushes that value; 0 pops the top item (nothing happens if the stack is empty). After every operation record the smallest value currently in the stack, or -1 if it is empty. Return the records."
+signature = "fn min_stack(ops: vec<int>) -> vec<int>"
+constraints = ["0 <= len(ops) <= 20000", "0 <= ops[i] <= 1000"]
+technique = "Auxiliary stack of minimums"
+big_o = "O(n) time, O(n) space"
+types = ["stack", "vec"]
+builtins = ["is_empty", "min", "peek", "pop", "push"]
+hints = [
+  "Scanning the whole stack for its minimum after every step is slow.",
+  "Keep a second stack: its top is always the minimum of the first stack.",
+  "Push `min(op, current min)` on the second stack whenever you push on the first; pop both together.",
+]
+reference = '''
+fn min_stack(ops: vec<int>) -> vec<int> {
+    let items = stack<int>();
+    let mins = stack<int>();
+    let out: vec<int> = [];
+    for op in ops {
+        if op == 0 {
+            if !items.is_empty() {
+                items.pop();
+                mins.pop();
+            }
+        } else {
+            items.push(op);
+            if mins.is_empty() or op < mins.peek() {
+                mins.push(op);
+            } else {
+                mins.push(mins.peek());
+            }
+        }
+        if mins.is_empty() {
+            out.push(-1);
+        } else {
+            out.push(mins.peek());
+        }
+    }
+    return out;
+}
+'''
+naive = '''
+fn min_stack(ops: vec<int>) -> vec<int> {
+    let items: vec<int> = [];
+    let out: vec<int> = [];
+    for op in ops {
+        if op == 0 {
+            if !items.is_empty() {
+                items.pop();
+            }
+        } else {
+            items.push(op);
+        }
+        if items.is_empty() {
+            out.push(-1);
+        } else {
+            out.push(min(items));
+        }
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [92, 72, 57]
+speed = [260, 139, 97]
+
+[[examples]]
+args = ["[5, 3, 7, 0, 0, 0, 2]"]
+expect = "[5, 3, 3, 3, 5, -1, 2]"
+
+[[examples]]
+args = ["[0]"]
+expect = "[-1]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[tests]]
+args = ["[4, 4, 0, 4]"]
+expect = "[4, 4, 4, 4]"
+
+[[generate]]
+seed = 331
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 12], range = [0, 9] },
+]
+
+[[generate]]
+seed = 332
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [0, 1000] },
+]

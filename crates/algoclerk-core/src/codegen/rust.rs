@@ -449,7 +449,7 @@ impl<'a> Gen<'a> {
 
     fn method(&mut self, _e: &Expr, recv: &Expr, name: &str, args: &[Expr]) -> Ex {
         let rt = self.ety(recv);
-        let r = self.expr(recv);
+        let r = if crate::lang::check::is_mutating(&rt, name) { Ex::atom(self.place(recv, false)) } else { self.expr(recv) };
         let rs = r.at(20);
         let atom = Ex::atom;
         let copy_elem = |t: &Ty| match t {

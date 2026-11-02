@@ -1,0 +1,78 @@
+title = "The Best Streak"
+order = 7
+story = "A shop's daily profit goes up and down. Which run of consecutive days earned the most in total?"
+statement = "Return the largest sum of any non-empty contiguous run of nums."
+signature = "fn max_subarray(nums: vec<int>) -> int"
+constraints = ["1 <= len(nums) <= 20000"]
+technique = "Kadane's algorithm"
+big_o = "O(n) time, O(1) space"
+types = ["vec"]
+builtins = ["len", "max"]
+hints = [
+  "Track the best sum of a run that ends at the current day.",
+  "That is either the current number alone or the current number added to the previous best run.",
+  "`cur = max(nums[i], cur + nums[i]);` and keep the overall best.",
+]
+reference = '''
+fn max_subarray(nums: vec<int>) -> int {
+    let best = nums[0];
+    let cur = nums[0];
+    for i in range(1, len(nums)) {
+        cur = max(nums[i], cur + nums[i]);
+        best = max(best, cur);
+    }
+    return best;
+}
+'''
+naive = '''
+fn max_subarray(nums: vec<int>) -> int {
+    let best = nums[0];
+    for i in range(len(nums)) {
+        let sum = 0;
+        for j in range(i, len(nums)) {
+            sum += nums[j];
+            best = max(best, sum);
+        }
+    }
+    return best;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [48, 38, 30]
+speed = [145, 78, 54]
+
+[[examples]]
+args = ["[-2, 1, -3, 4, -1, 2, 1, -5, 4]"]
+expect = "6"
+
+[[examples]]
+args = ["[1]"]
+expect = "1"
+
+[[examples]]
+args = ["[-3, -1, -2]"]
+expect = "-1"
+
+[[tests]]
+args = ["[5, 4, -1, 7, 8]"]
+expect = "23"
+
+[[generate]]
+seed = 461
+count = 10
+args = [
+  { kind = "vec_int", len = [1, 10], range = [-9, 9] },
+]
+
+[[generate]]
+seed = 462
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [-100, 100] },
+]

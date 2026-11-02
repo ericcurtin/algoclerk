@@ -1,0 +1,83 @@
+title = "Runner-Up Prize"
+order = 6
+story = "The sales board wants the kth biggest sale of the month, without sorting the entire ledger."
+statement = "Return the kth largest number in nums (counting duplicates: in [5, 5, 3] the 2nd largest is 5)."
+signature = "fn kth_largest(nums: vec<int>, k: int) -> int"
+constraints = ["1 <= k <= len(nums) <= 20000"]
+technique = "Heap of size k"
+big_o = "O(n log k) time, O(k) space"
+types = ["heap", "vec"]
+builtins = ["len", "max", "peek", "pop", "push", "remove"]
+hints = [
+  "A heap keeps the extreme item ready. Ours gives the largest, so store negated numbers to get the smallest.",
+  "Push every number (negated); if the heap grows beyond k, pop once.",
+  "What remains on top is the kth largest (remember to negate it back).",
+]
+reference = '''
+fn kth_largest(nums: vec<int>, k: int) -> int {
+    let h = heap<int>();
+    for x in nums {
+        h.push(-x);
+        if len(h) > k {
+            h.pop();
+        }
+    }
+    return -h.peek();
+}
+'''
+naive = '''
+fn kth_largest(nums: vec<int>, k: int) -> int {
+    let rest = nums;
+    for round in range(k - 1) {
+        let best = 0;
+        for i in range(1, len(rest)) {
+            if rest[i] > rest[best] {
+                best = i;
+            }
+        }
+        rest.remove(best);
+    }
+    return max(rest);
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [34, 27, 21]
+speed = [191, 102, 71]
+
+[[examples]]
+args = ["[3, 2, 1, 5, 6, 4]", "2"]
+expect = "5"
+
+[[examples]]
+args = ["[3, 2, 3, 1, 2, 4, 5, 5, 6]", "4"]
+expect = "4"
+
+[[examples]]
+args = ["[7]", "1"]
+expect = "7"
+
+[[tests]]
+args = ["[5, 5, 3]", "2"]
+expect = "5"
+
+[[generate]]
+seed = 351
+count = 10
+args = [
+  { kind = "vec_int", len = [1, 10], range = [-9, 9] },
+  { kind = "int", in_len_of = 0 },
+]
+
+[[generate]]
+seed = 352
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [-100000, 100000] },
+  { kind = "int", range = ["n/10", "n/10"] },
+]

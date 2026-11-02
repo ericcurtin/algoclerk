@@ -1,0 +1,76 @@
+title = "Tidy the Directions"
+order = 8
+story = "Visitors get directions like /a/./b/../c/. The receptionist wants the shortest equivalent path before she prints the map."
+statement = "Simplify the path (which starts with /): ignore empty parts and \".\", let \"..\" go back up one level (nothing happens at the top), and return the cleaned path starting with / with no trailing / (except for the root path \"/\"). Other parts, even ones like \"...\", are normal names."
+signature = "fn simplify_path(path: string) -> string"
+constraints = ["1 <= len(path) <= 20000", "path starts with /"]
+technique = "Stack of path parts"
+big_o = "O(n) time, O(n) space"
+types = ["char", "string", "vec"]
+builtins = ["is_empty", "join", "pop", "push", "split"]
+hints = [
+  "Split on / and look at the parts one at a time.",
+  "Push normal names; \"..\" pops (if there is something to pop); \"\" and \".\" do nothing.",
+  "`\"/\" + join(parts, \"/\")` builds the answer.",
+]
+reference = '''
+fn simplify_path(path: string) -> string {
+    let parts: vec<string> = [];
+    for p in path.split('/') {
+        if p == "" or p == "." {
+            continue;
+        }
+        if p == ".." {
+            if !parts.is_empty() {
+                parts.pop();
+            }
+        } else {
+            parts.push(p);
+        }
+    }
+    return "/" + join(parts, "/");
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [58, 45, 36]
+speed = [215, 115, 80]
+
+[[examples]]
+args = ["\"/home/\""]
+expect = "\"/home\""
+
+[[examples]]
+args = ["\"/a/./b/../../c/\""]
+expect = "\"/c\""
+
+[[examples]]
+args = ["\"/../\""]
+expect = "\"/\""
+
+[[examples]]
+args = ["\"/a//b/...\""]
+expect = "\"/a/b/...\""
+
+[[tests]]
+args = ["\"/\""]
+expect = "\"/\""
+
+[[generate]]
+seed = 371
+count = 12
+args = [
+  { kind = "string", len = [0, 14], alphabet = "ab./", prefix = "/" },
+]
+
+[[generate]]
+seed = 372
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "string", len = "n", alphabet = "ab./", prefix = "/" },
+]

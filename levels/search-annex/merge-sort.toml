@@ -1,0 +1,107 @@
+title = "Sort It Yourself"
+order = 10
+story = "The sorting machine is broken, and the order desk is open. Sort the numbers by hand, but cleverly: dividing the pile is faster than shuffling it around."
+statement = "Return nums in ascending order. The `sorted` and `sort` tools are locked. Helper functions and recursion are unlocked."
+signature = "fn sort_it(nums: vec<int>) -> vec<int>"
+constraints = ["0 <= len(nums) <= 3000"]
+technique = "Merge sort (divide and conquer)"
+big_o = "O(n log n) time, O(n) space"
+types = ["vec"]
+builtins = ["len", "push", "swap"]
+locked = [{ name = "sorted", why = "Sorting it yourself is the lesson." }, { name = "sort", why = "Same reason." }]
+hints = [
+  "Split the shelf in the middle, sort both halves, then merge.",
+  "Merging two sorted shelves: repeatedly take the smaller front item.",
+  "A helper `fn msort(nums: vec<int>) -> vec<int>` can call itself on the halves `nums[0..mid]` and `nums[mid..]`.",
+]
+reference = '''
+fn msort(nums: vec<int>) -> vec<int> {
+    if len(nums) <= 1 {
+        return nums;
+    }
+    let mid = len(nums) / 2;
+    let left = msort(nums[0..mid]);
+    let right = msort(nums[mid..]);
+    let out: vec<int> = [];
+    let i = 0;
+    let j = 0;
+    while i < len(left) and j < len(right) {
+        if left[i] <= right[j] {
+            out.push(left[i]);
+            i += 1;
+        } else {
+            out.push(right[j]);
+            j += 1;
+        }
+    }
+    while i < len(left) {
+        out.push(left[i]);
+        i += 1;
+    }
+    while j < len(right) {
+        out.push(right[j]);
+        j += 1;
+    }
+    return out;
+}
+
+fn sort_it(nums: vec<int>) -> vec<int> {
+    return msort(nums);
+}
+'''
+naive = '''
+fn sort_it(nums: vec<int>) -> vec<int> {
+    let out = nums;
+    for i in range(1, len(out)) {
+        let j = i;
+        while j > 0 and out[j - 1] > out[j] {
+            out.swap(j - 1, j);
+            j -= 1;
+        }
+    }
+    return out;
+}
+'''
+
+[unlock]
+helpers = true
+recursion = true
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [157, 123, 98]
+speed = [973, 519, 358]
+
+[[examples]]
+args = ["[5, 2, 3, 1]"]
+expect = "[1, 2, 3, 5]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[examples]]
+args = ["[3, 3, 1]"]
+expect = "[1, 3, 3]"
+
+[[tests]]
+args = ["[1]"]
+expect = "[1]"
+
+[[generate]]
+seed = 491
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 12], range = [-9, 9] },
+]
+
+[[generate]]
+seed = 492
+count = 1
+large = true
+n = 3000
+args = [
+  { kind = "vec_int", len = "n", range = [-100000, 100000] },
+]

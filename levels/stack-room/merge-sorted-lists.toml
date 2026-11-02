@@ -1,0 +1,93 @@
+title = "Merging the Queues"
+order = 7
+story = "Several branch offices each send a list of ticket numbers, already in order. Head office wants a single ordered list."
+statement = "Merge the sorted lists into one sorted list that contains all their numbers (duplicates are kept)."
+signature = "fn merge_sorted(lists: vec<vec<int>>) -> vec<int>"
+constraints = ["0 <= len(lists) <= 200", "total numbers <= 20000", "every list is sorted ascending"]
+technique = "Heap of list heads"
+big_o = "O(n log k) time, O(k) space"
+types = ["heap", "tuple", "vec"]
+builtins = ["is_empty", "len", "pop", "push"]
+hints = [
+  "Repeatedly taking the smallest head among k lists by scanning is O(n * k).",
+  "Keep the current head of every list in a heap, so the smallest is one step away.",
+  "Store (-value, list index, position): after popping, push the next element of that list.",
+]
+reference = '''
+fn merge_sorted(lists: vec<vec<int>>) -> vec<int> {
+    let h = heap<(int, int, int)>();
+    for i in range(len(lists)) {
+        if len(lists[i]) > 0 {
+            h.push((-lists[i][0], i, 0));
+        }
+    }
+    let out: vec<int> = [];
+    while !h.is_empty() {
+        let (neg, i, j) = h.pop();
+        out.push(-neg);
+        if j + 1 < len(lists[i]) {
+            h.push((-lists[i][j + 1], i, j + 1));
+        }
+    }
+    return out;
+}
+'''
+naive = '''
+fn merge_sorted(lists: vec<vec<int>>) -> vec<int> {
+    let pos = [0; len(lists)];
+    let out: vec<int> = [];
+    while true {
+        let best = -1;
+        for i in range(len(lists)) {
+            if pos[i] < len(lists[i]) and (best < 0 or lists[i][pos[i]] < lists[best][pos[best]]) {
+                best = i;
+            }
+        }
+        if best < 0 {
+            break;
+        }
+        out.push(lists[best][pos[best]]);
+        pos[best] += 1;
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [104, 82, 65]
+speed = [377, 201, 140]
+
+[[examples]]
+args = ["[[1, 4, 5], [1, 3, 4], [2, 6]]"]
+expect = "[1, 1, 2, 3, 4, 4, 5, 6]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[examples]]
+args = ["[[], [1]]"]
+expect = "[1]"
+
+[[tests]]
+args = ["[[2], [1]]"]
+expect = "[1, 2]"
+
+[[generate]]
+seed = 361
+count = 10
+args = [
+  { kind = "sorted_lists", count = [0, 5], len = [0, 5], range = [0, 20] },
+]
+
+[[generate]]
+seed = 362
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "sorted_lists", count = [100, 100], len = [200, 200], range = [0, 100000] },
+]

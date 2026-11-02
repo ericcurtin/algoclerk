@@ -253,6 +253,23 @@ impl<'a> Gen<'a> {
         }
     }
 
+    /// An assignable form of a place: map entries use `operator[]` so that new keys can be created.
+    fn place(&mut self, e: &Expr) -> String {
+        match &e.kind {
+            ExprKind::Index(a, i) if matches!(self.ety(a), Ty::Map(..)) => {
+                let base = self.place(a);
+                let k = self.expr(i).s;
+                format!("{base}[{k}]")
+            }
+            ExprKind::Index(a, i) => {
+                let base = self.place(a);
+                let k = self.expr(i).s;
+                format!("{base}[{k}]")
+            }
+            _ => self.expr(e).at(20),
+        }
+    }
+
     fn call(&mut self, e: &Expr, name: &str, args: &[Expr]) -> Ex {
         let callee = self.info.slots[e.id as usize];
         if callee != u32::MAX {
@@ -483,7 +500,7 @@ impl<'a> Gen<'a> {
                 }
             }
             StmtKind::Assign { target, op, value } => {
-                let t = self.expr(target).s;
+                let t = self.place(target);
                 let v = self.expr(value);
                 match op {
                     None => self.line(&format!("{t} = {};", v.s)),

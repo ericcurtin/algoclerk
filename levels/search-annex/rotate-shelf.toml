@@ -1,0 +1,84 @@
+title = "Spin the Carousel"
+order = 4
+story = "The parcel carousel turns k places to the right: the last k parcels come round to the front."
+statement = "Return nums rotated to the right by k places: the last k % len(nums) items move to the front, in order."
+signature = "fn rotate(nums: vec<int>, k: int) -> vec<int>"
+constraints = ["0 <= len(nums) <= 20000", "0 <= k <= 100000"]
+technique = "Slicing and concatenation"
+big_o = "O(n) time, O(n) space"
+types = ["vec"]
+builtins = ["insert", "len", "remove"]
+hints = [
+  "Rotating by k and by k % n is the same. Be careful with an empty shelf.",
+  "The answer is the last `shift` items followed by the first `n - shift` items.",
+  "Slices: `nums[a..b]`; shelves can be joined with `+`.",
+]
+reference = '''
+fn rotate(nums: vec<int>, k: int) -> vec<int> {
+    let n = len(nums);
+    if n == 0 {
+        return nums;
+    }
+    let shift = k % n;
+    return nums[n - shift..n] + nums[0..n - shift];
+}
+'''
+naive = '''
+fn rotate(nums: vec<int>, k: int) -> vec<int> {
+    let n = len(nums);
+    let out = nums;
+    if n == 0 {
+        return out;
+    }
+    for round in range(k % n) {
+        let last = out.remove(n - 1);
+        out.insert(0, last);
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [44, 34, 27]
+speed = [56, 30, 22]
+
+[[examples]]
+args = ["[1, 2, 3, 4, 5, 6, 7]", "3"]
+expect = "[5, 6, 7, 1, 2, 3, 4]"
+
+[[examples]]
+args = ["[1, 2]", "5"]
+expect = "[2, 1]"
+
+[[examples]]
+args = ["[]", "4"]
+expect = "[]"
+
+[[tests]]
+args = ["[1, 2, 3]", "0"]
+expect = "[1, 2, 3]"
+
+[[tests]]
+args = ["[1, 2, 3]", "3"]
+expect = "[1, 2, 3]"
+
+[[generate]]
+seed = 431
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 10], range = [-9, 9] },
+  { kind = "int", range = [0, 25] },
+]
+
+[[generate]]
+seed = 432
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [-1000, 1000] },
+  { kind = "int", range = ["n/2", "n/2"] },
+]

@@ -10,8 +10,8 @@ use algoclerk_levels::Campaign;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-fn scratch() -> PathBuf {
-    let d = std::env::temp_dir().join(format!("algoclerk-cg-{}", std::process::id()));
+fn scratch(tag: &str) -> PathBuf {
+    let d = std::env::temp_dir().join(format!("algoclerk-cg-{}-{tag}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     d
 }
@@ -58,7 +58,7 @@ fn run_lang(lang: Lang) {
     }
     let campaign = Campaign::shipped();
     let levels: Vec<_> = campaign.all_levels().cloned().collect();
-    let dir = scratch();
+    let dir = scratch(lang.id());
     let problems = Mutex::new(Vec::new());
     let next = Mutex::new(0usize);
     let filter = std::env::var("ALGOCLERK_LEVEL").ok();

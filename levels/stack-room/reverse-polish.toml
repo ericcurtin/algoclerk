@@ -1,0 +1,81 @@
+title = "Back-to-Front Calculator"
+order = 3
+story = "The old office calculator takes its numbers first and its operator last: 3 4 + means 3 plus 4. The clerk needs a program that reads such tapes."
+statement = "tokens is a valid expression in reverse Polish notation: numbers as text, and the operators + - * /. Return its value. Division truncates toward zero."
+signature = "fn eval_rpn(tokens: vec<string>) -> int"
+constraints = ["1 <= len(tokens) <= 20001", "the expression is valid and never divides by zero"]
+technique = "Stack evaluation"
+big_o = "O(n) time, O(n) space"
+types = ["stack", "string", "vec"]
+builtins = ["pop", "push", "to_int"]
+hints = [
+  "Numbers go on a stack. An operator takes the two top numbers.",
+  "Pop `b` first, then `a`: the result is `a op b`.",
+  "`to_int(token)` turns a numeral into a number; compare tokens with `==`.",
+]
+reference = '''
+fn eval_rpn(tokens: vec<string>) -> int {
+    let st = stack<int>();
+    for t in tokens {
+        if t == "+" or t == "-" or t == "*" or t == "/" {
+            let b = st.pop();
+            let a = st.pop();
+            if t == "+" {
+                st.push(a + b);
+            } else if t == "-" {
+                st.push(a - b);
+            } else if t == "*" {
+                st.push(a * b);
+            } else {
+                st.push(a / b);
+            }
+        } else {
+            st.push(to_int(t));
+        }
+    }
+    return st.pop();
+}
+'''
+
+[budgets]
+large_steps = 2500000
+
+[medals]
+size = [112, 88, 70]
+speed = [338, 181, 125]
+
+[[examples]]
+args = ["[\"2\", \"1\", \"+\", \"3\", \"*\"]"]
+expect = "9"
+
+[[examples]]
+args = ["[\"4\", \"13\", \"5\", \"/\", \"+\"]"]
+expect = "6"
+
+[[examples]]
+args = ["[\"7\"]"]
+expect = "7"
+
+[[tests]]
+args = ["[\"3\", \"-4\", \"+\"]"]
+expect = "-1"
+
+[[tests]]
+args = ["[\"-7\", \"2\", \"/\"]"]
+expect = "-3"
+
+[[generate]]
+seed = 321
+count = 12
+args = [
+  { kind = "rpn", numbers = [1, 6], ops = "+-*/", range = [-9, 9] },
+]
+
+[[generate]]
+seed = 322
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "rpn", numbers = "n/2", ops = "+-", range = [-9, 9] },
+]

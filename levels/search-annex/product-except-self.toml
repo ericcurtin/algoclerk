@@ -1,0 +1,90 @@
+title = "Everyone Else's Product"
+order = 5
+story = "The statistician wants, for every measurement, the product of all the other measurements, and her calculator has no divide key."
+statement = "Return a shelf where slot i holds the product of every number in nums except nums[i]. Do not use division."
+signature = "fn product_except_self(nums: vec<int>) -> vec<int>"
+constraints = ["0 <= len(nums) <= 20000", "products fit in a 64-bit number"]
+technique = "Prefix and suffix products"
+big_o = "O(n) time, O(n) space"
+types = ["vec"]
+builtins = ["len", "push"]
+hints = [
+  "The answer for slot i is (product of everything left of i) * (product of everything right of i).",
+  "A first pass fills the slots with the left products.",
+  "A second pass from the right multiplies in the right products with a running variable.",
+]
+reference = '''
+fn product_except_self(nums: vec<int>) -> vec<int> {
+    let n = len(nums);
+    let out = [1; n];
+    let left = 1;
+    for i in range(n) {
+        out[i] = left;
+        left *= nums[i];
+    }
+    let right = 1;
+    for i in range(n - 1, -1, -1) {
+        out[i] *= right;
+        right *= nums[i];
+    }
+    return out;
+}
+'''
+naive = '''
+fn product_except_self(nums: vec<int>) -> vec<int> {
+    let out: vec<int> = [];
+    for i in range(len(nums)) {
+        let p = 1;
+        for j in range(len(nums)) {
+            if j != i {
+                p *= nums[j];
+            }
+        }
+        out.push(p);
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [66, 52, 41]
+speed = [179, 96, 67]
+
+[[examples]]
+args = ["[1, 2, 3, 4]"]
+expect = "[24, 12, 8, 6]"
+
+[[examples]]
+args = ["[-1, 1, 0, -3, 3]"]
+expect = "[0, 0, 9, 0, 0]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[tests]]
+args = ["[5]"]
+expect = "[1]"
+
+[[tests]]
+args = ["[2, 3]"]
+expect = "[3, 2]"
+
+[[generate]]
+seed = 441
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 8], range = [-4, 4] },
+]
+
+[[generate]]
+seed = 442
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [-1, 1] },
+]

@@ -1,0 +1,89 @@
+title = "Overlapping Bookings"
+order = 6
+story = "The meeting-room calendar has bookings that overlap. The caretaker wants the fewest unbroken blocks of time."
+statement = "intervals holds [start, end] pairs. Merge all intervals that overlap or touch (end of one equals the start of the next) and return the merged intervals sorted by start."
+signature = "fn merge_intervals(intervals: vec<vec<int>>) -> vec<vec<int>>"
+constraints = ["0 <= len(intervals) <= 5000", "start <= end"]
+technique = "Sort then sweep"
+big_o = "O(n log n) time, O(n) space"
+types = ["vec"]
+builtins = ["is_empty", "len", "max", "push", "sorted", "swap"]
+hints = [
+  "After sorting by start, only the last merged interval can overlap the next one.",
+  "`sorted` orders shelves of numbers lexicographically, so [start, end] pairs sort by start.",
+  "If the next start is <= the last end, extend the last end to the larger end; otherwise push a new interval.",
+]
+reference = '''
+fn merge_intervals(intervals: vec<vec<int>>) -> vec<vec<int>> {
+    let ordered = sorted(intervals);
+    let out: vec<vec<int>> = [];
+    for iv in ordered {
+        if !out.is_empty() and out[len(out) - 1][1] >= iv[0] {
+            out[len(out) - 1][1] = max(out[len(out) - 1][1], iv[1]);
+        } else {
+            out.push(iv);
+        }
+    }
+    return out;
+}
+'''
+naive = '''
+fn merge_intervals(intervals: vec<vec<int>>) -> vec<vec<int>> {
+    let items = intervals;
+    for i in range(1, len(items)) {
+        let j = i;
+        while j > 0 and items[j - 1][0] > items[j][0] {
+            items.swap(j - 1, j);
+            j -= 1;
+        }
+    }
+    let out: vec<vec<int>> = [];
+    for iv in items {
+        if !out.is_empty() and out[len(out) - 1][1] >= iv[0] {
+            out[len(out) - 1][1] = max(out[len(out) - 1][1], iv[1]);
+        } else {
+            out.push(iv);
+        }
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [82, 64, 51]
+speed = [189, 101, 71]
+
+[[examples]]
+args = ["[[1, 3], [2, 6], [8, 10], [15, 18]]"]
+expect = "[[1, 6], [8, 10], [15, 18]]"
+
+[[examples]]
+args = ["[[1, 4], [4, 5]]"]
+expect = "[[1, 5]]"
+
+[[examples]]
+args = ["[]"]
+expect = "[]"
+
+[[tests]]
+args = ["[[5, 6], [1, 2]]"]
+expect = "[[1, 2], [5, 6]]"
+
+[[generate]]
+seed = 451
+count = 12
+args = [
+  { kind = "pairs", intervals = true, count = [0, 8], range = [0, 30], max_len = 6 },
+]
+
+[[generate]]
+seed = 452
+count = 1
+large = true
+n = 5000
+args = [
+  { kind = "pairs", intervals = true, count = "n", range = [0, 1000000], max_len = 100 },
+]

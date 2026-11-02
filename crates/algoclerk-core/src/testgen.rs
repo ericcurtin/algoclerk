@@ -215,7 +215,14 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 let len = num(t, "len", (0, 8), n, rng)?;
                 let mut out = String::new();
                 let mut stack: Vec<char> = Vec::new();
-                while (out.len() as i64) < len {
+                if flag(t, "nested") {
+                    for _ in 0..len / 2 {
+                        let p = pairs[rng.range(0, pairs.len() as i64 - 1) as usize];
+                        out.push(p.0);
+                        stack.push(p.1);
+                    }
+                }
+                while (out.len() as i64) < len && !flag(t, "nested") {
                     let remaining = len - out.len() as i64;
                     if !stack.is_empty() && (stack.len() as i64 >= remaining || rng.chance(50)) {
                         out.push(stack.pop().unwrap_or(')'));

@@ -754,17 +754,43 @@ pub fn build_prelude(used: &[Ty]) -> String {
     s.push_str("\n/* ---- typed containers, instantiated for the types this program uses ---- */\n");
     has.insert("Vec_char".into());
     let mut emitted: BTreeSet<String> = BTreeSet::new();
-    for ty in &need {
-        let n = sname(ty);
-        if !emitted.insert(n) {
-            continue;
+    let names: BTreeSet<String> = need.iter().map(sname).collect();
+    fn deps(t: &Ty) -> Vec<Ty> {
+        match t {
+            Ty::Vec(a) | Ty::Stack(a) | Ty::Queue(a) | Ty::Deque(a) | Ty::Heap(a) | Ty::Option(a) => vec![(**a).clone()],
+            Ty::Set(a) => vec![(**a).clone(), Ty::Vec(a.clone())],
+            Ty::Map(k, v) => {
+                let tup = Ty::Tuple(vec![(**k).clone(), (**v).clone()]);
+                vec![(**k).clone(), (**v).clone(), Ty::Vec(k.clone()), Ty::Vec(v.clone()), tup.clone(), Ty::Vec(Box::new(tup)), Ty::Option(v.clone())]
+            }
+            Ty::Tuple(ts) => ts.clone(),
+            _ => vec![],
         }
-        if let Some(code) = instance(ty, &has) {
+    }
+    fn emit(ty: &Ty, need: &[Ty], names: &BTreeSet<String>, has: &BTreeSet<String>, emitted: &mut BTreeSet<String>, s: &mut String, visiting: &mut Vec<String>) {
+        let n = sname(ty);
+        if emitted.contains(&n) || visiting.contains(&n) || !names.contains(&n) {
+            return;
+        }
+        visiting.push(n.clone());
+        for d in deps(ty) {
+            if let Some(real) = need.iter().find(|x| sname(x) == sname(&d)) {
+                emit(real, need, names, has, emitted, s, visiting);
+            }
+        }
+        visiting.pop();
+        if !emitted.insert(n) {
+            return;
+        }
+        if let Some(code) = instance(ty, has) {
             s.push_str(&code);
         }
         if *ty == Ty::Vec(Box::new(Ty::Char)) {
             s.push_str(t::STR_HELPERS);
         }
+    }
+    for ty in &need {
+        emit(ty, &need, &names, &has, &mut emitted, &mut s, &mut Vec::new());
     }
     if has.contains("Vec_str") {
         s.push_str(t::STR_SPLIT_JOIN);
