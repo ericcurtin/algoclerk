@@ -65,9 +65,15 @@ pub fn classify(samples: &[f64]) -> Class {
     }
     let first = samples[0].max(1.0);
     let last = samples[samples.len() - 1].max(1.0);
-    // Mostly flat (a tiny absolute drift is allowed for constants).
-    if last - first <= 8.0 && last <= first * 1.1 + 8.0 {
+    let steps: Vec<f64> = samples.windows(2).map(|w| w[1] - w[0]).collect();
+    // Mostly flat (a tiny drift is allowed for constants).
+    if steps.iter().all(|d| d.abs() <= (0.03 * last).max(4.0)) {
         return Class::Constant;
+    }
+    // A steady, small increase per doubling is logarithmic growth.
+    let (lo, hi) = steps.iter().fold((f64::MAX, f64::MIN), |(l, h), d| (l.min(*d), h.max(*d)));
+    if last / first < 1.7 && lo > 0.0 && hi <= 1.8 * lo {
+        return Class::Log;
     }
     // Geometric mean of the later ratios (the first one is dominated by constant offsets).
     let skip = if samples.len() > 3 { 1 } else { 0 };

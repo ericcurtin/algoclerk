@@ -53,7 +53,7 @@ fn helper(name: &str) -> &'static str {
         "repeat" => "inline std::string repeat(const std::string& s, long long k) { std::string out; for (long long i = 0; i < k; ++i) out += s; return out; }",
         "hash" => "inline void hash_mix(size_t& h, size_t v) { h ^= v + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2); }\ntemplate <class T> size_t hash_of(const T& x) { return std::hash<T>()(x); }\ntemplate <class A, class B> size_t hash_of(const std::pair<A, B>& p) { size_t h = hash_of(p.first); hash_mix(h, hash_of(p.second)); return h; }\ntemplate <class... Ts> size_t hash_of(const std::tuple<Ts...>& t) { size_t h = 0; std::apply([&](const Ts&... xs) { (hash_mix(h, hash_of(xs)), ...); }, t); return h; }\ntemplate <class T> size_t hash_of(const std::vector<T>& v) { size_t h = v.size(); for (const T& x : v) hash_mix(h, hash_of(x)); return h; }\nstruct Hash { template <class T> size_t operator()(const T& x) const { return hash_of(x); } };",
         "sets" => "template <class T, class H> std::unordered_set<T, H> set_union(std::unordered_set<T, H> a, const std::unordered_set<T, H>& b) { a.insert(b.begin(), b.end()); return a; }\ntemplate <class T, class H> std::unordered_set<T, H> set_intersection(const std::unordered_set<T, H>& a, const std::unordered_set<T, H>& b) { std::unordered_set<T, H> r; for (const T& x : a) if (b.count(x)) r.insert(x); return r; }\ntemplate <class T, class H> std::unordered_set<T, H> set_difference(const std::unordered_set<T, H>& a, const std::unordered_set<T, H>& b) { std::unordered_set<T, H> r; for (const T& x : a) if (!b.count(x)) r.insert(x); return r; }",
-        "maps" => "// Maps and sets have no defined order, so keys(), values() and items() hand back the entries sorted by key.\ntemplate <class M> auto items(const M& m) {\n    std::vector<std::pair<typename M::key_type, typename M::mapped_type>> v(m.begin(), m.end());\n    std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) { return a.first < b.first; });\n    return v;\n}\ntemplate <class M> auto keys(const M& m) { std::vector<typename M::key_type> v; for (const auto& kv : items(m)) v.push_back(kv.first); return v; }\ntemplate <class M> auto values(const M& m) { std::vector<typename M::mapped_type> v; for (const auto& kv : items(m)) v.push_back(kv.second); return v; }\ntemplate <class M, class K, class V> V get_or(const M& m, const K& k, const V& d) { auto it = m.find(k); return it == m.end() ? d : it->second; }\ntemplate <class M, class K> auto get(const M& m, const K& k) { auto it = m.find(k); using V = typename M::mapped_type; return it == m.end() ? std::optional<V>() : std::optional<V>(it->second); }",
+        "maps" => "// Maps and sets have no defined order, so keys(), values() and items() hand back the entries sorted by key.\ntemplate <class M> auto items(const M& m) {\n    std::vector<std::pair<typename M::key_type, typename M::mapped_type>> v(m.begin(), m.end());\n    std::sort(v.begin(), v.end(), [](const auto& a, const auto& b) { return a.first < b.first; });\n    return v;\n}\ntemplate <class M> auto keys(const M& m) { std::vector<typename M::key_type> v; for (const auto& kv : items(m)) v.push_back(kv.first); return v; }\ntemplate <class M> auto values(const M& m) { std::vector<typename M::mapped_type> v; for (const auto& kv : items(m)) v.push_back(kv.second); return v; }\ntemplate <class M> typename M::mapped_type get_or(const M& m, const typename M::key_type& k, const typename M::mapped_type& d) { auto it = m.find(k); return it == m.end() ? d : it->second; }\ntemplate <class M, class K> auto get(const M& m, const K& k) { auto it = m.find(k); using V = typename M::mapped_type; return it == m.end() ? std::optional<V>() : std::optional<V>(it->second); }",
         _ => "",
     }
 }
@@ -580,17 +580,31 @@ impl<'a> Gen<'a> {
         self.info.pat_slots.get(&s.id).is_some_and(|v| v.iter().any(|&x| self.slot_mutated(x)))
     }
 
+    /// A name for a collection that is indexed repeatedly: places are used directly, temporaries are bound first.
+    fn hoist(&mut self, e: &Expr) -> String {
+        if is_place(e) {
+            return self.expr(e).at(20);
+        }
+        self.tmp += 1;
+        let name = format!("src{}", self.tmp);
+        let v = self.expr(e).s;
+        let t = self.ety(e);
+        let ty = self.ty(&t);
+        self.line(&format!("const {ty} {name} = {v};"));
+        name
+    }
+
     fn for_each(&mut self, s: &Stmt, pat: &Pat, iter: &Expr, body: &Block) {
         let mutated = self.pat_mutated(s, pat);
         if let Some((kind, args)) = iter_special(iter) {
             let Pat::Tuple(ps) = pat else { return };
             self.tmp += 1;
             let i = if kind == "enumerate" { Self::pat_names(&ps[0]) } else { format!("i{}", self.tmp) };
-            let a0 = self.expr(&args[0]).at(20);
+            let a0 = self.hoist(&args[0]);
             let (bound, names): (String, Vec<(String, String)>) = if kind == "enumerate" {
                 (format!("(long long){a0}.size()"), vec![(Self::pat_names(&ps[1]), format!("{a0}[{i}]"))])
             } else {
-                let a1 = self.expr(&args[1]).at(20);
+                let a1 = self.hoist(&args[1]);
                 self.inc.insert("algorithm");
                 (
                     format!("(long long)std::min({a0}.size(), {a1}.size())"),

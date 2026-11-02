@@ -45,6 +45,7 @@ fn search(nums: vec<int>, target: int) -> int {
 [budgets]
 steps = 200000
 large_steps = 20000
+sweep_n0 = 128
 
 [medals]
 size = [72, 57, 45]
@@ -86,4 +87,10 @@ n = 20000
 args = [
   { kind = "vec_int", len = "n", range = [0, 1000000], sorted = true, distinct = true },
   { kind = "int", pick_from = 0, miss = 0 },
+]
+
+[sweep]
+args = [
+  { kind = "vec_int", len = "n", range = [0, 100000000], sorted = true, distinct = true },
+  { kind = "int", range = [-1, -1] },
 ]

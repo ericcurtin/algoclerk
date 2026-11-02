@@ -650,6 +650,19 @@ impl<'a> Gen<'a> {
         }
     }
 
+    /// A name for a collection that is indexed repeatedly: places are used directly, temporaries are bound first.
+    fn hoist(&mut self, e: &Expr) -> String {
+        if is_place(e) {
+            return self.lval(e);
+        }
+        self.tmp += 1;
+        let name = format!("src{}_", self.tmp);
+        let v = self.expr(e).s;
+        let t = self.ety(e);
+        self.line(&format!("{} {name} = {v};", cty(&t)));
+        name
+    }
+
     fn for_each(&mut self, _s: &Stmt, pat: &Pat, iter: &Expr, body: &Block) {
         self.tmp += 1;
         let i = format!("i{}_", self.tmp);
@@ -662,7 +675,7 @@ impl<'a> Gen<'a> {
                 },
                 _ => (Ty::Int, Ty::Int),
             };
-            let a0 = self.expr(&args[0]).at(20);
+            let a0 = self.hoist(&args[0]);
             if kind == "enumerate" {
                 self.line(&format!("for (size_t {i} = 0; {i} < {a0}.len; {i}++) {{"));
                 self.ind += 1;
@@ -670,7 +683,7 @@ impl<'a> Gen<'a> {
                 self.destructure(&ps[1], &t1, &format!("{a0}.data[{i}]"));
                 self.ind -= 1;
             } else {
-                let a1 = self.expr(&args[1]).at(20);
+                let a1 = self.hoist(&args[1]);
                 self.line(&format!("for (size_t {i} = 0; {i} < {a0}.len && {i} < {a1}.len; {i}++) {{"));
                 self.ind += 1;
                 self.destructure(&ps[0], &t0, &format!("{a0}.data[{i}]"));

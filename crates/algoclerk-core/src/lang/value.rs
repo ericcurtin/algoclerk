@@ -105,7 +105,7 @@ impl Value {
 }
 
 /// Maximum nodes rendered when printing linked structures.
-const RENDER_CAP: usize = 10_000;
+const RENDER_CAP: usize = 1_000_000;
 
 /// Text form of a value; the same syntax is accepted by [`parse_value`].
 pub fn render(v: &Value, ty: &Ty, nodes: &[NodeData]) -> String {

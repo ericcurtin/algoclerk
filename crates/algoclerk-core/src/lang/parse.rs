@@ -195,7 +195,12 @@ struct Parser {
     next_id: NodeId,
     spans: Vec<Span>,
     depth: u32,
+    heights: Vec<u16>,
+    too_tall: bool,
 }
+
+/// Tallest expression tree the parser accepts (keeps every later recursion shallow).
+pub const MAX_EXPR_HEIGHT: u16 = 100;
 
 type R<T> = Result<T, Diag>;
 
@@ -301,7 +306,25 @@ impl Parser {
         id
     }
     fn expr(&mut self, kind: ExprKind, start: u32) -> Expr {
-        Expr { id: self.id(start), kind }
+        let h = |p: &Parser, e: &Expr| p.heights.get(e.id as usize).copied().unwrap_or(0);
+        let below = match &kind {
+            ExprKind::Unary(_, a) | ExprKind::Field(a, _) | ExprKind::TupleIdx(a, _) => h(self, a),
+            ExprKind::Binary(_, a, b) | ExprKind::Index(a, b) | ExprKind::VecRepeat(a, b) => h(self, a).max(h(self, b)),
+            ExprKind::Slice(a, b, c) => h(self, a).max(b.as_ref().map_or(0, |x| h(self, x))).max(c.as_ref().map_or(0, |x| h(self, x))),
+            ExprKind::Call(_, a) | ExprKind::VecLit(a) | ExprKind::TupleLit(a) => a.iter().map(|x| h(self, x)).max().unwrap_or(0),
+            ExprKind::Method(r, _, a) => a.iter().map(|x| h(self, x)).max().unwrap_or(0).max(h(self, r)),
+            _ => 0,
+        };
+        let id = self.id(start);
+        let height = below.saturating_add(1);
+        if height > MAX_EXPR_HEIGHT {
+            self.too_tall = true;
+        }
+        if self.heights.len() <= id as usize {
+            self.heights.resize(id as usize + 1, 0);
+        }
+        self.heights[id as usize] = height.min(MAX_EXPR_HEIGHT + 1);
+        Expr { id, kind }
     }
     fn stmt(&mut self, kind: StmtKind, start: u32) -> Stmt {
         Stmt { id: self.id(start), kind }
@@ -861,15 +884,18 @@ pub fn parse(src: &str) -> Result<Program, Diag> {
         return Err(Diag::plain("parse.long", "That page is too long for my desk."));
     }
     let toks = lex(src)?;
-    let mut p = Parser { toks, pos: 0, next_id: 0, spans: Vec::new(), depth: 0 };
+    let mut p = Parser { toks, pos: 0, next_id: 0, spans: Vec::new(), depth: 0, heights: Vec::new(), too_tall: false };
     let fns = p.program()?;
+    if p.too_tall {
+        return Err(Diag::plain("parse.tall", "That sentence is far too long-winded for me. Break it into smaller steps with `let`."));
+    }
     Ok(Program { fns, next_id: p.next_id, spans: p.spans })
 }
 
 /// Parse a single type such as `map<string, vec<int>>` (level signatures, tests).
 pub fn parse_type(src: &str) -> Result<Ty, Diag> {
     let toks = lex(src)?;
-    let mut p = Parser { toks, pos: 0, next_id: 0, spans: Vec::new(), depth: 0 };
+    let mut p = Parser { toks, pos: 0, next_id: 0, spans: Vec::new(), depth: 0, heights: Vec::new(), too_tall: false };
     let t = p.ty()?;
     if *p.peek() != Tok::Eof {
         return Err(Diag::at(p.span(), "parse.expected", "Extra text after the type."));
@@ -880,10 +906,13 @@ pub fn parse_type(src: &str) -> Result<Ty, Diag> {
 /// Parse one expression (used for level examples and the autocomplete preview).
 pub fn parse_expr(src: &str) -> Result<Expr, Diag> {
     let toks = lex(src)?;
-    let mut p = Parser { toks, pos: 0, next_id: 0, spans: Vec::new(), depth: 0 };
+    let mut p = Parser { toks, pos: 0, next_id: 0, spans: Vec::new(), depth: 0, heights: Vec::new(), too_tall: false };
     let e = p.expr_top()?;
     if *p.peek() != Tok::Eof {
         return Err(Diag::at(p.span(), "parse.expected", "Extra text after the expression."));
+    }
+    if p.too_tall {
+        return Err(Diag::plain("parse.tall", "That sentence is far too long-winded for me."));
     }
     Ok(e)
 }
