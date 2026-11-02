@@ -3,7 +3,13 @@
 //! model. See `docs/CPP_SUBSET.md`.
 
 pub mod ast;
+pub mod check;
 pub mod diag;
+pub mod interp;
+pub mod lexer;
+pub mod parse;
+pub mod print;
+pub mod stdlib;
 pub mod value;
 
 pub use ast::{Program, Ty};
