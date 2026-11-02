@@ -17,39 +17,6 @@ pub struct Rg {
     pub rev: bool,
 }
 
-/// Where an iterator expression points: the beginning or the end of a container, plus an offset.
-pub enum Pos<'e> {
-    Begin(&'e Expr, Option<&'e Expr>, bool),
-    End(&'e Expr, Option<&'e Expr>, bool),
-}
-
-pub fn iter_pos_pub(e: &Expr) -> Option<Pos<'_>> {
-    iter_pos(e)
-}
-
-fn iter_pos(e: &Expr) -> Option<Pos<'_>> {
-    match &e.kind {
-        ExprKind::Call { callee, args } if args.is_empty() => {
-            let ExprKind::Member { obj, name, .. } = &callee.kind else {
-                return None;
-            };
-            match name.as_str() {
-                "begin" | "cbegin" => Some(Pos::Begin(obj, None, false)),
-                "end" | "cend" => Some(Pos::End(obj, None, false)),
-                "rbegin" => Some(Pos::Begin(obj, None, true)),
-                "rend" => Some(Pos::End(obj, None, true)),
-                _ => None,
-            }
-        }
-        ExprKind::Binary(op @ (BinOp::Add | BinOp::Sub), a, k) => match iter_pos(a)? {
-            Pos::Begin(o, None, r) if *op == BinOp::Add => Some(Pos::Begin(o, Some(k), r)),
-            Pos::End(o, None, r) if *op == BinOp::Sub => Some(Pos::End(o, Some(k), r)),
-            _ => None,
-        },
-        _ => None,
-    }
-}
-
 impl Rs<'_> {
     /// Translate a `[first, last)` pair into a range of one container.
     pub(super) fn range(&mut self, a: &Expr, b: &Expr) -> R<Option<Rg>> {

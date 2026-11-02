@@ -2,7 +2,7 @@
 //! Rust translation of member functions of sequences, adaptors, priority queues and optionals.
 
 use super::Rs;
-use super::lib_free::{Pos, iter_pos_pub};
+
 use crate::cpp::ast::*;
 use crate::cpp::check::Resolved;
 use crate::cpp::codegen::common::*;
@@ -40,7 +40,7 @@ impl Rs<'_> {
 
     /// The index an iterator argument (`begin()`, `begin() + k`, `end()`) of `obj` stands for.
     pub(super) fn pos_idx(&mut self, obj: &Expr, p: &Expr) -> R<String> {
-        match iter_pos_pub(p) {
+        match iter_pos(p) {
             Some(Pos::Begin(o, k, false)) if print_expr(o) == print_expr(obj) => match k {
                 None => Ok("0".into()),
                 Some(k) => {
@@ -150,7 +150,7 @@ impl Rs<'_> {
     fn erase_range(&mut self, obj: &Expr, o: &str, a: &Expr, b: &Expr) -> R<Ex> {
         if let ExprKind::Call { callee, args } = &a.kind
             && let Some(Resolved::Lib(mem)) = self.info.resolved(callee.id)
-            && matches!(iter_pos_pub(b), Some(Pos::End(_, None, false)))
+            && matches!(iter_pos(b), Some(Pos::End(_, None, false)))
         {
             match (mem.name, args.as_slice()) {
                 ("std::unique", [x, y]) => {

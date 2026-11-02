@@ -2,7 +2,7 @@
 //! Rust translation of the library's free functions and of the comparisons that mean "found / not found".
 
 use super::Rs;
-use super::lib_free::iter_pos_pub;
+
 use crate::cpp::ast::*;
 use crate::cpp::check::Resolved;
 use crate::cpp::codegen::common::*;
@@ -335,7 +335,7 @@ impl Rs<'_> {
         let val = |s: String| Ex::new(s, 19, Kind::Val);
         if let [a, b, ..] = args
             && matches!(name, "std::sort" | "std::reverse")
-            && let Some(super::lib_free::Pos::Begin(o, None, false)) = iter_pos_pub(a)
+            && let Some(Pos::Begin(o, None, false)) = iter_pos(a)
             && matches!(self.ty_of(o), Ty::Str)
         {
             let p = self.place_text(o)?;

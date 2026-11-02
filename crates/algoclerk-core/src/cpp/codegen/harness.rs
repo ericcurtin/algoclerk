@@ -8,7 +8,7 @@ use super::{Generated, Lang, generate};
 use crate::cpp::interp::Limits;
 use crate::cpp::run::{Compiled, compile};
 use crate::judge::{canonical, raw_suite};
-use crate::level::Level;
+use crate::level::{Compare, Level};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
@@ -75,11 +75,16 @@ pub fn toolchains(lang: Lang) -> Vec<Toolchain> {
         .collect()
 }
 
-/// Source of a complete program: generated code plus harness for these test cases.
-pub fn program(level: &Level, g: &Generated, cases: &[Vec<String>]) -> Result<String, String> {
+/// Source of a complete program: generated code plus harness for the cases of the function `entry`.
+pub fn program(
+    c: &Compiled,
+    entry: &str,
+    g: &Generated,
+    cases: &[Vec<String>],
+) -> Result<String, String> {
     match g.lang {
-        Lang::Rust => super::harness_rust::program(level, g, cases),
-        Lang::C => super::harness_c::program(level, g, cases),
+        Lang::Rust => super::harness_rust::program(c, entry, g, cases),
+        Lang::C => super::harness_c::program(c, entry, g, cases),
         Lang::Cpp => Err("the C++ tab is the player's own code".into()),
     }
 }
@@ -159,23 +164,28 @@ pub enum Outcome {
     Failed(String),
 }
 
-/// The interpreter's canonical results for the cases.
+/// The interpreter's canonical results for the cases of `entry`.
 pub fn expected(
-    level: &Level,
     sol: &Compiled,
+    entry: &str,
+    mode: Compare,
+    steps: u64,
     cases: &[Vec<String>],
 ) -> Result<Vec<String>, String> {
     let limits = Limits {
-        steps: level.budgets.large_steps.saturating_mul(40),
+        steps,
         ..Limits::default()
     };
-    let ret = &level.signature.ret.ty;
+    let ret = sol
+        .program
+        .find(entry)
+        .map_or(crate::cpp::ast::Ty::Void, |f| f.ret.ty.clone());
     cases
         .iter()
         .map(|a| {
-            let c = sol.call(&level.signature.name, a, &limits)?;
+            let c = sol.call(entry, a, &limits)?;
             match c.output {
-                Some(o) => Ok(canonical(&o, ret, level.compare)),
+                Some(o) => Ok(canonical(&o, &ret, mode)),
                 None => Err(format!("the interpreter stopped on {a:?}")),
             }
         })
@@ -191,8 +201,7 @@ pub fn standard_cases(level: &Level) -> Result<Vec<Vec<String>>, String> {
         .collect())
 }
 
-/// Translate `text` (a solution of `level`) to `lang`, compile it with every compiler and compare with the
-/// interpreter on `cases`.
+/// Translate a solution of `level` to `lang`, compile it with every compiler and compare with the interpreter.
 pub fn check_solution(
     level: &Level,
     text: &str,
@@ -211,22 +220,53 @@ pub fn check_solution(
             ));
         }
     };
-    let g = match generate(&sol, lang, &level.signature.name) {
+    let steps = level.budgets.large_steps.saturating_mul(40);
+    check_compiled(
+        &sol,
+        &level.signature.name,
+        lang,
+        tcs,
+        dir,
+        tag,
+        cases,
+        level.compare,
+        steps,
+    )
+}
+
+/// Translate the function `entry` of a compiled program to `lang`, compile it with every compiler and
+/// compare its results on `cases` with the interpreter's.
+#[allow(clippy::too_many_arguments)]
+pub fn check_compiled(
+    sol: &Compiled,
+    entry: &str,
+    lang: Lang,
+    tcs: &[Toolchain],
+    dir: &Path,
+    tag: &str,
+    cases: &[Vec<String>],
+    mode: Compare,
+    steps: u64,
+) -> Outcome {
+    let g = match generate(sol, lang, entry) {
         Ok(g) => g,
         Err(m) => return Outcome::Untranslatable(m),
     };
     if tcs.is_empty() {
         return Outcome::NoCompiler;
     }
-    let src = match program(level, &g, cases) {
+    let src = match program(sol, entry, &g, cases) {
         Ok(s) => s,
         Err(m) => return Outcome::Failed(format!("harness: {m}")),
     };
-    let want = match expected(level, &sol, cases) {
+    let want = match expected(sol, entry, mode, steps, cases) {
         Ok(w) => w,
         Err(m) => return Outcome::Failed(format!("interpreter: {m}")),
     };
-    let ret = &level.signature.ret.ty;
+    let ret = sol
+        .program
+        .find(entry)
+        .map_or(crate::cpp::ast::Ty::Void, |f| f.ret.ty.clone());
     let mut warnings = String::new();
     for tc in tcs {
         let (lines, warn) =
@@ -251,7 +291,7 @@ pub fn check_solution(
             ));
         }
         for (i, (got, w)) in lines.iter().zip(&want).enumerate() {
-            let got = canonical(got, ret, level.compare);
+            let got = canonical(got, &ret, mode);
             if &got != w {
                 let short = |s: &str| s.chars().take(100).collect::<String>();
                 return Outcome::Failed(format!(
