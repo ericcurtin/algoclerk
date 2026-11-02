@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.algoclerk.AlgoClerk</id>
+  <name>AlgoClerk</name>
+  <summary>Programming puzzles about classic algorithms</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <description>
+    <p>Program a tiny office clerk with a handful of instructions and learn the algorithms behind
+    classic interview questions. When you solve a level the game shows your program as equivalent
+    C, C++ and Rust code.</p>
+  </description>
+  <launchable type="desktop-id">algoclerk.desktop</launchable>
+  <categories><category>Game</category><category>LogicGame</category></categories>
+  <content_rating type="oars-1.1"/>
+</component>

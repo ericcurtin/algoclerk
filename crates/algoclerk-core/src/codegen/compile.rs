@@ -119,7 +119,9 @@ pub fn build_and_run(
 ) -> Result<String, String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     let src: PathBuf = dir.join(format!("{stem}.{}", c.lang.extension()));
-    let exe: PathBuf = dir.join(format!("{stem}.bin"));
+    let exe: PathBuf = dir
+        .join(format!("{stem}.bin"))
+        .with_extension(std::env::consts::EXE_EXTENSION);
     std::fs::write(&src, source).map_err(|e| e.to_string())?;
     let mut cmd = Command::new(&c.exe);
     match c.lang {

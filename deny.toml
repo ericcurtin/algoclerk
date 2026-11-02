@@ -1,0 +1,73 @@
+# cargo-deny configuration: licences, advisories, bans and sources.
+# Run: cargo deny check          (CI runs this on every push)
+#
+# AlgoClerk is Apache-2.0. Every dependency must be under a permissive licence that is compatible
+# with Apache-2.0. Copyleft licences (GPL, LGPL, AGPL), the Slint licence and network-copyleft
+# licences are not allowed. Dependencies are checked for the five supported platforms only.
+
+[graph]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "aarch64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "aarch64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+    "aarch64-apple-darwin",
+    "aarch64-linux-android",
+    "armv7-linux-androideabi",
+    "x86_64-linux-android",
+    "aarch64-apple-ios",
+    "aarch64-apple-ios-sim",
+]
+all-features = true
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+unused-allowed-license = "allow"
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "MIT-0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "BSL-1.0",
+    "OFL-1.1",
+    "0BSD",
+]
+
+[licenses.private]
+ignore = false
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace crates depend on each other by path.
+allow-wildcard-paths = true
+highlight = "all"
+# Policy: AlgoClerk runs player programs in its own Rust interpreter. No WebAssembly runtimes,
+# no browser/web glue and no scripting engines.
+deny = [
+    { crate = "wasmtime" },
+    { crate = "wasmer" },
+    { crate = "wasmi" },
+    { crate = "wasm-bindgen" },
+    { crate = "wasm-pack" },
+    { crate = "trunk" },
+    { crate = "mlua" },
+    { crate = "rhai" },
+    { crate = "slint" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

@@ -38,3 +38,11 @@ unimplemented = "deny"
 lto = "thin"
 codegen-units = 4
 strip = true
+
+# Dependencies (egui, wgpu, ...) are compiled with optimisation even in debug builds, and so is the
+# UI crate: the immediate-mode UI and the software renderer are far too slow at opt-level 0.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.package.algoclerk-app]
+opt-level = 2

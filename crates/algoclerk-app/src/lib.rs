@@ -51,7 +51,7 @@ pub fn run_desktop() -> eframe::Result {
 /// Android entry point (NativeActivity).
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
-fn android_main(app: eframe::egui_winit::winit::platform::android::activity::AndroidApp) {
+fn android_main(app: android_activity::AndroidApp) {
     let options = eframe::NativeOptions {
         android_app: Some(app),
         ..Default::default()

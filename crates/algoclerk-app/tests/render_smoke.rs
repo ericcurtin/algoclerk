@@ -36,6 +36,7 @@ fn all_screens_render_on_desktop_and_phone_sizes() {
                     scale,
                     narrow,
                     tab: tab.map(Into::into),
+                    frames: 3,
                     ..Spec::default()
                 });
             }
@@ -53,6 +54,7 @@ fn themes_and_colourblind_palette_render() {
                 colorblind,
                 width: 1000,
                 height: 700,
+                frames: 3,
                 ..Spec::default()
             });
         }
@@ -69,6 +71,7 @@ fn every_shipped_level_renders_its_play_screen() {
             width: 1000,
             height: 640,
             steps: 25,
+            frames: 3,
             ..Spec::default()
         });
     }

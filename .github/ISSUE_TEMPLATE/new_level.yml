@@ -1,0 +1,40 @@
+name: New level proposal
+description: Propose a puzzle for the campaign
+labels: [level, good first issue]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: Working title
+    validations:
+      required: true
+  - type: dropdown
+    id: pack
+    attributes:
+      label: Which pack?
+      options: [Mail Room, Counting House, Number Cruncher, The Shelves, Sort & Search, Ledger Room, Executive Floor, A new pack]
+  - type: textarea
+    id: topic
+    attributes:
+      label: Algorithm topic
+      description: Which classic idea does it teach (two pointers, binary search, DP, ...)?
+    validations:
+      required: true
+  - type: textarea
+    id: statement
+    attributes:
+      label: Statement in your own words
+      description: Inputs, expected outputs and constraints. Please do not copy text from other games or problem sites.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Idea for a reference solution (optional)
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Originality
+      options:
+        - label: I wrote this proposal myself and it is not copied from another game or site.
+          required: true

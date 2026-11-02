@@ -117,17 +117,28 @@ impl Rasterizer {
                     mesh.vertices[tri[1] as usize],
                     mesh.vertices[tri[2] as usize],
                 ];
-                let p: Vec<(f32, f32)> = v.iter().map(|v| (v.pos.x * ppp, v.pos.y * ppp)).collect();
+                let p = [
+                    (v[0].pos.x * ppp, v[0].pos.y * ppp),
+                    (v[1].pos.x * ppp, v[1].pos.y * ppp),
+                    (v[2].pos.x * ppp, v[2].pos.y * ppp),
+                ];
                 let area =
                     (p[1].0 - p[0].0) * (p[2].1 - p[0].1) - (p[1].1 - p[0].1) * (p[2].0 - p[0].0);
                 if area.abs() < 1e-6 {
                     continue;
                 }
-                let minx = (p.iter().map(|q| q.0).fold(f32::MAX, f32::min).floor() as i64).max(cx0);
-                let maxx = (p.iter().map(|q| q.0).fold(f32::MIN, f32::max).ceil() as i64).min(cx1);
-                let miny = (p.iter().map(|q| q.1).fold(f32::MAX, f32::min).floor() as i64).max(cy0);
-                let maxy = (p.iter().map(|q| q.1).fold(f32::MIN, f32::max).ceil() as i64).min(cy1);
-                let col: Vec<[f32; 4]> = v.iter().map(|v| to_f(v.color)).collect();
+                let minx = (p[0].0.min(p[1].0).min(p[2].0).floor() as i64).max(cx0);
+                let maxx = (p[0].0.max(p[1].0).max(p[2].0).ceil() as i64).min(cx1);
+                let miny = (p[0].1.min(p[1].1).min(p[2].1).floor() as i64).max(cy0);
+                let maxy = (p[0].1.max(p[1].1).max(p[2].1).ceil() as i64).min(cy1);
+                let col = [to_f(v[0].color), to_f(v[1].color), to_f(v[2].color)];
+                let flat_color = v[0].color == v[1].color && v[1].color == v[2].color;
+                let flat_uv = v[0].uv == v[1].uv && v[1].uv == v[2].uv;
+                // Constant texture sample for solid fills (they all use the same texel).
+                let const_tex = match (tex, flat_uv) {
+                    (Some(t), true) => Some(Self::sample(t, v[0].uv.x, v[0].uv.y)),
+                    _ => None,
+                };
                 for y in miny..maxy {
                     for x in minx..maxx {
                         let (px, py) = (x as f32 + 0.5, y as f32 + 0.5);
@@ -139,11 +150,20 @@ impl Rasterizer {
                         if w0 < 0.0 || w1 < 0.0 || w2 < 0.0 {
                             continue;
                         }
-                        let mut c = [0.0f32; 4];
-                        for i in 0..4 {
-                            c[i] = col[0][i] * w0 + col[1][i] * w1 + col[2][i] * w2;
-                        }
-                        if let Some(t) = tex {
+                        let mut c = if flat_color {
+                            col[0]
+                        } else {
+                            let mut c = [0.0f32; 4];
+                            for i in 0..4 {
+                                c[i] = col[0][i] * w0 + col[1][i] * w1 + col[2][i] * w2;
+                            }
+                            c
+                        };
+                        if let Some(s) = const_tex {
+                            for i in 0..4 {
+                                c[i] *= s[i];
+                            }
+                        } else if let Some(t) = tex {
                             let u = v[0].uv.x * w0 + v[1].uv.x * w1 + v[2].uv.x * w2;
                             let vv = v[0].uv.y * w0 + v[1].uv.y * w1 + v[2].uv.y * w2;
                             let s = Self::sample(t, u, vv);

@@ -23,6 +23,10 @@ pub struct Spec {
     pub steps: usize,
     pub narrow: Option<bool>,
     pub tab: Option<String>,
+    /// Language of the code view (`c`, `cpp`, `rust`).
+    pub lang: Option<String>,
+    /// Number of UI passes to run before painting (animations settle).
+    pub frames: usize,
 }
 
 impl Default for Spec {
@@ -38,6 +42,8 @@ impl Default for Spec {
             steps: 14,
             narrow: None,
             tab: None,
+            lang: None,
+            frames: 12,
         }
     }
 }
@@ -66,6 +72,9 @@ fn prepare(spec: &Spec) -> Result<AlgoClerkApp, String> {
     let mut app = AlgoClerkApp::new(None);
     app.progress.settings.theme = spec.theme.clone();
     app.progress.settings.colorblind = spec.colorblind;
+    if let Some(l) = &spec.lang {
+        app.progress.settings.code_lang.clone_from(l);
+    }
     app.force_layout(spec.narrow);
     match spec.screen.as_str() {
         "title" => {}
@@ -163,7 +172,7 @@ pub fn render(spec: &Spec) -> Result<Rasterizer, String> {
     let pal = theme::palette(&spec.theme, spec.colorblind);
     let mut raster = Rasterizer::new(spec.width, spec.height, pal.bg);
     let mut time = 0.0;
-    let frames = 12;
+    let frames = spec.frames.max(2);
     for i in 0..frames {
         let mut out = ctx.run_ui(raw_input(w, h, time), |ui| app.ui(ui));
         raster.apply_textures(&out.textures_delta);
@@ -275,6 +284,7 @@ USAGE:
 SCREENSHOT SCREENS: title levels play victory code text sandbox settings about
 OPTIONS: --width N --height N --scale F --theme dark|light|contrast --colorblind
          --level <id> --steps N --narrow | --wide --tab brief|program|office|text
+         --lang c|cpp|rust --frames N
 Screenshots use a software renderer: no window, display or GPU needed.
 ";
 
@@ -315,6 +325,12 @@ pub fn cli(args: &[String]) -> i32 {
                     .unwrap_or(spec.steps)
             }
             "--tab" => spec.tab = get(&mut i),
+            "--lang" => spec.lang = get(&mut i),
+            "--frames" => {
+                spec.frames = get(&mut i)
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(spec.frames)
+            }
             "--icon" => icon = get(&mut i).and_then(|v| v.parse().ok()),
             "--colorblind" => spec.colorblind = true,
             "--narrow" => spec.narrow = Some(true),

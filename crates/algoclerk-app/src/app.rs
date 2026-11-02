@@ -514,7 +514,7 @@ fn level_button(
         egui::FontId::monospace(14.0),
         pal.dim,
     );
-    let max_chars = (((w - 70.0) / 8.0) as usize).max(8);
+    let max_chars = (((w - 84.0) / 8.6) as usize).max(8);
     let t: String = if title.chars().count() > max_chars {
         title.chars().take(max_chars - 1).chain(['~']).collect()
     } else {

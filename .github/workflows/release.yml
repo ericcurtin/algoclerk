@@ -1,0 +1,142 @@
+name: Release
+
+# Builds artifacts for all five platforms when a version tag is pushed (v0.1.0, ...).
+# Signing: see docs/BUILDING.md. Without the optional secrets the Android artifacts are unsigned
+# and iOS produces a simulator build only.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+      - run: linux/package-linux.sh --features audio
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*.tar.gz
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - run: macos/package-macos.sh aarch64-apple-darwin
+        env:
+          ALGOCLERK_SIGN_IDENTITY: ${{ secrets.ALGOCLERK_SIGN_IDENTITY }}
+      - run: macos/package-macos.sh x86_64-apple-darwin
+        env:
+          ALGOCLERK_SIGN_IDENTITY: ${{ secrets.ALGOCLERK_SIGN_IDENTITY }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*.zip
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: windows/package-windows.ps1
+        shell: pwsh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.zip
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10.2"
+      - run: cargo install cargo-ndk --locked
+      - name: Decode the signing keystore (optional secret)
+        if: ${{ env.HAS_KEYSTORE == 'true' }}
+        run: echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+        env:
+          HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      - name: Build release APK and AAB
+        run: android/build-android.sh release --aab
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+          ALGOCLERK_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && format('{0}/release.keystore', runner.temp) || '' }}
+          ALGOCLERK_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALGOCLERK_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ALGOCLERK_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - uses: Swatinem/rust-cache@v2
+      - run: brew install xcodegen
+      - name: Simulator build (unsigned)
+        run: ios/build-ios.sh simulator
+      - name: Device archive (only when a team id secret exists)
+        if: ${{ env.HAS_TEAM == 'true' }}
+        run: ios/build-ios.sh archive
+        env:
+          HAS_TEAM: ${{ secrets.ALGOCLERK_TEAM_ID != '' }}
+          ALGOCLERK_TEAM_ID: ${{ secrets.ALGOCLERK_TEAM_ID }}
+      - run: cd ios/build/Build/Products/Release-iphonesimulator && zip -qr "$GITHUB_WORKSPACE/AlgoClerk-ios-simulator.zip" AlgoClerk.app
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios
+          path: |
+            AlgoClerk-ios-simulator.zip
+            ios/build/AlgoClerk.xcarchive
+
+  publish:
+    needs: [linux, macos, windows, android, ios]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true

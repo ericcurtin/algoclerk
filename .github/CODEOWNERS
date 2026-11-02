@@ -1,0 +1,7 @@
+# Replace @algoclerk/maintainers with the real GitHub team or user names after publishing.
+*                       @algoclerk/maintainers
+/levels/                @algoclerk/maintainers @algoclerk/level-reviewers
+/crates/algoclerk-core/ @algoclerk/maintainers
+/crates/algoclerk-core/lang/ @algoclerk/maintainers @algoclerk/translators
+/docs/                  @algoclerk/maintainers
+/.github/               @algoclerk/maintainers

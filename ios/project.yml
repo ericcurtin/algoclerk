@@ -1,0 +1,29 @@
+# XcodeGen project description. Generate the Xcode project with:  xcodegen generate
+# (see ios/README.md). The Rust game is linked as a static library built by cargo.
+name: AlgoClerk
+options:
+  bundleIdPrefix: org.algoclerk
+  deploymentTarget:
+    iOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+targets:
+  AlgoClerk:
+    type: application
+    platform: iOS
+    sources:
+      - path: AlgoClerk
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: org.algoclerk.game
+        INFOPLIST_FILE: AlgoClerk/Info.plist
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_BITCODE: NO
+        LIBRARY_SEARCH_PATHS[sdk=iphoneos*]: "$(SRCROOT)/../target-ios/aarch64-apple-ios/release"
+        LIBRARY_SEARCH_PATHS[sdk=iphonesimulator*]: "$(SRCROOT)/../target-ios/aarch64-apple-ios-sim/release"
+        OTHER_LDFLAGS: ["-lalgoclerk_app", "-framework", "Metal", "-framework", "QuartzCore", "-framework", "UIKit", "-framework", "CoreGraphics", "-framework", "Foundation", "-framework", "AudioToolbox", "-framework", "CoreAudio"]

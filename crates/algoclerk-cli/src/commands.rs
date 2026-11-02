@@ -29,7 +29,7 @@ COMMANDS:
     judge                        Judge a program against a level's tests
     validate [path...]           Validate level files, pack directories or the shipped levels
     tune                         Suggest [targets] from a level's reference solution (or --all)
-    codegen                      Translate a program to C, C++ or Rust
+    codegen                      Translate a program to C, C++ or Rust (--generic, --verify)
     export                       Produce shareable solution text
     import <file>                Read shared solution text and print the canonical program
     help                         Show this help
@@ -535,6 +535,9 @@ fn codegen_cmd(args: &Args) -> Result<u8, String> {
             });
         }
     }
+    if args.flag("verify") {
+        return verify_codegen(&program, lang, level, &opts);
+    }
     let g = codegen::generate(&program, lang, level, &opts);
     if args.flag("json") {
         println!(
@@ -545,6 +548,72 @@ fn codegen_cmd(args: &Args) -> Result<u8, String> {
         print!("{}", g.code);
     }
     Ok(0)
+}
+
+/// Compile the generated code with every installed compiler and compare it with the interpreter.
+fn verify_codegen(
+    program: &Arc<Program>,
+    lang: Lang,
+    level: Option<&Level>,
+    opts: &Options,
+) -> Result<u8, String> {
+    use algoclerk_core::codegen::compile;
+    use algoclerk_core::codegen::harness::HarnessCase;
+    let level = level.ok_or("--verify needs --level (its tests provide the inputs)")?;
+    let compilers = compile::available(lang);
+    if compilers.is_empty() {
+        println!(
+            "no {} compiler found on this machine; nothing to verify",
+            lang.title()
+        );
+        return Ok(0);
+    }
+    let tests = Judge::new(level)
+        .map_err(|e| e.to_string())?
+        .tests()
+        .to_vec();
+    let cases: Vec<HarnessCase> = tests
+        .iter()
+        .map(|t| HarnessCase {
+            inbox: t.inbox.clone(),
+            floor: t.floor.clone(),
+        })
+        .collect();
+    let expected: Vec<Vec<i32>> = tests.iter().map(|t| t.expected.clone()).collect();
+    // The expected outputs come from the level; a failing program would differ from them.
+    let judge_ok = Judge::new(level)
+        .map_err(|e| e.to_string())?
+        .judge(program)
+        .passed;
+    if !judge_ok {
+        return Err(
+            "the program does not pass the level, so there is nothing to compare against".into(),
+        );
+    }
+    let item = compile::prepare(program, lang, Some(level), opts, cases, expected);
+    let dir = std::env::temp_dir().join("algoclerk-verify");
+    let mut failed = false;
+    for c in &compilers {
+        match compile::verify(
+            c,
+            std::slice::from_ref(&item),
+            &dir,
+            &format!("verify_{}", c.exe.replace('+', "p")),
+            false,
+        ) {
+            Ok(()) => println!(
+                "ok    {} compiled the {} code and it matches the interpreter on {} tests",
+                c.exe,
+                lang.title(),
+                tests.len()
+            ),
+            Err(e) => {
+                failed = true;
+                println!("FAIL  {e}");
+            }
+        }
+    }
+    Ok(u8::from(failed))
 }
 
 fn export(args: &Args) -> Result<u8, String> {

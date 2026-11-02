@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=AlgoClerk
+GenericName=Programming puzzle game
+Comment=Teach a tiny office clerk classic algorithms
+Exec=algoclerk
+Icon=algoclerk
+Terminal=false
+Categories=Game;LogicGame;Education;
+Keywords=programming;puzzle;algorithms;

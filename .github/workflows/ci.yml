@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  test:
+    name: clippy and tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      # The code generator is compile-tested with gcc, g++, clang and rustc.
+      - name: Install compilers (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y gcc g++ clang libasound2-dev
+      - name: Install compilers (Windows)
+        if: runner.os == 'Windows'
+        run: choco install -y llvm mingw --no-progress
+      - name: Clippy (warnings are errors)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests
+        run: cargo test --workspace
+      - name: Clippy with audio (Linux)
+        if: runner.os == 'Linux'
+        run: cargo clippy -p algoclerk-app --all-targets --features audio -- -D warnings
+
+  levels:
+    name: validate levels
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo run -q -p algoclerk-cli -- validate
+      - run: cargo run -q -p algoclerk-cli -- judge --all --reference
+
+  deny:
+    name: cargo-deny (licences, bans, advisories)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+
+  android-check:
+    name: Android type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - uses: Swatinem/rust-cache@v2
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27c
+      - run: cargo install cargo-ndk --locked
+      - name: cargo check for the three Android ABIs
+        run: cargo ndk -t arm64-v8a -t armeabi-v7a -t x86_64 check -p algoclerk-app --lib
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+      - name: Core crates for Android targets
+        run: cargo check -p algoclerk-core -p algoclerk-levels --target aarch64-linux-android
+
+  ios-check:
+    name: iOS type-check
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo check for iOS device and simulator
+        run: |
+          cargo check -p algoclerk-app --lib --target aarch64-apple-ios
+          cargo check -p algoclerk-app --lib --target aarch64-apple-ios-sim
+
+  windows-cross:
+    name: Windows cross-compile check (from Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-gnu
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update && sudo apt-get install -y gcc-mingw-w64-x86-64
+      - run: cargo check --workspace --target x86_64-pc-windows-gnu --lib --bins

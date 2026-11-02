@@ -1,0 +1,33 @@
+name: Bug report
+description: Something does not work as described
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AlgoClerk version
+      placeholder: "0.1.0 (see About screen)"
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options: [Linux, macOS, Windows, Android, iOS, Headless CLI]
+    validations:
+      required: true
+  - type: textarea
+    id: program
+    attributes:
+      label: Program text and level (if relevant)
+      description: Paste the program text (the copy button in the game exports it) and the level id.
+      render: text
+  - type: textarea
+    id: env
+    attributes:
+      label: Device / OS / graphics driver

@@ -30,16 +30,19 @@ algoclerk-levels.workspace = true
 serde_json.workspace = true
 eframe = { version = "=0.37.0", default-features = false, features = [
     "wgpu",
-    "wayland",
-    "x11",
     "clipboard",
     "persistence",
 ] }
 png = "0.18"
 rodio = { version = "0.23", default-features = false, features = ["playback"], optional = true }
 
+# Wayland and X11 only exist on Linux and the BSDs.
+[target.'cfg(all(unix, not(any(target_os = "macos", target_os = "ios", target_os = "android"))))'.dependencies]
+eframe = { version = "=0.37.0", default-features = false, features = ["wayland", "x11"] }
+
 [target.'cfg(target_os = "android")'.dependencies]
 eframe = { version = "=0.37.0", default-features = false, features = ["android-native-activity"] }
+android-activity = { version = "0.6", default-features = false, features = ["native-activity"] }
 
 [lints]
 workspace = true
