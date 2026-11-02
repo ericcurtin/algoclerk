@@ -138,7 +138,7 @@ impl Office {
         let mut hidden = 0;
         for (name, ty, w, changed, param) in items {
             let tyw = ty.chars().count() as i32;
-            let with_ty = if tyw <= 18 {
+            let with_ty = if tyw <= 18 && ty != "?" {
                 name.chars().count() as i32 * 4 + 18 + tyw * 6
             } else {
                 0
@@ -413,7 +413,7 @@ impl Office {
             let used = label.chars().count() as i32 * 4 + 8;
             let room = ((t.rect.w - used - 8) / 6).max(0) as usize;
             let tyw = t.ty.chars().count();
-            if tyw > 0 && tyw <= room {
+            if tyw > 0 && t.ty != "?" && tyw <= room {
                 g.text_r(t.rect.right() - 7, t.rect.y + 1, &t.ty, 'E', 1);
             }
             t.w.draw(

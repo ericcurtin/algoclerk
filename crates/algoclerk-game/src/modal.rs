@@ -74,6 +74,17 @@ impl Modal {
     /// Handle input.
     pub fn update(&mut self, cx: &Ctx<'_>) -> Answer {
         let (_, yes, no) = Modal::rects(&cx.vp);
+        if self.purpose == Purpose::Notice {
+            let wide = Rect::new(yes.x, yes.y, no.right() - yes.x, yes.h);
+            if cx.ptr.tapped_in(&wide)
+                || cx.input.key(Key::Enter)
+                || cx.input.key(Key::Space)
+                || cx.input.key(Key::Escape)
+            {
+                return Answer::Yes;
+            }
+            return Answer::Open;
+        }
         if cx.ptr.tapped_in(&yes) {
             return Answer::Yes;
         }
@@ -112,6 +123,16 @@ impl Modal {
             11,
             n.min(8),
         );
+        if self.purpose == Purpose::Notice {
+            let wide = Rect::new(yes.x, yes.y, no.right() - yes.x, yes.h);
+            g.button(
+                wide,
+                &self.yes,
+                Kind::Good,
+                widget_state(v.ptr, &wide, true, false),
+            );
+            return;
+        }
         g.button(
             yes,
             &self.yes,

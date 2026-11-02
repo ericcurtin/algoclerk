@@ -162,7 +162,7 @@ fn is_grid_elem(t: &Ty) -> bool {
 pub fn build(v: &Plain, t: &Ty, heap: &Heap, max_w: i32) -> W {
     match (v, t) {
         (Plain::Uninit, _) => tag("uninit"),
-        (_, Ty::Iter { .. }) => tag("iterator"),
+        (_, Ty::Iter { .. }) | (Plain::Void, Ty::Unknown) => tag("iterator"),
         (Plain::Void, _) => tag("..."),
         (Plain::Int(i), Ty::Bool) => W {
             w: 14,

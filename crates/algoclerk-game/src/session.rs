@@ -7,7 +7,7 @@
 
 use crate::blocks;
 use crate::textedit::TextEdit;
-use algoclerk_core::cpp::ast::{ItemKind, Program, Ty};
+use algoclerk_core::cpp::ast::{ItemKind, Program, Ty, walk_stmts};
 use algoclerk_core::cpp::check::CheckOpts;
 use algoclerk_core::cpp::diag::{Diag, line_col};
 use algoclerk_core::cpp::interp::{Limits, RtError};
@@ -372,13 +372,40 @@ impl Session {
         self.verdict.as_ref()
     }
 
-    /// Statement being executed in the current frame.
+    /// Statement being executed in the current frame. At the end of a run that stopped with an error it is
+    /// the statement holding the failing expression.
     pub fn current_node(&self) -> Option<u32> {
-        self.run
-            .as_ref()
-            .and_then(|r| r.frames.get(r.pos))
-            .map(|f| f.node)
-            .filter(|n| *n != 0)
+        let r = self.run.as_ref()?;
+        if r.pos + 1 >= r.frames.len()
+            && let Err(e) = &r.result
+        {
+            return self.statement_of(e.node);
+        }
+        r.frames.get(r.pos).map(|f| f.node).filter(|n| *n != 0)
+    }
+
+    /// The innermost statement of the compiled program whose text contains the node (a statement is its
+    /// own statement).
+    pub fn statement_of(&self, node: u32) -> Option<u32> {
+        let c = self.compiled.as_ref().ok()?;
+        let target = c.program.span(node)?;
+        let mut best: Option<(u32, u32)> = None;
+        for it in c.program.player_items() {
+            let ItemKind::Func(f) = &it.kind else {
+                continue;
+            };
+            let Some(body) = &f.body else { continue };
+            walk_stmts(body, &mut |st| {
+                if let Some(sp) = c.program.span(st.id)
+                    && sp.start <= target.start
+                    && sp.end >= target.end
+                    && best.is_none_or(|(_, len)| sp.end - sp.start < len)
+                {
+                    best = Some((st.id, sp.end - sp.start));
+                }
+            });
+        }
+        best.map(|(id, _)| id)
     }
 
     /// Block rows of the best known program.
@@ -488,4 +515,120 @@ pub fn parse_with_prelude(prelude: &str, player: &str) -> Result<Program, Vec<Di
         next_id: pl.next_id.max(pre.next_id),
         spans,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use algoclerk_core::cpp::value::render;
+    use algoclerk_levels::Campaign;
+
+    fn level(id: &str) -> Level {
+        Campaign::shipped().find(id).expect("level").clone()
+    }
+
+    #[test]
+    fn the_starter_is_the_signature_with_an_empty_body() {
+        let l = level("two-sum");
+        let s = Session::for_level(&l, "").unwrap();
+        assert_eq!(s.text(), l.starter_code());
+        // the only thing wrong with the empty body is the missing `return`
+        assert_eq!(s.problem().map(|d| d.code), Some("flow.missing-return"));
+        assert_eq!(s.prelude(), l.prelude);
+        assert_eq!(s.entry_name(), "twoSum");
+    }
+
+    #[test]
+    fn a_run_records_frames_with_cpp_types_and_values() {
+        let l = level("two-sum");
+        let mut s = Session::for_level(&l, &l.reference).unwrap();
+        s.start_run().unwrap();
+        let r = s.run.as_ref().unwrap();
+        assert_eq!(r.result.as_deref().ok(), Some("{0, 1}"));
+        assert_eq!(r.expected, "{0, 1}");
+        // first frame: the arguments, with their C++ types
+        let first = &r.frames[0];
+        assert_eq!(first.vars[0].0, "nums");
+        assert_eq!(first.vars[0].1.to_string(), "std::vector<int>");
+        assert_eq!(
+            render(&first.vars[0].2, &first.vars[0].1, &first.heap),
+            "{2, 7, 11, 15}"
+        );
+        // later frames show the map with its C++ type
+        let last = r.frames.last().unwrap();
+        assert!(last.returned.is_some());
+        assert!(
+            last.vars
+                .iter()
+                .any(|(n, t, _)| n == "seen" && t.to_string() == "std::unordered_map<int, int>")
+        );
+        assert!(r.frames.iter().skip(1).all(|f| f.node != 0));
+    }
+
+    #[test]
+    fn list_arguments_travel_with_their_heap() {
+        let l = level("reverse-list");
+        let mut s = Session::for_level(&l, &l.reference).unwrap();
+        s.start_run().unwrap();
+        let r = s.run.as_ref().unwrap();
+        let (name, ty, v) = &r.frames[0].vars[0];
+        assert_eq!(name, "head");
+        assert_eq!(ty.to_string(), "ListNode*");
+        assert_eq!(render(v, ty, &r.frames[0].heap), "{1, 2, 3}");
+    }
+
+    #[test]
+    fn compile_problems_point_at_the_line_and_columns() {
+        let l = level("sum-the-bills");
+        let text = "int sumTheBills(const std::vector<int>& bills) {\n    int total = 0;\n    for (int b : bills) {\n        total += \"1\";\n    }\n    return total;\n}\n";
+        let s = Session::for_level(&l, text).unwrap();
+        let d = s.problem().expect("a type problem");
+        assert!(d.msg.contains("`+=`"), "{}", d.msg);
+        let (line, from, to) = s.problem_span().expect("span");
+        assert_eq!(line, 4);
+        assert!(from >= 8 && to > from && to <= 24, "{from}..{to}");
+        // a parse problem carries its own span
+        let s = Session::for_level(
+            &l,
+            "int sumTheBills(const std::vector<int>& bills) {\n    int total = ;\n}\n",
+        )
+        .unwrap();
+        assert_eq!(s.problem_span().map(|x| x.0), Some(2));
+    }
+
+    #[test]
+    fn a_runtime_error_highlights_its_statement() {
+        let l = level("sum-the-bills");
+        let text = "int sumTheBills(const std::vector<int>& bills) {\n    int total = 0;\n    for (std::size_t i = 0; i <= bills.size(); ++i) {\n        total += bills[i];\n    }\n    return total;\n}\n";
+        let mut s = Session::for_level(&l, text).unwrap();
+        assert!(s.problem().is_none());
+        s.start_run().unwrap();
+        let r = s.run.as_mut().unwrap();
+        assert!(r.result.is_err());
+        r.pos = r.frames.len() - 1;
+        assert_eq!(s.run_error_span().map(|x| x.0), Some(4));
+        let node = s.current_node().expect("the failing statement");
+        assert_eq!(s.node_line(node), Some(4));
+        assert!(s.problem_message().unwrap().contains("out of range"));
+    }
+
+    #[test]
+    fn the_sandbox_runs_its_own_function() {
+        let mut s = Session::sandbox("");
+        assert_eq!(s.entry_name(), "sumAll");
+        s.start_run().unwrap();
+        assert_eq!(s.run.as_ref().unwrap().result.as_deref().ok(), Some("14"));
+    }
+
+    #[test]
+    fn undo_and_redo_follow_the_text() {
+        let l = level("two-sum");
+        let mut s = Session::for_level(&l, "").unwrap();
+        let start = s.text();
+        s.set_text("int x;\n");
+        assert!(s.can_undo() && s.undo());
+        assert_eq!(s.text(), start);
+        assert!(s.redo());
+        assert_eq!(s.text(), "int x;\n");
+    }
 }

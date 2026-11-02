@@ -154,7 +154,13 @@ fn parts(
     } else {
         0
     };
-    let strip_h = if has_strip && tab == Tab::Text { 10 } else { 0 };
+    // the prelude strip only fits when the text keeps at least a few lines
+    let room = area.h - th - 2 - bar_h - kb_h;
+    let strip_h = if has_strip && tab == Tab::Text && room >= 50 {
+        10
+    } else {
+        0
+    };
     let strip = Rect::new(area.x, area.y + th + 2, area.w, strip_h);
     let body = Rect::new(
         area.x,
@@ -1237,7 +1243,7 @@ impl EditorPanel {
             g.tiny(
                 all.right() - 22,
                 all.bottom() + 2,
-                &format!("{}/{}", pop.sel + 1, pop.items.len()),
+                &format!("{} OF {}", pop.sel + 1, pop.items.len()),
                 'k',
             );
         }
