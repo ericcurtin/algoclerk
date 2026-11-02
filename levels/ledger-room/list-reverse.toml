@@ -19,7 +19,7 @@ note = "The trail was 5, 7, 9; reversed it reads 9, 7, 5."
 
 [machine]
 floor = 15
-names = ["", "", "", "", "", "", "", "", "", "", "previous", "current", "next", "link", "one"]
+names = ["", "", "", "", "", "", "", "", "", "", "previous", "current", "following", "link", "one"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "bumpup", "jump", "jumpz", "indirect"]
 [machine.prefill]
 10 = -1

@@ -17,7 +17,7 @@ output = [32]
 
 [machine]
 floor = 3
-names = ["base", "exponent", "result"]
+names = ["factor", "times_left", "result"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "mul", "div", "mod", "bumpup", "bumpdn", "jump", "jumpz", "jumpn"]
 [machine.prefill]
 2 = 1

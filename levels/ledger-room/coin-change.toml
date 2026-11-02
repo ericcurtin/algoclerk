@@ -18,7 +18,7 @@ note = "3 + 3. Greedy would use 4 + 1 + 1."
 
 [machine]
 floor = 23
-names = ["pad", "pad", "pad", "pad", "zero_coins", "", "", "", "", "", "", "", "", "", "", "", "", "here", "look", "best", "remaining", "", "one"]
+names = ["pad_a", "pad_b", "pad_c", "pad_d", "zero_coins", "", "", "", "", "", "", "", "", "", "", "", "", "here", "look", "best", "remaining", "", "one"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "bumpdn", "bumpup", "jump", "jumpz", "jumpn", "indirect"]
 [machine.prefill]
 0 = 99

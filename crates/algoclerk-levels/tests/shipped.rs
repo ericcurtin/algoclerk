@@ -139,3 +139,33 @@ fn curriculum_covers_the_required_topics() {
         assert!(ids.contains(needed), "missing level {needed}");
     }
 }
+
+#[test]
+fn tile_names_do_not_clash_with_generated_code_names() {
+    let c = Campaign::shipped();
+    for l in c.all_levels() {
+        let Some(code) = &l.code else { continue };
+        let reserved: Vec<String> = code
+            .params
+            .iter()
+            .map(|p| p.name.clone())
+            .chain([code.function.clone()])
+            .chain(["hand", "next", "inbox", "outbox", "floor"].map(String::from))
+            .collect();
+        for name in l.machine.names.iter().filter(|n| !n.is_empty()) {
+            assert!(
+                !reserved.contains(name),
+                "level {}: tile name \"{name}\" clashes with a generated identifier",
+                l.id
+            );
+        }
+        let mut seen = HashSet::new();
+        for name in l.machine.names.iter().filter(|n| !n.is_empty()) {
+            assert!(
+                seen.insert(name.clone()),
+                "level {}: duplicate tile name {name}",
+                l.id
+            );
+        }
+    }
+}

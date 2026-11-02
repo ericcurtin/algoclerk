@@ -18,7 +18,7 @@ output = [1, 2, 3]
 
 [machine]
 floor = 15
-names = ["", "", "", "", "", "", "", "", "passes", "left_at", "right_at", "swap", "zero", "n", "one"]
+names = ["", "", "", "", "", "", "", "", "passes", "left_at", "right_at", "swap", "zero", "count", "one"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "bumpup", "bumpdn", "jump", "jumpz", "jumpn", "indirect"]
 [machine.prefill]
 12 = 0

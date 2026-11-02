@@ -18,7 +18,7 @@ note = "6, 3, 10, 5, 16, 8, 4, 2, 1"
 
 [machine]
 floor = 5
-names = ["n", "steps", "two", "three", "one"]
+names = ["current", "steps", "two", "three", "one"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "mul", "div", "mod", "bumpup", "bumpdn", "jump", "jumpz", "jumpn"]
 [machine.prefill]
 1 = 0

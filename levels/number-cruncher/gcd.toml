@@ -17,7 +17,7 @@ output = [6]
 
 [machine]
 floor = 3
-names = ["a", "b", "remainder"]
+names = ["first", "second", "remainder"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "mul", "div", "mod", "bumpup", "bumpdn", "jump", "jumpz", "jumpn"]
 
 [tests]

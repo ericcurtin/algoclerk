@@ -17,7 +17,7 @@ output = [13]
 
 [machine]
 floor = 4
-names = ["current", "next", "months_left", "sum"]
+names = ["current", "second", "months_left", "sum"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "mul", "div", "mod", "bumpup", "bumpdn", "jump", "jumpz", "jumpn"]
 [machine.prefill]
 0 = 0

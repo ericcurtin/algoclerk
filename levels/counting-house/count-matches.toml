@@ -17,7 +17,7 @@ output = [3]
 
 [machine]
 floor = 2
-names = ["target", "count"]
+names = ["wanted", "count"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "bumpup", "jump", "jumpz"]
 [machine.prefill]
 1 = 0

@@ -174,6 +174,30 @@ struct Gen<'a> {
     ret: Ret,
     lines: Vec<String>,
     indent: usize,
+    /// Heads of the loops we are inside (innermost last).
+    loops: Vec<usize>,
+    /// Rust only: loops carry labels because a labelled block is present.
+    labelled: bool,
+}
+
+fn has_block(v: &[Stmt]) -> bool {
+    v.iter().any(|s| match s {
+        Stmt::Block { .. } => true,
+        Stmt::If { then, els, .. } => has_block(then) || has_block(els),
+        Stmt::Loop { body, .. } | Stmt::While { body, .. } | Stmt::DoWhile { body, .. } => {
+            has_block(body)
+        }
+        _ => false,
+    })
+}
+
+fn contains_break(v: &[Stmt]) -> bool {
+    v.iter().any(|s| match s {
+        Stmt::Break(_) => true,
+        Stmt::If { then, els, .. } => contains_break(then) || contains_break(els),
+        Stmt::Block { body, .. } => contains_break(body),
+        _ => false,
+    })
 }
 
 fn cond_text(lang: Lang, c: Cond) -> String {
@@ -349,6 +373,71 @@ impl Gen<'_> {
         self.indent -= 1;
     }
 
+    /// True if control can never fall off the end of `v`.
+    fn diverges(&self, v: &[Stmt]) -> bool {
+        match v.last() {
+            Some(Stmt::Exit(_)) => true,
+            Some(Stmt::Ins(i)) => {
+                matches!(self.prog.instrs[*i], Instr::Outbox)
+                    && matches!(self.ret, Ret::Scalar { .. })
+            }
+            Some(Stmt::Loop { body, .. }) => !contains_break(body),
+            Some(Stmt::If { then, els, .. }) => {
+                !els.is_empty() && self.diverges(then) && self.diverges(els)
+            }
+            _ => false,
+        }
+    }
+
+    /// Text of a `break` / `continue` / `return` / `break 'label` statement, if `s` is one.
+    fn jump_text(&self, s: &Stmt) -> Option<String> {
+        match s {
+            Stmt::Break(_) => Some(self.break_text()),
+            Stmt::Continue(_) => Some(match (self.labelled, self.loops.last()) {
+                (true, Some(h)) => format!("continue {};", self.loop_label(*h)),
+                _ => "continue;".to_string(),
+            }),
+            Stmt::Exit(_) => Some(self.exit_text()),
+            Stmt::BreakTo { target, .. } => {
+                let name = self.block_label(*target);
+                Some(if self.lang == Lang::Rust {
+                    format!("break 'to_{name};")
+                } else {
+                    format!("goto l_{name};")
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn block_label(&self, target: usize) -> String {
+        match self.prog.labels.get(target).and_then(|l| l.first()) {
+            Some(l) => snake(l),
+            None => format!("l{target}"),
+        }
+    }
+
+    fn loop_label(&self, head: usize) -> String {
+        format!("'loop_{}", self.block_label(head))
+    }
+
+    fn open_loop(&mut self, text: String, head: usize) {
+        let cm = self.head_comment(head);
+        if self.labelled {
+            let l = self.loop_label(head);
+            self.line_c(format!("{l}: {text}"), &cm);
+        } else {
+            self.line_c(text, &cm);
+        }
+    }
+
+    fn break_text(&self) -> String {
+        match (self.labelled, self.loops.last()) {
+            (true, Some(h)) => format!("break {};", self.loop_label(*h)),
+            _ => "break;".to_string(),
+        }
+    }
+
     fn stmt(&mut self, s: &Stmt) {
         match s {
             Stmt::Ins(i) => self.emit_ins(*i),
@@ -359,6 +448,18 @@ impl Gen<'_> {
                 at,
             } => {
                 let comment = self.instr_comment(*at);
+                if els.is_empty()
+                    && let [single] = then.as_slice()
+                    && let Some(j) = self.jump_text(single)
+                {
+                    let c = cond_text(self.lang, *cond);
+                    let text = match self.lang {
+                        Lang::Rust => format!("if {c} {{ {j} }}"),
+                        _ => format!("if {c} {{ {j} }}"),
+                    };
+                    self.line_c(text, &comment);
+                    return;
+                }
                 self.open_if(*cond, &comment);
                 self.block(then);
                 if !els.is_empty() {
@@ -373,17 +474,18 @@ impl Gen<'_> {
                     Lang::Cpp => "while (true) {",
                     Lang::Rust => "loop {",
                 };
-                let c = self.head_comment(*head);
-                self.line_c(open, &c);
+                self.open_loop(open.to_string(), *head);
+                self.loops.push(*head);
                 self.block(body);
+                self.loops.pop();
                 self.line("}");
             }
             Stmt::While { cond, body, head } => {
                 let c = cond_text(self.lang, *cond);
-                let open = format!("while {c} {{");
-                let cm = self.head_comment(*head);
-                self.line_c(open, &cm);
+                self.open_loop(format!("while {c} {{"), *head);
+                self.loops.push(*head);
                 self.block(body);
+                self.loops.pop();
                 self.line("}");
             }
             Stmt::DoWhile {
@@ -392,35 +494,69 @@ impl Gen<'_> {
                 head,
                 at,
             } => {
-                let cm = self.head_comment(*head);
                 let end_comment = self.instr_comment(*at);
                 if self.lang == Lang::Rust {
-                    self.line_c("loop {", &cm);
+                    self.open_loop("loop {".to_string(), *head);
+                    self.loops.push(*head);
                     self.block(body);
                     self.indent += 1;
                     let c = cond_text(Lang::Rust, cond.negate());
-                    self.line_c(format!("if {c} {{ break; }}"), &end_comment);
+                    let b = self.break_text();
+                    self.line_c(format!("if {c} {{ {b} }}"), &end_comment);
                     self.indent -= 1;
+                    self.loops.pop();
                     self.line("}");
                 } else {
-                    self.line_c("do {", &cm);
+                    self.open_loop("do {".to_string(), *head);
+                    self.loops.push(*head);
                     self.block(body);
+                    self.loops.pop();
                     let c = cond_text(self.lang, *cond);
                     self.line_c(format!("}} while {c};"), &end_comment);
                 }
             }
             Stmt::Break(at) => {
                 let c = self.instr_comment(*at);
-                self.line_c("break;", &c);
+                let b = self.break_text();
+                self.line_c(b, &c);
             }
             Stmt::Continue(at) => {
                 let c = self.instr_comment(*at);
-                self.line_c("continue;", &c);
+                let text = match (self.labelled, self.loops.last()) {
+                    (true, Some(h)) => format!("continue {};", self.loop_label(*h)),
+                    _ => "continue;".to_string(),
+                };
+                self.line_c(text, &c);
             }
             Stmt::Exit(at) => {
                 let c = self.instr_comment(*at);
                 let e = self.exit_text();
                 self.line_c(e, &c);
+            }
+            Stmt::Block { target, body } => {
+                let name = self.block_label(*target);
+                if self.lang == Lang::Rust {
+                    let comment =
+                        format!("jumps to {} leave this block", self.target_name(*target));
+                    self.line_c(format!("'to_{name}: {{"), &comment);
+                    self.block(body);
+                    self.line("}");
+                } else {
+                    self.stmts(body);
+                    let saved = self.indent;
+                    self.indent = 0;
+                    self.line(format!("l_{name}:;"));
+                    self.indent = saved;
+                }
+            }
+            Stmt::BreakTo { target, at } => {
+                let c = self.instr_comment(*at);
+                let name = self.block_label(*target);
+                if self.lang == Lang::Rust {
+                    self.line_c(format!("break 'to_{name};"), &c);
+                } else {
+                    self.line_c(format!("goto l_{name};"), &c);
+                }
             }
         }
     }
@@ -653,6 +789,8 @@ pub(super) fn generate(
         ret,
         lines: Vec::new(),
         indent: 0,
+        loops: Vec::new(),
+        labelled: false,
     };
 
     // Header and includes.
@@ -822,9 +960,12 @@ pub(super) fn generate(
     if n > 0 {
         match tree {
             Some(t) => {
+                g.labelled = lang == Lang::Rust && has_block(&t);
                 g.stmts(&t);
-                let e = g.exit_text();
-                g.line(e);
+                if !g.diverges(&t) {
+                    let e = g.exit_text();
+                    g.line(e);
+                }
             }
             None => match lang {
                 Lang::Rust => {

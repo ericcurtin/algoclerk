@@ -21,7 +21,7 @@ output = [0]
 
 [machine]
 floor = 3
-names = ["n", "divisor", "one"]
+names = ["number", "divisor", "one"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "mul", "div", "mod", "bumpup", "bumpdn", "jump", "jumpz", "jumpn"]
 [machine.prefill]
 1 = 1

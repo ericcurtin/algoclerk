@@ -18,7 +18,7 @@ note = "The items (2, 3) and (3, 4) together weigh 5 and are worth 7."
 
 [machine]
 floor = 15
-names = ["best_0", "best_1", "best_2", "best_3", "best_4", "best_5", "best_6", "best_7", "best_8", "capacity", "weight", "value", "c", "from", "candidate"]
+names = ["best_0", "best_1", "best_2", "best_3", "best_4", "best_5", "best_6", "best_7", "best_8", "room", "weight", "value", "c", "from", "candidate"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "add", "sub", "bumpdn", "jump", "jumpz", "jumpn", "indirect"]
 [machine.prefill]
 0 = 0

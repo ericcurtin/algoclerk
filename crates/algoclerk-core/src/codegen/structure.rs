@@ -68,6 +68,10 @@ pub enum Stmt {
     Continue(usize),
     /// End the program (return).
     Exit(usize),
+    /// A block that `BreakTo` can leave; code after the block starts at instruction `target`.
+    Block { target: usize, body: Vec<Stmt> },
+    /// Leave the enclosing `Block` whose target is `target` (a forward jump).
+    BreakTo { target: usize, at: usize },
 }
 
 struct Structurer<'a> {
@@ -75,6 +79,8 @@ struct Structurer<'a> {
     n: usize,
     /// Every jump as `(from, to)`.
     jumps: Vec<(usize, usize)>,
+    /// Forward-jump targets that are implemented with a labelled block.
+    wanted: Vec<usize>,
 }
 
 #[derive(Clone, Copy)]
@@ -83,23 +89,47 @@ struct LoopCtx {
     exit: usize,
 }
 
-type Res<T> = Result<T, ()>;
+#[derive(Default)]
+struct Ctx {
+    loops: Vec<LoopCtx>,
+    /// Targets of the blocks we are currently inside.
+    active: Vec<usize>,
+}
+
+/// Why structuring failed.
+#[derive(Clone, Copy, Debug)]
+enum Fail {
+    /// A forward jump to this target would work if a labelled block ended there.
+    Fix(usize),
+    /// Give up: use the fallback form.
+    No,
+}
+
+type Res<T> = Result<T, Fail>;
 
 /// Try to structure the whole program. `None` means "use the fallback form".
 pub fn structure(program: &Program) -> Option<Vec<Stmt>> {
-    let jumps = program
+    let jumps: Vec<(usize, usize)> = program
         .instrs
         .iter()
         .enumerate()
         .filter_map(|(i, ins)| ins.target().map(|t| (i, *t)))
         .collect();
-    let s = Structurer {
-        instrs: &program.instrs,
-        n: program.instrs.len(),
-        jumps,
-    };
-    let mut ctx = Vec::new();
-    s.region(0, s.n, &mut ctx, None).ok()
+    let mut wanted: Vec<usize> = Vec::new();
+    loop {
+        let s = Structurer {
+            instrs: &program.instrs,
+            n: program.instrs.len(),
+            jumps: jumps.clone(),
+            wanted: wanted.clone(),
+        };
+        let mut ctx = Ctx::default();
+        match s.region(0, s.n, &mut ctx, None) {
+            Ok(t) => return Some(t),
+            Err(Fail::Fix(t)) if !wanted.contains(&t) && wanted.len() < 16 => wanted.push(t),
+            Err(_) => return None,
+        }
+    }
 }
 
 fn cond_of(ins: &Instr<usize>) -> Option<Cond> {
@@ -114,6 +144,7 @@ fn contains_continue(stmts: &[Stmt]) -> bool {
     stmts.iter().any(|s| match s {
         Stmt::Continue(_) => true,
         Stmt::If { then, els, .. } => contains_continue(then) || contains_continue(els),
+        Stmt::Block { body, .. } => contains_continue(body),
         // Nested loops own their `continue`s.
         _ => false,
     })
@@ -127,15 +158,18 @@ impl Structurer<'_> {
             .any(|&(k, t)| !(s..e).contains(&k) && t > s && t < e)
     }
 
-    /// What a jump to `t` from instruction `i` inside a region ending at `hi` means.
-    fn special(&self, t: usize, ctx: &[LoopCtx], i: usize) -> Option<Stmt> {
-        if let Some(l) = ctx.last() {
+    /// What a jump to `t` from instruction `i` means when it leaves the current construct.
+    fn special(&self, t: usize, ctx: &Ctx, i: usize, blocks: bool) -> Option<Stmt> {
+        if let Some(l) = ctx.loops.last() {
             if t == l.head {
                 return Some(Stmt::Continue(i));
             }
             if t == l.exit {
                 return Some(Stmt::Break(i));
             }
+        }
+        if blocks && ctx.active.contains(&t) {
+            return Some(Stmt::BreakTo { target: t, at: i });
         }
         (t == self.n).then_some(Stmt::Exit(i))
     }
@@ -144,7 +178,40 @@ impl Structurer<'_> {
         &self,
         lo: usize,
         hi: usize,
-        ctx: &mut Vec<LoopCtx>,
+        ctx: &mut Ctx,
+        no_loop_at: Option<usize>,
+    ) -> Res<Vec<Stmt>> {
+        // Labelled blocks requested for forward jumps: the outermost (largest target) first.
+        let mut cands: Vec<usize> = self
+            .wanted
+            .iter()
+            .copied()
+            .filter(|t| *t > lo && *t <= hi && !ctx.active.contains(t))
+            .collect();
+        cands.sort_unstable_by(|a, b| b.cmp(a));
+        for t in cands {
+            ctx.active.push(t);
+            let first = self.region(lo, t, ctx, no_loop_at);
+            ctx.active.pop();
+            if let Ok(first) = first
+                && let Ok(rest) = self.region(t, hi, ctx, None)
+            {
+                let mut out = vec![Stmt::Block {
+                    target: t,
+                    body: first,
+                }];
+                out.extend(rest);
+                return Ok(out);
+            }
+        }
+        self.region_plain(lo, hi, ctx, no_loop_at)
+    }
+
+    fn region_plain(
+        &self,
+        lo: usize,
+        hi: usize,
+        ctx: &mut Ctx,
         no_loop_at: Option<usize>,
     ) -> Res<Vec<Stmt>> {
         let mut out = Vec::new();
@@ -159,18 +226,15 @@ impl Structurer<'_> {
                     .map(|&(k, _)| k)
                     .max();
                 if let Some(j) = back {
-                    if j >= hi {
-                        return Err(());
+                    if j >= hi || self.entered_from_outside(i, j + 1) {
+                        return Err(Fail::No);
                     }
-                    if self.entered_from_outside(i, j + 1) {
-                        return Err(());
-                    }
-                    ctx.push(LoopCtx {
+                    ctx.loops.push(LoopCtx {
                         head: i,
                         exit: j + 1,
                     });
                     let body = self.region(i, j, ctx, Some(i));
-                    ctx.pop();
+                    ctx.loops.pop();
                     let body = body?;
                     out.push(self.make_loop(i, j, body));
                     i = j + 1;
@@ -183,21 +247,23 @@ impl Structurer<'_> {
                     let t = *t;
                     if t == i + 1 || (t == hi && i + 1 == hi) {
                         // Jump to the next instruction: nothing to do.
-                    } else if let Some(s) = self.special(t, ctx, i) {
+                    } else if let Some(s) = self.special(t, ctx, i, true) {
                         out.push(s);
+                    } else if t > i {
+                        return Err(Fail::Fix(t));
                     } else {
-                        return Err(());
+                        return Err(Fail::No);
                     }
                     i += 1;
                 }
                 Instr::JumpZ(t) | Instr::JumpN(t) => {
                     let t = *t;
-                    let cond = cond_of(ins).ok_or(())?;
+                    let cond = cond_of(ins).ok_or(Fail::No)?;
                     if t == i + 1 {
                         i += 1;
                         continue;
                     }
-                    if let Some(s) = self.special(t, ctx, i) {
+                    if let Some(s) = self.special(t, ctx, i, false) {
                         out.push(Stmt::If {
                             cond,
                             then: vec![s],
@@ -209,46 +275,23 @@ impl Structurer<'_> {
                     }
                     if t > i && t <= hi {
                         // if-then, possibly with else.
-                        let else_end = match self.instrs.get(t - 1) {
-                            Some(Instr::Jump(u))
-                                if t - 1 > i
-                                    && *u > t
-                                    && *u <= hi
-                                    && self.special(*u, ctx, t - 1).is_none() =>
-                            {
-                                Some(*u)
-                            }
-                            _ => None,
-                        };
-                        if let Some(u) = else_end {
-                            if self.entered_from_outside(i, u) {
-                                return Err(());
-                            }
-                            let then = self.region(i + 1, t - 1, ctx, None)?;
-                            let els = self.region(t, u, ctx, None)?;
-                            out.push(Stmt::If {
-                                cond: cond.negate(),
-                                then,
-                                els,
-                                at: i,
-                            });
-                            i = u;
-                        } else {
-                            if self.entered_from_outside(i, t) {
-                                return Err(());
-                            }
-                            let then = self.region(i + 1, t, ctx, None)?;
-                            out.push(Stmt::If {
-                                cond: cond.negate(),
-                                then,
-                                els: Vec::new(),
-                                at: i,
-                            });
-                            i = t;
+                        if let Some((stmt, next)) = self.if_construct(i, t, hi, cond, ctx)? {
+                            out.push(stmt);
+                            i = next;
+                            continue;
                         }
+                    }
+                    if let Some(s) = self.special(t, ctx, i, true) {
+                        out.push(Stmt::If {
+                            cond,
+                            then: vec![s],
+                            els: Vec::new(),
+                            at: i,
+                        });
+                        i += 1;
                         continue;
                     }
-                    return Err(());
+                    return Err(if t > i { Fail::Fix(t) } else { Fail::No });
                 }
                 _ => {
                     out.push(Stmt::Ins(i));
@@ -257,6 +300,54 @@ impl Structurer<'_> {
             }
         }
         Ok(out)
+    }
+
+    /// `if` / `if-else` for a forward conditional jump at `i` to `t <= hi`.
+    /// `Ok(None)` means the pattern does not apply (something jumps into the middle).
+    fn if_construct(
+        &self,
+        i: usize,
+        t: usize,
+        hi: usize,
+        cond: Cond,
+        ctx: &mut Ctx,
+    ) -> Res<Option<(Stmt, usize)>> {
+        let else_end = match self.instrs.get(t - 1) {
+            Some(Instr::Jump(u))
+                if t - 1 > i
+                    && *u > t
+                    && *u <= hi
+                    && self.special(*u, ctx, t - 1, true).is_none() =>
+            {
+                Some(*u)
+            }
+            _ => None,
+        };
+        if let Some(u) = else_end {
+            if self.entered_from_outside(i, u) {
+                return Ok(None);
+            }
+            let then = self.region(i + 1, t - 1, ctx, None)?;
+            let els = self.region(t, u, ctx, None)?;
+            let stmt = Stmt::If {
+                cond: cond.negate(),
+                then,
+                els,
+                at: i,
+            };
+            return Ok(Some((stmt, u)));
+        }
+        if self.entered_from_outside(i, t) {
+            return Ok(None);
+        }
+        let then = self.region(i + 1, t, ctx, None)?;
+        let stmt = Stmt::If {
+            cond: cond.negate(),
+            then,
+            els: Vec::new(),
+            at: i,
+        };
+        Ok(Some((stmt, t)))
     }
 
     fn make_loop(&self, head: usize, j: usize, mut body: Vec<Stmt>) -> Stmt {

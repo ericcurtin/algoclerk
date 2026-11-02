@@ -17,7 +17,7 @@ output = [3, 4, 5, 1, 2]
 
 [machine]
 floor = 13
-names = ["", "", "", "", "", "", "", "", "next_free", "k", "position", "remaining", "zero"]
+names = ["", "", "", "", "", "", "", "", "next_free", "shift", "position", "remaining", "zero"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "mod", "bumpup", "bumpdn", "jump", "jumpz", "indirect"]
 [machine.prefill]
 8 = 0

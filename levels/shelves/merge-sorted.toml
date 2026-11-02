@@ -17,7 +17,7 @@ output = [1, 2, 3, 4, 6, 7]
 
 [machine]
 floor = 9
-names = ["last", "next", "tmp"]
+names = ["last", "following", "tmp"]
 allowed = ["inbox", "outbox", "copyto", "copyfrom", "sub", "bumpup", "jump", "jumpz", "jumpn", "indirect"]
 [machine.prefill]
 0 = 3
