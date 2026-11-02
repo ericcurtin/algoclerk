@@ -2,6 +2,7 @@
 //! `algoclerk-cli`: run, judge, validate and translate clerk programs without a GUI.
 
 mod args;
+mod codegen_cmd;
 mod commands;
 
 use std::process::ExitCode;

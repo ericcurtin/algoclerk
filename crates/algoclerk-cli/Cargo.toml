@@ -14,7 +14,7 @@ name = "algoclerk-cli"
 path = "src/main.rs"
 
 [dependencies]
-algoclerk-core = { workspace = true, features = ["compile-tests"] }
+algoclerk-core = { workspace = true }
 algoclerk-levels.workspace = true
 serde_json.workspace = true
 

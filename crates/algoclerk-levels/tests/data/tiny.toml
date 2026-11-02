@@ -1,0 +1,24 @@
+title = "Tiny"
+order = 1
+story = "A test level."
+statement = "Add the two numbers."
+signature = "fn add(a: int, b: int) -> int"
+technique = "Arithmetic"
+big_o = "O(1) time, O(1) space"
+builtins = []
+hints = ["Use +."]
+reference = """
+fn add(a: int, b: int) -> int {
+    return a + b;
+}
+"""
+[medals]
+size = [10, 8, 6]
+speed = [20, 10, 6]
+[[examples]]
+args = ["1", "2"]
+expect = "3"
+[[generate]]
+seed = 3
+count = 4
+args = [{ kind = "int" }, { kind = "int" }]

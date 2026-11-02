@@ -6,4 +6,10 @@
 #![warn(missing_docs)]
 
 pub mod i18n;
+pub mod complexity;
+pub mod judge;
 pub mod lang;
+pub mod level;
+pub mod progress;
+pub mod testgen;
+pub mod validate;

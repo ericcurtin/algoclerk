@@ -169,6 +169,12 @@ pub fn is_mutating(recv: &Ty, name: &str) -> bool {
     }
 }
 
+/// Names callable as plain functions: `len(x)`, `min(a, b)` ...
+pub const FREE_BUILTINS: &[&str] = &[
+    "len", "min", "max", "abs", "sum", "sorted", "reversed", "to_string", "to_int", "ord", "chr", "join", "from_chars",
+    "enumerate", "zip", "some", "lnode", "tnode",
+];
+
 /// Names of every built-in function and method (for the unlock lists, the picker and tests).
 pub const ALL_BUILTINS: &[&str] = &[
     "len", "min", "max", "abs", "sum", "sorted", "reversed", "to_string", "to_int", "ord", "chr", "join", "from_chars",
@@ -550,8 +556,8 @@ impl<'a> Checker<'a> {
         if name == "range" {
             return self.err(id, "range.place", "`range` only works right after `for x in`.");
         }
-        if !ALL_BUILTINS.contains(&name) {
-            let names: Vec<&str> = self.sigs.keys().map(String::as_str).chain(ALL_BUILTINS.iter().copied()).collect();
+        if !FREE_BUILTINS.contains(&name) {
+            let names: Vec<&str> = self.sigs.keys().map(String::as_str).chain(FREE_BUILTINS.iter().copied()).collect();
             let hint = did_you_mean(name, names.into_iter()).map(|h| format!(" Did you mean `{h}`?")).unwrap_or_default();
             return self.err(id, "call.unknown", format!("I do not know a tool called `{name}`.{hint}"));
         }
@@ -1072,7 +1078,7 @@ pub fn check(prog: &Program, opts: &CheckOpts) -> Result<TypeInfo, Vec<Diag>> {
     let mut sigs: HashMap<String, (usize, Vec<Param>, Ty)> = HashMap::new();
     let mut errors = Vec::new();
     for (i, f) in prog.fns.iter().enumerate() {
-        if ALL_BUILTINS.contains(&f.name.as_str()) || f.name == "range" {
+        if FREE_BUILTINS.contains(&f.name.as_str()) || f.name == "range" {
             errors.push(Diag::node(f.id, "fn.builtin", format!("`{}` is already the name of a built-in tool. Pick another name.", f.name)));
         }
         if sigs.insert(f.name.clone(), (i, f.params.clone(), f.ret.clone())).is_some() {

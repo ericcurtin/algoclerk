@@ -1,0 +1,50 @@
+title = "Reverse the Label"
+order = 6
+story = "The label printer feeds paper backwards. Every label has to be typed in reverse so it reads correctly when it comes out."
+statement = "Return s written backwards. The `reversed` tool is locked: build the new word yourself."
+signature = "fn reverse_label(s: string) -> string"
+constraints = ["0 <= len(s) <= 100000"]
+technique = "Build a string, two pointers"
+big_o = "O(n) time, O(n) space"
+types = ["string", "char"]
+builtins = ["len"]
+locked = [{ name = "reversed", why = "That is the whole exercise." }, { name = "reverse", why = "Also locked." }]
+hints = [
+  "Start with an empty result: `let out = \"\";`.",
+  "Walk the indices from the end: `for i in range(len(s) - 1, -1, -1)`.",
+  "Add each letter: `out += s[i];` (adding a letter to a word is allowed).",
+]
+reference = '''
+fn reverse_label(s: string) -> string {
+    let out = "";
+    for i in range(len(s) - 1, -1, -1) {
+        out += s[i];
+    }
+    return out;
+}
+'''
+[medals]
+size = [26, 20, 16]
+speed = [135, 72, 51]
+[[examples]]
+args = ['"stamp"']
+expect = '"pmats"'
+[[examples]]
+args = ['""']
+expect = '""'
+[[tests]]
+args = ['"a"']
+expect = '"a"'
+[[tests]]
+args = ['"Hello, World!"']
+expect = '"!dlroW ,olleH"'
+[[generate]]
+seed = 61
+count = 8
+args = [{ kind = "string", len = [0, 20], alphabet = "abcXYZ 09" }]
+[[generate]]
+seed = 62
+count = 2
+large = true
+n = 20000
+args = [{ kind = "string", len = "n", alphabet = "abcXYZ 09" }]

@@ -1,0 +1,50 @@
+title = "Biggest Parcel"
+order = 4
+story = "A row of parcels waits on the scale. The courier only takes the heaviest one today."
+statement = "Return the largest number on the shelf. The shelf is never empty. `max` and `min` are locked; compare as you go."
+signature = "fn biggest_parcel(weights: vec<int>) -> int"
+constraints = ["1 <= len(weights) <= 100000", "-100000 <= weights[i] <= 100000"]
+technique = "Running maximum"
+big_o = "O(n) time, O(1) space"
+types = ["vec"]
+builtins = []
+locked = [{ name = "max", why = "Finding the biggest is the lesson." }, { name = "min", why = "Same family of tools." }]
+hints = [
+  "Start by assuming the first parcel `weights[0]` is the biggest.",
+  "Visit every parcel; whenever one is heavier, remember it instead.",
+  "`if w > best { best = w; }`",
+]
+reference = '''
+fn biggest_parcel(weights: vec<int>) -> int {
+    let best = weights[0];
+    for w in weights {
+        if w > best {
+            best = w;
+        }
+    }
+    return best;
+}
+'''
+[medals]
+size = [24, 19, 15]
+speed = [72, 39, 28]
+[[examples]]
+args = ["[3, 9, 4]"]
+expect = "9"
+[[examples]]
+args = ["[-7]"]
+expect = "-7"
+note = "One parcel, so it is the biggest."
+[[tests]]
+args = ["[-3, -9, -1, -4]"]
+expect = "-1"
+[[generate]]
+seed = 41
+count = 10
+args = [{ kind = "vec_int", len = [1, 15], range = [-100000, 100000] }]
+[[generate]]
+seed = 42
+count = 2
+large = true
+n = 20000
+args = [{ kind = "vec_int", len = "n", range = [-100000, 100000] }]

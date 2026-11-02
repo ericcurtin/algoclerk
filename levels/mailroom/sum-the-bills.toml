@@ -1,0 +1,51 @@
+title = "Sum the Bills"
+order = 2
+story = "Month end. A shelf of invoices sits on your desk and the boss wants one number: the total owed."
+statement = "Return the sum of all numbers on the shelf. An empty shelf sums to 0. The built-in `sum` is locked; walk the shelf yourself."
+signature = "fn sum_the_bills(bills: vec<int>) -> int"
+constraints = ["0 <= len(bills) <= 100000", "-1000 <= bills[i] <= 1000"]
+technique = "Accumulator loop"
+big_o = "O(n) time, O(1) space"
+types = ["vec"]
+builtins = []
+locked = [{ name = "sum", why = "Adding things up is the whole exercise." }]
+hints = [
+  "Keep a running total in a variable that starts at 0.",
+  "`for bill in bills { ... }` visits every number once.",
+  "Inside the loop: `total += bill;`.",
+]
+reference = '''
+fn sum_the_bills(bills: vec<int>) -> int {
+    let total = 0;
+    for bill in bills {
+        total += bill;
+    }
+    return total;
+}
+'''
+[medals]
+size = [15, 12, 9]
+speed = [71, 38, 27]
+[[examples]]
+args = ["[3, 4, 5]"]
+expect = "12"
+[[examples]]
+args = ["[]"]
+expect = "0"
+note = "An empty shelf adds up to nothing."
+[[tests]]
+args = ["[-5, 5]"]
+expect = "0"
+[[tests]]
+args = ["[1000, 1000, 1000]"]
+expect = "3000"
+[[generate]]
+seed = 21
+count = 10
+args = [{ kind = "vec_int", len = [0, 15], range = [-1000, 1000] }]
+[[generate]]
+seed = 22
+count = 2
+large = true
+n = 20000
+args = [{ kind = "vec_int", len = "n", range = [-1000, 1000] }]

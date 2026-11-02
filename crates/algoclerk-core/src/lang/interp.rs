@@ -512,6 +512,30 @@ impl<'a> Machine<'a> {
             return Ok(());
         }
         let (root, steps) = self.place(target)?;
+        if op == Some(BinOp::Add) && matches!(v, Value::Str(_) | Value::Char(_) | Value::Vec(_)) {
+            // `s += x` appends in place (amortised O(1) for a letter, O(len x) otherwise), like real code.
+            let t = walk(&mut self.stack[root], &steps).map_err(|f| rt_err(id, f))?;
+            let (extra, grown) = match (t, &v) {
+                (Value::Str(rc), Value::Char(c)) => {
+                    Rc::make_mut(rc).push(*c);
+                    (1, 1)
+                }
+                (Value::Str(rc), Value::Str(o)) => {
+                    Rc::make_mut(rc).extend_from_slice(o);
+                    (1 + o.len() as u64, o.len() as i64)
+                }
+                (Value::Vec(rc), Value::Vec(o)) => {
+                    Rc::make_mut(rc).extend(o.iter().cloned());
+                    (1 + o.len() as u64, o.len() as i64)
+                }
+                _ => (u64::MAX, 0),
+            };
+            if extra != u64::MAX {
+                self.charge(id, extra)?;
+                self.grow(id, grown)?;
+                return Ok(());
+            }
+        }
         if steps.is_empty() {
             let new = match op {
                 None => v,

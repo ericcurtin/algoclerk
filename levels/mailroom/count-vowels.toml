@@ -1,0 +1,52 @@
+title = "Count the Vowels"
+order = 3
+story = "The sign painter charges by the vowel, because vowels use the expensive blue paint. Count them before quoting."
+statement = "Return how many letters of s are vowels: a, e, i, o or u, in either upper or lower case."
+signature = "fn count_vowels(s: string) -> int"
+constraints = ["0 <= len(s) <= 100000", "s holds plain ASCII letters, digits, spaces and punctuation"]
+technique = "Scan a string"
+big_o = "O(n) time, O(1) space"
+types = ["string", "char"]
+builtins = ["contains"]
+hints = [
+  "A string is a ribbon of letters: `for c in s { ... }` visits each one.",
+  "A word can answer questions too: `\"aeiou\".contains(c)` is true when c is a vowel.",
+  "Do not forget capital letters: try `c.lower()` first (you may need to unlock it!), or list both cases.",
+]
+reference = '''
+fn count_vowels(s: string) -> int {
+    let n = 0;
+    for c in s {
+        if "aeiouAEIOU".contains(c) {
+            n += 1;
+        }
+    }
+    return n;
+}
+'''
+[medals]
+size = [21, 17, 13]
+speed = [376, 201, 139]
+[[examples]]
+args = ['"hello"']
+expect = "2"
+[[examples]]
+args = ['"RHYTHM"']
+expect = "0"
+note = "No vowels at all."
+[[tests]]
+args = ['""']
+expect = "0"
+[[tests]]
+args = ['"AEIOUaeiou"']
+expect = "10"
+[[generate]]
+seed = 31
+count = 10
+args = [{ kind = "string", len = [0, 20], alphabet = "abcdeEAIOUxyz 1!" }]
+[[generate]]
+seed = 32
+count = 2
+large = true
+n = 20000
+args = [{ kind = "string", len = "n", alphabet = "abcdeEAIOUxyz 1!" }]

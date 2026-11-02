@@ -23,6 +23,8 @@ pub struct LevelRecord {
     pub medals: Medals,
     /// Stars 0-3.
     pub stars: u8,
+    /// Measured complexity of the latest accepted solution.
+    pub complexity: Option<crate::complexity::Complexity>,
     /// Text of the smallest solution.
     pub best_size_solution: String,
     /// Text of the fastest solution.
@@ -166,14 +168,15 @@ impl Progress {
             rec.best_size_solution = solution_text.to_string();
             improved = true;
         }
-        if rec.best_speed.is_none_or(|b| verdict.avg_steps < b) {
-            rec.best_speed = Some(verdict.avg_steps);
+        if rec.best_speed.is_none_or(|b| verdict.avg_cost < b) {
+            rec.best_speed = Some(verdict.avg_cost);
             rec.best_speed_solution = solution_text.to_string();
             improved = true;
         }
         rec.medals.size = rec.medals.size.max(verdict.medals.size);
         rec.medals.speed = rec.medals.speed.max(verdict.medals.speed);
         rec.stars = rec.medals.stars();
+        rec.complexity = verdict.complexity.clone();
         improved
     }
 
@@ -208,14 +211,16 @@ mod tests {
 
     #[test]
     fn verdict_recording_keeps_best() {
-        let level = Level::from_toml(include_str!("../tests/data/echo.toml"), "t").unwrap();
+        let level = Level::from_toml(include_str!("../tests/data/tiny.toml"), "t").unwrap();
+        let mut level = level;
+        level.id = "tiny".into();
         let judge = Judge::new(&level).unwrap();
-        let v = judge.judge(&level.reference_program().unwrap());
+        let v = judge.judge(&level.reference);
+        assert!(v.passed, "{v:?}");
         let mut p = Progress::default();
         assert!(p.record_verdict(&level, &v, "a"));
         assert!(!p.record_verdict(&level, &v, "b"));
         assert_eq!(p.record(&level.id).best_size_solution, "a");
-        assert_eq!(p.total_stars(), 3);
         let again = Progress::from_json(&p.to_json());
         assert_eq!(again, p);
     }

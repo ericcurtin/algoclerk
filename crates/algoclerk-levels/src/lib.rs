@@ -75,15 +75,9 @@ impl Campaign {
                 }
             } else {
                 match Level::from_toml(text, dir) {
-                    Ok(l) => {
-                        if l.id != stem {
-                            self.load_errors.push(format!(
-                                "{path}: id \"{}\" must equal the file name \"{stem}\"",
-                                l.id
-                            ));
-                        } else {
-                            levels.push(l);
-                        }
+                    Ok(mut l) => {
+                        l.id = stem.to_string();
+                        levels.push(l);
                     }
                     Err(e) => self.load_errors.push(format!("{path}: {e}")),
                 }
@@ -212,13 +206,8 @@ impl Campaign {
 mod tests {
     use super::*;
 
-    fn lvl(id: &str, order: u32) -> String {
-        include_str!("../../algoclerk-core/tests/data/echo.toml")
-            .replace("echo-test", id)
-            .replace(
-                "title = \"Echo\"",
-                &format!("title = \"Echo\"\norder = {order}"),
-            )
+    fn lvl(_id: &str, order: u32) -> String {
+        include_str!("../tests/data/tiny.toml").replace("order = 1", &format!("order = {order}"))
     }
 
     #[test]
@@ -251,13 +240,12 @@ mod tests {
                 "a/pack.toml".to_string(),
                 "title=\"A\"\nblurb=\"a\"\norder=1".to_string(),
             ),
-            ("a/x.toml".to_string(), lvl("y", 1)),
             ("a/z.toml".to_string(), "garbage".to_string()),
             ("lonely.toml".to_string(), "x".to_string()),
             ("nopack/q.toml".to_string(), lvl("q", 1)),
         ];
         let c = Campaign::from_files(&files);
-        assert_eq!(c.load_errors.len(), 4);
+        assert_eq!(c.load_errors.len(), 3, "{:?}", c.load_errors);
         assert_eq!(c.level_count(), 0);
     }
 
