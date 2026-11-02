@@ -2,8 +2,8 @@
 //! Level validation used by CI, the CLI and the shipped-campaign tests.
 
 use crate::complexity::Class;
+use crate::cpp::run::{Compiled, compile};
 use crate::judge::{FailKind, Judge, Medal};
-use crate::lang::run::compile;
 use crate::level::Level;
 
 /// Parse the leading class of a Big-O note such as `"O(n log n) time, O(n) space"`.
@@ -58,6 +58,20 @@ pub fn validate_level(level: &Level) -> Vec<String> {
     {
         p("speed medal targets must be bronze >= silver >= gold > 0".into());
     }
+    if level.signature.ret.ty == crate::cpp::ast::Ty::Void {
+        p("the entry function must return a value (the judge compares results)".into());
+    }
+    if !level.reference.contains(&level.signature.name) {
+        p(format!(
+            "the reference does not define `{}`",
+            level.signature.name
+        ));
+    }
+    for k in &level.locked {
+        if level.unlocked.contains(&k.name) {
+            p(format!("`{}` is both locked and unlocked", k.name));
+        }
+    }
     let judge = match Judge::new(level) {
         Ok(j) => j,
         Err(e) => {
@@ -65,7 +79,7 @@ pub fn validate_level(level: &Level) -> Vec<String> {
             return problems;
         }
     };
-    let scalar_only = level.signature.params.iter().all(|p| p.ty.is_scalar());
+    let scalar_only = level.scalar_only();
     if !scalar_only && !level.generate.iter().any(|g| g.large) {
         p(
             "needs at least one large generator (performance tests and the complexity sweep)"
@@ -132,7 +146,7 @@ pub fn validate_level(level: &Level) -> Vec<String> {
         (_, None) => p(format!("cannot parse the Big-O note '{}'", level.big_o)),
     }
     if let Some(naive) = &level.naive {
-        match compile(naive, &level.check_opts()) {
+        match compile(&level.prelude, naive, &level.check_opts()) {
             Err(d) => p(format!(
                 "naive solution does not compile: {}",
                 d.first().map_or(String::new(), |d| d.msg.clone())
@@ -161,11 +175,7 @@ pub fn validate_level(level: &Level) -> Vec<String> {
     problems
 }
 
-fn judge_subset(
-    judge: &Judge,
-    sol: &crate::lang::run::Compiled,
-    large: bool,
-) -> Option<crate::judge::Failure> {
+fn judge_subset(judge: &Judge, sol: &Compiled, large: bool) -> Option<crate::judge::Failure> {
     // Re-use the judge on a filtered suite.
     let mut sub = Judge {
         level: judge.level.clone(),
@@ -181,4 +191,43 @@ fn judge_subset(
         sub.suite = vec![];
     }
     sub.judge_compiled(sol, false).failure
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn big_o_notes_are_parsed() {
+        assert_eq!(
+            declared_time_class("O(n) time, O(1) space"),
+            Some(Class::Linear)
+        );
+        assert_eq!(
+            declared_time_class("O(n log n) time, O(n) space"),
+            Some(Class::NLogN)
+        );
+        assert_eq!(
+            declared_space_class("O(n) time, O(1) space"),
+            Some(Class::Constant)
+        );
+        assert_eq!(declared_time_class("fast"), None);
+    }
+
+    #[test]
+    fn contradictory_unlocks_are_reported_even_without_the_pipeline() {
+        let text = include_str!("../tests/data/tiny.toml").replace(
+            "[medals]",
+            "unlocked = [\"<algorithm>\"]\nlocked = [{ name = \"<algorithm>\", why = \"w\" }]\n[medals]",
+        );
+        // the keys above landed after top-level scalars and before [medals]: valid TOML
+        let level = Level::from_toml(&text, "t").unwrap();
+        let problems = validate_level(&level);
+        assert!(
+            problems
+                .iter()
+                .any(|m| m.contains("both locked and unlocked")),
+            "{problems:?}"
+        );
+    }
 }

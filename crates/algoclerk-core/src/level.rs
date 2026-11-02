@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Level data model (loaded from TOML). See `docs/LEVEL_FORMAT.md`.
 
-use crate::lang::ast::Ty;
-use crate::lang::check::{Allowed, CheckOpts, EntrySig};
-use crate::lang::parse::parse;
+use crate::cpp::ast::Ty;
+use crate::cpp::check::{CheckOpts, EntrySig};
+use crate::cpp::sig::{parse_signature, prelude_aliases};
 use serde::Deserialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// How the judge compares outputs.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
@@ -20,10 +20,11 @@ pub enum Compare {
     SortAll,
 }
 
-/// A built-in the level locks, with the reason shown in the brief.
+/// A library name the level locks (`<algorithm>`, `std::sort`, `std::string::substr`), with the reason shown
+/// in the brief.
 #[derive(Clone, Debug, Deserialize)]
 pub struct LockNote {
-    /// Built-in name.
+    /// Header (`<algorithm>`), `std::` name or member (`std::string::substr`).
     pub name: String,
     /// Why it is locked.
     #[serde(default)]
@@ -114,15 +115,19 @@ impl Default for Budgets {
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct Unlock {
     #[serde(default)]
     helpers: bool,
     #[serde(default)]
     recursion: bool,
+    #[serde(default)]
+    structs: bool,
 }
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RawLevel {
     title: String,
     #[serde(default)]
@@ -130,15 +135,15 @@ struct RawLevel {
     #[serde(default)]
     story: String,
     statement: String,
+    #[serde(default)]
+    prelude: String,
     signature: String,
     #[serde(default)]
     constraints: Vec<String>,
     technique: String,
     big_o: String,
     #[serde(default)]
-    types: Vec<String>,
-    #[serde(default)]
-    builtins: Vec<String>,
+    unlocked: Vec<String>,
     #[serde(default)]
     locked: Vec<LockNote>,
     #[serde(default)]
@@ -214,24 +219,28 @@ pub struct Level {
     pub story: String,
     /// Plain problem statement.
     pub statement: String,
-    /// The fixed function header.
+    /// Read-only code above the player's: `#include` lines, helper structs such as `ListNode`.
+    pub prelude: String,
+    /// The fixed function header, parsed.
     pub signature: EntrySig,
+    /// The signature as written in the level file (what the brief and the editor show).
+    pub signature_text: String,
     /// Constraint bullets.
     pub constraints: Vec<String>,
     /// Name of the standard technique ("Hash map lookup").
     pub technique: String,
     /// Big-O note.
     pub big_o: String,
-    /// Unlocked type families (besides those in the signature).
-    pub types: Vec<String>,
-    /// Unlocked built-ins.
-    pub builtins: Vec<String>,
-    /// Locked built-ins with reasons.
+    /// Headers the player may `#include` besides those of the prelude (`<algorithm>`); `*` unlocks all.
+    pub unlocked: Vec<String>,
+    /// Locked names with reasons.
     pub locked: Vec<LockNote>,
     /// Helper functions allowed.
     pub helpers: bool,
     /// Recursion allowed.
     pub recursion: bool,
+    /// Player-defined structs allowed.
+    pub structs: bool,
     /// Hint ladder.
     pub hints: Vec<String>,
     /// Reference solution text.
@@ -254,25 +263,60 @@ pub struct Level {
     pub sweep: Option<GenSpec>,
 }
 
+/// Does `text` contain `struct name` as a whole word?
+fn defines_struct(text: &str, name: &str) -> bool {
+    let key = format!("struct {name}");
+    text.match_indices(&key).any(|(i, _)| {
+        text[i + key.len()..]
+            .chars()
+            .next()
+            .is_none_or(|c| !(c.is_alphanumeric() || c == '_'))
+    })
+}
+
+fn valid_header(h: &str) -> bool {
+    h == "*"
+        || (h.len() > 2
+            && ((h.starts_with('<') && h.ends_with('>'))
+                || (h.starts_with('"') && h.ends_with('"'))))
+}
+
 impl Level {
     /// Parse a level file. `pack` is the directory name.
     pub fn from_toml(text: &str, pack: &str) -> Result<Level, String> {
         let r: RawLevel = toml::from_str(text).map_err(|e| e.to_string())?;
-        let header = format!("{} {{}}", r.signature.trim());
-        let prog = parse(&header).map_err(|d| format!("signature: {}", d.msg))?;
-        let f = prog.fns.first().ok_or("signature: no function")?;
-        let signature = EntrySig {
-            name: f.name.clone(),
-            params: f.params.clone(),
-            ret: f.ret.clone(),
-        };
         if r.title.trim().is_empty() {
             return Err("empty title".into());
         }
-        let u = r.unlock.unwrap_or(Unlock {
-            helpers: false,
-            recursion: false,
-        });
+        let aliases = prelude_aliases(&r.prelude);
+        let signature =
+            parse_signature(&r.signature, &aliases).map_err(|e| format!("signature: {e}"))?;
+        let mut missing = Vec::new();
+        let mut note = |t: &Ty| {
+            t.walk(&mut |x| {
+                if let Ty::Struct(n) = x
+                    && !defines_struct(&r.prelude, n)
+                    && !missing.contains(n)
+                {
+                    missing.push(n.clone());
+                }
+            });
+        };
+        for p in &signature.params {
+            note(&p.spec.ty);
+        }
+        note(&signature.ret.ty);
+        if let Some(n) = missing.first() {
+            return Err(format!(
+                "signature: `{n}` is not defined by the prelude (add `struct {n} {{ ... }};`)"
+            ));
+        }
+        if let Some(h) = r.unlocked.iter().find(|h| !valid_header(h)) {
+            return Err(format!(
+                "unlocked: `{h}` is not a header such as \"<vector>\" (or \"*\")"
+            ));
+        }
+        let u = r.unlock.unwrap_or_default();
         Ok(Level {
             id: String::new(),
             pack: pack.to_string(),
@@ -280,15 +324,17 @@ impl Level {
             order: r.order,
             story: r.story,
             statement: r.statement,
+            prelude: r.prelude,
             signature,
+            signature_text: r.signature.trim().trim_end_matches(';').trim().to_string(),
             constraints: r.constraints,
             technique: r.technique,
             big_o: r.big_o,
-            types: r.types,
-            builtins: r.builtins,
+            unlocked: r.unlocked,
             locked: r.locked,
             helpers: u.helpers,
             recursion: u.recursion,
+            structs: u.structs,
             hints: r.hints,
             reference: r.reference,
             naive: r.naive,
@@ -302,57 +348,177 @@ impl Level {
         })
     }
 
-    /// The set of type families the player may use (signature types are always included).
-    pub fn allowed_types(&self) -> BTreeSet<String> {
-        let mut set: BTreeSet<String> = self.types.iter().cloned().collect();
-        let mut fams = Vec::new();
-        for p in &self.signature.params {
-            p.ty.families(&mut fams);
-        }
-        self.signature.ret.families(&mut fams);
-        for f in fams {
-            set.insert(f.to_string());
-        }
-        for n in ["int", "bool", "unit"] {
-            set.remove(n);
-        }
-        set
-    }
-
-    /// Options for the type checker.
+    /// Options for the checker: the entry signature and what the level unlocks.
     pub fn check_opts(&self) -> CheckOpts {
-        let everything = self.builtins.iter().any(|b| b == "*");
+        let everything = self.unlocked.iter().any(|h| h == "*");
+        let locked: BTreeMap<String, String> = self
+            .locked
+            .iter()
+            .map(|l| (l.name.clone(), l.why.clone()))
+            .collect();
         CheckOpts {
-            allowed: Allowed {
-                types: if everything {
-                    None
-                } else {
-                    Some(self.allowed_types())
-                },
-                builtins: if everything {
-                    None
-                } else {
-                    Some(self.builtins.iter().cloned().collect())
-                },
-                helpers: self.helpers,
-                recursion: self.recursion,
-            },
             entry: Some(self.signature.clone()),
+            unlocked_headers: if everything {
+                None
+            } else {
+                Some(self.unlocked.iter().cloned().collect::<BTreeSet<_>>())
+            },
+            locked,
+            helpers: self.helpers,
+            recursion: self.recursion,
+            structs: self.structs,
         }
     }
 
-    /// The skeleton shown in a fresh editor.
-    pub fn starter(&self) -> String {
-        let ret = &self.signature.ret;
-        let tail = match ret {
-            Ty::Unit => String::new(),
-            Ty::Int => "    return 0;\n".into(),
-            Ty::Bool => "    return false;\n".into(),
-            Ty::Str => "    return \"\";\n".into(),
-            Ty::Char => "    return 'a';\n".into(),
-            Ty::Vec(_) => "    return [];\n".into(),
-            _ => "    // your code here\n".into(),
+    /// The initial editor text: the signature with an empty body.
+    pub fn starter_code(&self) -> String {
+        format!("{} {{\n}}\n", self.signature_text)
+    }
+
+    /// The complete translation unit text: the prelude, then the given player code.
+    pub fn full_source(&self, player: &str) -> String {
+        let mut s = self.prelude.trim_end().to_string();
+        if !s.is_empty() {
+            s.push_str("\n\n");
+        }
+        s.push_str(player.trim_start_matches('\n'));
+        s
+    }
+
+    /// Does the prelude define `struct name`?
+    pub fn prelude_defines(&self, name: &str) -> bool {
+        defines_struct(&self.prelude, name)
+    }
+
+    /// Is every parameter and the return type a scalar (no containers, no pointers)?
+    pub fn scalar_only(&self) -> bool {
+        let scalar = |t: &Ty| {
+            matches!(
+                t,
+                Ty::Bool | Ty::Char | Ty::Int | Ty::UInt | Ty::LongLong | Ty::ULongLong | Ty::Size
+            )
         };
-        format!("{} {{\n{tail}}}\n", self.signature.text())
+        self.signature.params.iter().all(|p| scalar(&p.spec.ty))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const BASE: &str = r#"
+title = "T"
+statement = "s"
+signature = "SIG"
+technique = "t"
+big_o = "O(1) time, O(1) space"
+reference = "REF"
+"#;
+
+    fn with_sig(sig: &str) -> String {
+        BASE.replace("SIG", sig)
+    }
+
+    #[test]
+    fn parses_a_full_level() {
+        let text = r#"
+title = "Pair"
+statement = "s"
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<int> twoSum(const std::vector<int>& nums, int target)"
+technique = "t"
+big_o = "O(n) time, O(n) space"
+unlocked = ["<unordered_map>"]
+locked = [{ name = "std::sort", why = "w" }, { name = "<algorithm>", why = "w2" }]
+unlock = { helpers = true, structs = true }
+reference = "x"
+"#;
+        let l = Level::from_toml(text, "p").unwrap();
+        assert_eq!(l.signature.name, "twoSum");
+        assert_eq!(l.signature.params.len(), 2);
+        assert!(l.helpers && !l.recursion && l.structs);
+        let o = l.check_opts();
+        assert_eq!(o.entry.as_ref().unwrap().name, "twoSum");
+        assert!(
+            o.unlocked_headers
+                .as_ref()
+                .unwrap()
+                .contains("<unordered_map>")
+        );
+        assert_eq!(o.locked.get("std::sort").map(String::as_str), Some("w"));
+        assert!(o.helpers && !o.recursion && o.structs);
+        assert_eq!(
+            l.starter_code(),
+            "std::vector<int> twoSum(const std::vector<int>& nums, int target) {\n}\n"
+        );
+        assert_eq!(l.full_source("int x;\n"), "#include <vector>\n\nint x;\n");
+        assert!(!l.scalar_only());
+    }
+
+    #[test]
+    fn star_unlocks_every_header() {
+        let text = format!("unlocked = [\"*\"]\n{}", with_sig("int f(int a)"));
+        let l = Level::from_toml(&text, "p").unwrap();
+        assert!(l.check_opts().unlocked_headers.is_none());
+        assert!(l.scalar_only());
+    }
+
+    #[test]
+    fn rejects_old_format_and_bad_signatures() {
+        assert!(Level::from_toml(&with_sig("fn f(a: int) -> int"), "p").is_err());
+        assert!(Level::from_toml(&with_sig("int f(int)"), "p").is_err());
+        assert!(Level::from_toml(&with_sig("double f(int a)"), "p").is_err());
+        let old = format!("builtins = []\n{}", with_sig("int f(int a)"));
+        let e = Level::from_toml(&old, "p").unwrap_err();
+        assert!(e.contains("builtins"), "{e}");
+        let e = Level::from_toml(&with_sig("ListNode* f(ListNode* h)"), "p").unwrap_err();
+        assert!(e.contains("ListNode"), "{e}");
+        let e = Level::from_toml(
+            &format!("unlocked = [\"vector\"]\n{}", with_sig("int f(int a)")),
+            "p",
+        )
+        .unwrap_err();
+        assert!(e.contains("header"), "{e}");
+    }
+
+    #[test]
+    fn struct_signatures_need_the_prelude_definition() {
+        let text = format!(
+            "prelude = \"struct ListNode {{ int val; ListNode* next; ListNode(int v) : val(v), next(nullptr) {{}} }};\"\n{}",
+            with_sig("ListNode* f(ListNode* h)")
+        );
+        let l = Level::from_toml(&text, "p").unwrap();
+        assert!(l.prelude_defines("ListNode"));
+        assert!(!l.prelude_defines("TreeNode"));
+        assert!(!l.prelude_defines("List"));
+    }
+
+    #[test]
+    fn prelude_aliases_can_be_used_in_the_signature() {
+        let text = format!(
+            "prelude = \"#include <vector>\\nusing Grid = std::vector<std::vector<char>>;\"\n{}",
+            with_sig("int f(const Grid& g)")
+        );
+        let l = Level::from_toml(&text, "p").unwrap();
+        assert_eq!(
+            l.signature.params[0].spec.ty,
+            Ty::vector(Ty::vector(Ty::Char))
+        );
+    }
+
+    /// The worked example of `docs/LEVEL_FORMAT.md` must load.
+    #[test]
+    fn the_documented_example_loads() {
+        let doc = include_str!("../../../docs/LEVEL_FORMAT.md");
+        let start = doc.find("## A complete example").unwrap();
+        let rest = &doc[start..];
+        let a = rest.find("```toml\n").unwrap() + "```toml\n".len();
+        let b = a + rest[a..].find("\n```").unwrap();
+        let l = Level::from_toml(&rest[a..b], "doc").unwrap();
+        assert_eq!(l.signature.name, "twoSum");
+        assert!(l.naive.is_some() && l.examples.len() == 2 && l.generate.len() == 2);
+        assert_eq!(l.locked.len(), 1);
     }
 }

@@ -1,41 +1,46 @@
 title = "Matching Pair"
 order = 1
 story = "The accountant has a shelf of invoices and one cheque. Two invoices add up exactly to the cheque, and she wants to know which two."
-statement = "Find two different positions i < j with nums[i] + nums[j] == target. If several pairs work, return the one with the smallest j. Return [] when no pair works. All numbers are different."
-signature = "fn two_sum(nums: vec<int>, target: int) -> vec<int>"
-constraints = ["0 <= len(nums) <= 20000", "all values in nums are different", "result is [i, j]"]
+statement = "Find two different positions i < j with nums[i] + nums[j] == target. If several pairs work, return the one with the smallest j. Return {} when no pair works. All numbers are different."
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<int> twoSum(const std::vector<int>& nums, int target)"
+constraints = ["0 <= nums.size() <= 20000", "all values in nums are different", "result is {i, j}"]
 technique = "Hash map lookup"
 big_o = "O(n) time, O(n) space"
-types = ["map", "vec"]
-builtins = ["contains", "len"]
+unlocked = ["<unordered_map>"]
 hints = [
   "For each number x you need target - x. Have you seen it already?",
-  "Keep a map from value to index of every number you have walked past.",
-  "`if seen.contains(want) { return [seen[want], i]; }` then record `seen[nums[i]] = i;`.",
+  "Keep a `std::unordered_map<int, int>` from value to index of every number you have walked past. `seen.find(want)` returns `seen.end()` when `want` is missing.",
+  "`if (auto it = seen.find(want); it != seen.end()) { return {it->second, i}; }` then record `seen[nums[i]] = i;`. `nums` is a `const std::vector<int>&`, so looking at it is free.",
 ]
 reference = '''
-fn two_sum(nums: vec<int>, target: int) -> vec<int> {
-    let seen = map<int, int>();
-    for i in range(len(nums)) {
-        let want = target - nums[i];
-        if seen.contains(want) {
-            return [seen[want], i];
+#include <unordered_map>
+
+std::vector<int> twoSum(const std::vector<int>& nums, int target) {
+    std::unordered_map<int, int> seen;
+    for (int i = 0; i < static_cast<int>(nums.size()); ++i) {
+        const int want = target - nums[i];
+        if (auto it = seen.find(want); it != seen.end()) {
+            return {it->second, i};
         }
         seen[nums[i]] = i;
     }
-    return [];
+    return {};
 }
 '''
 naive = '''
-fn two_sum(nums: vec<int>, target: int) -> vec<int> {
-    for j in range(len(nums)) {
-        for i in range(j) {
-            if nums[i] + nums[j] == target {
-                return [i, j];
+std::vector<int> twoSum(const std::vector<int>& nums, int target) {
+    const int n = static_cast<int>(nums.size());
+    for (int j = 0; j < n; ++j) {
+        for (int i = 0; i < j; ++i) {
+            if (nums[i] + nums[j] == target) {
+                return {i, j};
             }
         }
     }
-    return [];
+    return {};
 }
 '''
 
@@ -47,25 +52,25 @@ size = [48, 38, 30]
 speed = [78, 42, 30]
 
 [[examples]]
-args = ["[2, 7, 11, 15]", "9"]
-expect = "[0, 1]"
+args = ["{2, 7, 11, 15}", "9"]
+expect = "{0, 1}"
 
 [[examples]]
-args = ["[3, 2, 4]", "6"]
-expect = "[1, 2]"
+args = ["{3, 2, 4}", "6"]
+expect = "{1, 2}"
 
 [[examples]]
-args = ["[1, 2]", "10"]
-expect = "[]"
+args = ["{1, 2}", "10"]
+expect = "{}"
 note = "No pair adds up."
 
 [[tests]]
-args = ["[]", "0"]
-expect = "[]"
+args = ["{}", "0"]
+expect = "{}"
 
 [[tests]]
-args = ["[5, -5]", "0"]
-expect = "[0, 1]"
+args = ["{5, -5}", "0"]
+expect = "{0, 1}"
 
 [[generate]]
 seed = 201

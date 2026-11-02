@@ -6,8 +6,12 @@ use crate::level::Level;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-/// Current on-disk format version.
-pub const PROGRESS_VERSION: u32 = 1;
+/// Current on-disk format version. Version 1 saves were written when players still wrote the invented
+/// ClerkScript language; version 2 is the C++ era.
+pub const PROGRESS_VERSION: u32 = 2;
+
+/// Shown once after an old save was converted (see [`Progress::from_json`]).
+pub const MIGRATION_NOTE: &str = "The office switched from ClerkScript to real C++. Old solutions cannot be migrated, so drafts and saved solutions were cleared; your solved levels, stars and settings were kept.";
 
 /// Per-level record.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -114,6 +118,8 @@ pub struct Progress {
     pub sandbox: String,
     /// Id of the level last played.
     pub last_level: String,
+    /// Non-empty when an old save was converted on load: tell the player once, then clear it.
+    pub migration_note: String,
 }
 
 impl Default for Progress {
@@ -124,14 +130,58 @@ impl Default for Progress {
             settings: Settings::default(),
             sandbox: String::new(),
             last_level: String::new(),
+            migration_note: String::new(),
         }
     }
 }
 
 impl Progress {
     /// Parse JSON; falls back to defaults on corrupt data (never panics, never loses the app).
+    ///
+    /// Saves older than [`PROGRESS_VERSION`] (ClerkScript era) are migrated: settings, solved flags, medals
+    /// and stars are kept; everything that contained ClerkScript text (drafts, saved best solutions,
+    /// sandbox) and the numbers that are not comparable with the C++ size metric (best size, best speed,
+    /// measured complexity) are cleared, and [`Progress::migration_note`] says so.
     pub fn from_json(s: &str) -> Progress {
-        serde_json::from_str(s).unwrap_or_default()
+        let Ok(raw) = serde_json::from_str::<serde_json::Value>(s) else {
+            return Progress::default();
+        };
+        let version = raw
+            .get("version")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(0);
+        let Ok(mut p) = serde_json::from_value::<Progress>(raw) else {
+            return Progress::default();
+        };
+        if version < u64::from(PROGRESS_VERSION) {
+            p.migrate_old();
+        }
+        p
+    }
+
+    fn migrate_old(&mut self) {
+        let had_work = !self.sandbox.trim().is_empty()
+            || self.levels.values().any(|r| {
+                !r.draft.trim().is_empty()
+                    || !r.best_size_solution.is_empty()
+                    || !r.best_speed_solution.is_empty()
+            });
+        for r in self.levels.values_mut() {
+            r.draft.clear();
+            r.best_size_solution.clear();
+            r.best_speed_solution.clear();
+            r.best_size = None;
+            r.best_speed = None;
+            r.complexity = None;
+            r.hints_used = 0;
+            r.reference_revealed = false;
+            r.code_revealed = false;
+        }
+        self.sandbox.clear();
+        self.version = PROGRESS_VERSION;
+        if had_work {
+            self.migration_note = MIGRATION_NOTE.to_string();
+        }
     }
 
     /// Serialise.
@@ -194,7 +244,6 @@ impl Progress {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::judge::Judge;
 
     #[test]
     fn corrupt_json_gives_defaults() {
@@ -209,19 +258,90 @@ mod tests {
         assert!(p.settings.sound);
     }
 
+    fn passed(size: u32, cost: f64) -> Verdict {
+        Verdict {
+            passed: true,
+            size,
+            avg_cost: cost,
+            ..Verdict::default()
+        }
+    }
+
+    fn fake_level() -> Level {
+        let text = include_str!("../tests/data/tiny.toml");
+        let mut level = Level::from_toml(text, "t").unwrap();
+        level.id = "tiny".into();
+        level
+    }
+
     #[test]
     fn verdict_recording_keeps_best() {
-        let level = Level::from_toml(include_str!("../tests/data/tiny.toml"), "t").unwrap();
-        let mut level = level;
-        level.id = "tiny".into();
-        let judge = Judge::new(&level).unwrap();
-        let v = judge.judge(&level.reference);
-        assert!(v.passed, "{v:?}");
+        let level = fake_level();
         let mut p = Progress::default();
-        assert!(p.record_verdict(&level, &v, "a"));
-        assert!(!p.record_verdict(&level, &v, "b"));
-        assert_eq!(p.record(&level.id).best_size_solution, "a");
+        assert!(p.record_verdict(&level, &passed(10, 50.0), "a"));
+        assert!(!p.record_verdict(&level, &passed(12, 60.0), "b"));
+        assert!(p.record_verdict(&level, &passed(8, 70.0), "c"));
+        assert_eq!(p.record(&level.id).best_size_solution, "c");
+        assert_eq!(p.record(&level.id).best_speed_solution, "a");
         let again = Progress::from_json(&p.to_json());
         assert_eq!(again, p);
+    }
+
+    #[test]
+    fn current_saves_are_not_migrated() {
+        let mut p = Progress::default();
+        p.record_mut("x").draft = "int f() { return 1; }".into();
+        let again = Progress::from_json(&p.to_json());
+        assert_eq!(again.record("x").draft, "int f() { return 1; }");
+        assert!(again.migration_note.is_empty());
+    }
+
+    #[test]
+    fn clerkscript_era_saves_are_migrated_not_crashed_on() {
+        let old = r#"{
+            "version": 1,
+            "levels": {
+                "two-sum": {"solved": true, "best_size": 30, "best_speed": 42.0, "stars": 3,
+                    "medals": {"size": "Gold", "speed": "Silver"},
+                    "best_size_solution": "fn two_sum(nums: vec<int>) -> int { return 0; }",
+                    "draft": "fn two_sum() {}", "hints_used": 2, "reference_revealed": true},
+                "other": {"solved": false}
+            },
+            "settings": {"theme": "light", "palette": "contrast", "music_volume": 3},
+            "sandbox": "fn main() -> int { return 1; }",
+            "last_level": "two-sum"
+        }"#;
+        let p = Progress::from_json(old);
+        assert_eq!(p.version, PROGRESS_VERSION);
+        assert_eq!(p.settings.theme, "light");
+        assert_eq!(p.settings.music_volume, 3);
+        assert_eq!(p.last_level, "two-sum");
+        let r = p.record("two-sum");
+        assert!(r.solved && r.stars == 3);
+        assert_eq!(r.medals.size, crate::judge::Medal::Gold);
+        assert!(r.draft.is_empty() && r.best_size_solution.is_empty());
+        assert_eq!((r.best_size, r.best_speed), (None, None));
+        assert!(p.sandbox.is_empty());
+        assert!(p.migration_note.contains("cannot be migrated"));
+        // saving and loading again keeps the converted state and does not repeat the conversion
+        let q = Progress::from_json(&p.to_json());
+        assert_eq!(q, p);
+    }
+
+    #[test]
+    fn saves_without_any_work_migrate_silently_and_garbage_gives_defaults() {
+        let p = Progress::from_json("{\"version\": 1, \"levels\": {\"a\": {\"solved\": true}}}");
+        assert!(p.record("a").solved);
+        assert!(p.migration_note.is_empty());
+        for junk in [
+            "",
+            "null",
+            "[]",
+            "{\"version\": \"x\"}",
+            "{\"levels\": [1]}",
+            "\u{0}",
+        ] {
+            assert_eq!(Progress::from_json(junk), Progress::default(), "{junk:?}");
+        }
     }
 }

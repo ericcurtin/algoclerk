@@ -2,38 +2,51 @@ title = "Counting Islands"
 order = 4
 story = "The harbour map marks land with 1 and water with 0. The ferry company wants to know how many separate islands there are."
 statement = "Count the groups of '1' cells that are connected horizontally or vertically."
-signature = "fn count_islands(grid: vec<vec<char>>) -> int"
+prelude = '''
+#include <vector>
+'''
+signature = "int countIslands(const std::vector<std::vector<char>>& grid)"
 constraints = ["1 <= rows, cols", "rows * cols <= 10000", "cells are '0' or '1'"]
 technique = "Breadth-first flood fill"
 big_o = "O(n) time, O(n) space"
-types = ["char", "queue", "set", "tuple", "vec"]
-builtins = ["add", "contains", "is_empty", "len", "pop", "push"]
+unlocked = ["<queue>", "<utility>"]
 hints = [
-  "Scan every cell. A land cell you have not visited starts a new island.",
-  "From it, flood outwards with a queue and mark everything reached as seen.",
-  "A `set<(int, int)>` of visited cells works; neighbours are (y+1, x), (y-1, x), (y, x+1), (y, x-1).",
+  "Scan every cell. A land cell you have not visited starts a new island. Keep your own `std::vector<std::vector<int>> seen(rows, std::vector<int>(cols, 0));` since the grid is a `const` reference you may not change.",
+  "From it, flood outwards with a `std::queue<std::pair<int, int>>` and mark everything reached as seen. `auto [y, x] = q.front(); q.pop();` unpacks a pair.",
+  "The neighbours of (y, x) are (y+1, x), (y-1, x), (y, x+1), (y, x-1): check the bounds before you index.",
 ]
 reference = '''
-fn count_islands(grid: vec<vec<char>>) -> int {
-    let rows = len(grid);
-    let seen = set<(int, int)>();
-    let count = 0;
-    for r in range(rows) {
-        for c in range(len(grid[r])) {
-            if grid[r][c] == '1' and !seen.contains((r, c)) {
-                count += 1;
-                let q = queue<(int, int)>();
-                q.push((r, c));
-                seen.add((r, c));
-                while !q.is_empty() {
-                    let (y, x) = q.pop();
-                    for (dy, dx) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-                        let ny = y + dy;
-                        let nx = x + dx;
-                        if ny >= 0 and ny < rows and nx >= 0 and nx < len(grid[ny]) and grid[ny][nx] == '1' and !seen.contains((ny, nx)) {
-                            seen.add((ny, nx));
-                            q.push((ny, nx));
-                        }
+#include <queue>
+#include <utility>
+
+int countIslands(const std::vector<std::vector<char>>& grid) {
+    const int rows = static_cast<int>(grid.size());
+    const int dy[4] = {1, -1, 0, 0};
+    const int dx[4] = {0, 0, 1, -1};
+    std::vector<std::vector<int>> seen(rows);
+    for (int r = 0; r < rows; ++r) {
+        seen[r].assign(grid[r].size(), 0);
+    }
+    int count = 0;
+    for (int r = 0; r < rows; ++r) {
+        for (int c = 0; c < static_cast<int>(grid[r].size()); ++c) {
+            if (grid[r][c] != '1' || seen[r][c] != 0) {
+                continue;
+            }
+            count += 1;
+            std::queue<std::pair<int, int>> q;
+            q.push({r, c});
+            seen[r][c] = 1;
+            while (!q.empty()) {
+                auto [y, x] = q.front();
+                q.pop();
+                for (int d = 0; d < 4; ++d) {
+                    const int ny = y + dy[d];
+                    const int nx = x + dx[d];
+                    if (ny >= 0 && ny < rows && nx >= 0 && nx < static_cast<int>(grid[ny].size()) &&
+                        grid[ny][nx] == '1' && seen[ny][nx] == 0) {
+                        seen[ny][nx] = 1;
+                        q.push({ny, nx});
                     }
                 }
             }
@@ -51,19 +64,19 @@ size = [197, 154, 123]
 speed = [1788, 954, 657]
 
 [[examples]]
-args = ["[['1', '1', '0'], ['0', '1', '0'], ['0', '0', '1']]"]
+args = ["{{'1', '1', '0'}, {'0', '1', '0'}, {'0', '0', '1'}}"]
 expect = "2"
 
 [[examples]]
-args = ["[['0']]"]
+args = ["{{'0'}}"]
 expect = "0"
 
 [[examples]]
-args = ["[['1', '0', '1']]"]
+args = ["{{'1', '0', '1'}}"]
 expect = "2"
 
 [[tests]]
-args = ["[['1', '1'], ['1', '1']]"]
+args = ["{{'1', '1'}, {'1', '1'}}"]
 expect = "1"
 
 [[generate]]

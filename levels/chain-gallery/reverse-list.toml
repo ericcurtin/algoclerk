@@ -1,27 +1,32 @@
 title = "Turn the Chain Around"
 order = 1
 story = "A chain of name tags hangs along the corridor, each tag pointing at the next. The boss wants the chain hung in the opposite direction."
-statement = "Reverse the linked list and return the new head. A list node has `val` and `next`; `null` marks the end. Change the `next` links instead of building a new list."
-signature = "fn reverse_list(head: lnode) -> lnode"
+statement = "Reverse the linked list and return the new head. A list node has `val` and `next`; `nullptr` marks the end. Change the `next` links instead of building a new list."
+prelude = '''
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int v) : val(v), next(nullptr) {}
+};
+'''
+signature = "ListNode* reverseList(ListNode* head)"
 constraints = ["0 <= length <= 20000"]
 technique = "Pointer reversal"
 big_o = "O(n) time, O(1) space"
-types = ["lnode"]
-builtins = []
 hints = [
-  "Walk the chain with a `cur` node, keeping a `prev` node (start with null).",
-  "Before changing `cur.next`, save the old next node.",
-  "Point `cur.next` at `prev`, then move both forward.",
+  "Walk the chain with a `ListNode* cur`, keeping a `ListNode* prev` (start it as `nullptr`). A pointer is passed by value, but it points at the caller's nodes: changing `cur->next` changes the real chain, and copying the pointer costs nothing.",
+  "Before changing `cur->next`, save the old next node in a local pointer.",
+  "Point `cur->next` at `prev`, then move both forward. When `cur` is `nullptr`, `prev` is the new head.",
 ]
 reference = '''
-fn reverse_list(head: lnode) -> lnode {
-    let prev: lnode = null;
-    let cur = head;
-    while cur != null {
-        let nx = cur.next;
-        cur.next = prev;
+ListNode* reverseList(ListNode* head) {
+    ListNode* prev = nullptr;
+    ListNode* cur = head;
+    while (cur != nullptr) {
+        ListNode* next = cur->next;
+        cur->next = prev;
         prev = cur;
-        cur = nx;
+        cur = next;
     }
     return prev;
 }
@@ -35,20 +40,20 @@ size = [37, 29, 23]
 speed = [101, 54, 38]
 
 [[examples]]
-args = ["[1, 2, 3]"]
-expect = "[3, 2, 1]"
+args = ["{1, 2, 3}"]
+expect = "{3, 2, 1}"
 
 [[examples]]
-args = ["[]"]
-expect = "[]"
+args = ["{}"]
+expect = "{}"
 
 [[examples]]
-args = ["[5]"]
-expect = "[5]"
+args = ["{5}"]
+expect = "{5}"
 
 [[tests]]
-args = ["[1, 2]"]
-expect = "[2, 1]"
+args = ["{1, 2}"]
+expect = "{2, 1}"
 
 [[generate]]
 seed = 701

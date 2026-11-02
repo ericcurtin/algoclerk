@@ -2,46 +2,52 @@ title = "Stamp Duty"
 order = 1
 story = "Welcome to AlgoClerk and Sons. The mail room sells stamps by the sheet, and the owner is generous: buy ten or more and you get a tenth off."
 statement = "Return price * qty. When qty is 10 or more, take a tenth off the total: subtract total / 10 (whole-number division, which rounds down)."
-signature = "fn stamp_duty(price: int, qty: int) -> int"
+prelude = ""
+signature = "int stampDuty(int price, int qty)"
 constraints = ["0 <= price <= 1000", "0 <= qty <= 1000"]
 technique = "Arithmetic and branching"
 big_o = "O(1) time, O(1) space"
-types = []
-builtins = []
 hints = [
-  "Start with `let total = price * qty;`.",
-  "An `if qty >= 10 { ... }` card can change `total` before you return it.",
-  "`total = total - total / 10;` takes a tenth off, rounding the discount down.",
+  "Both numbers arrive by value: `price` and `qty` are your own copies, so you may change them freely. Start with `int total = price * qty;`.",
+  "An `if (qty >= 10) { ... }` block can change `total` before you return it.",
+  "`total = total - total / 10;` takes a tenth off. Division of two `int`s throws the remainder away, which is exactly the rounding the boss wants.",
 ]
 reference = '''
-fn stamp_duty(price: int, qty: int) -> int {
-    let total = price * qty;
-    if qty >= 10 {
+int stampDuty(int price, int qty) {
+    int total = price * qty;
+    if (qty >= 10) {
         total = total - total / 10;
     }
     return total;
 }
 '''
+
 [medals]
 size = [28, 22, 17]
 speed = [23, 13, 10]
+
 [[examples]]
 args = ["5", "3"]
 expect = "15"
 note = "Three stamps at 5 each, no discount."
+
 [[examples]]
 args = ["20", "10"]
 expect = "180"
 note = "Ten stamps earn the discount: 200 - 20."
+
 [[tests]]
 args = ["0", "50"]
 expect = "0"
+
 [[tests]]
 args = ["7", "10"]
 expect = "63"
+
 [[tests]]
 args = ["999", "9"]
 expect = "8991"
+
 [[generate]]
 seed = 11
 count = 12

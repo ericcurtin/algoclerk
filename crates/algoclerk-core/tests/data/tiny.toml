@@ -2,13 +2,12 @@ title = "Tiny"
 order = 1
 story = "A test level."
 statement = "Add the two numbers."
-signature = "fn add(a: int, b: int) -> int"
+signature = "int add(int a, int b)"
 technique = "Arithmetic"
 big_o = "O(1) time, O(1) space"
-builtins = []
 hints = ["Use +."]
 reference = """
-fn add(a: int, b: int) -> int {
+int add(int a, int b) {
     return a + b;
 }
 """
@@ -21,4 +20,4 @@ expect = "3"
 [[generate]]
 seed = 3
 count = 4
-args = [{ kind = "int" }, { kind = "int" }]
+args = [{ kind = "int", range = [-1000, 1000] }, { kind = "int", range = [-1000, 1000] }]

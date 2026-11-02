@@ -1,55 +1,69 @@
 title = "Is It In Order?"
 order = 5
 story = "The archivist wants to know if the file numbers on a shelf already run from small to large, so nobody has to reshuffle them."
-statement = "Return true when every number is at least as large as the one before it (equal neighbours are fine). Empty and one-item shelves are in order."
-signature = "fn is_sorted(nums: vec<int>) -> bool"
-constraints = ["0 <= len(nums) <= 100000"]
+statement = "Return true when every number is at least as large as the one before it (equal neighbours are fine). Empty and one-item shelves are in order. `std::is_sorted` and `std::sort` are locked."
+prelude = '''
+#include <vector>
+'''
+signature = "bool isSorted(const std::vector<int>& nums)"
+constraints = ["0 <= nums.size() <= 100000"]
 technique = "Compare neighbours"
 big_o = "O(n) time, O(1) space"
-types = ["vec", "bool"]
-builtins = ["len"]
-locked = [{ name = "sorted", why = "Sorting a copy and comparing would hide the idea." }]
+locked = [
+  { name = "std::is_sorted", why = "That is the whole exercise." },
+  { name = "std::sort", why = "Sorting a copy and comparing would hide the idea." },
+  { name = "<algorithm>", why = "That drawer only holds tools that answer this for you." },
+]
 hints = [
-  "Walk the indices: `for i in range(1, len(nums)) { ... }`.",
+  "Walk the indices: `for (std::size_t i = 1; i < nums.size(); ++i) { ... }`. `nums.size()` is unsigned (`std::size_t`), so use an unsigned index to keep the compiler quiet about comparing signed with unsigned.",
   "Compare `nums[i - 1]` with `nums[i]`.",
-  "As soon as a pair is out of order you can `return false;`.",
+  "As soon as a pair is out of order you can `return false;`. If the loop finishes, `return true;`. An empty shelf never enters the loop.",
 ]
 reference = '''
-fn is_sorted(nums: vec<int>) -> bool {
-    for i in range(1, len(nums)) {
-        if nums[i - 1] > nums[i] {
+bool isSorted(const std::vector<int>& nums) {
+    for (std::size_t i = 1; i < nums.size(); ++i) {
+        if (nums[i - 1] > nums[i]) {
             return false;
         }
     }
     return true;
 }
 '''
+
 [medals]
 size = [29, 23, 18]
 speed = [44, 24, 17]
+
 [[examples]]
-args = ["[1, 2, 2, 9]"]
+args = ["{1, 2, 2, 9}"]
 expect = "true"
+
 [[examples]]
-args = ["[1, 3, 2]"]
+args = ["{1, 3, 2}"]
 expect = "false"
+
 [[tests]]
-args = ["[]"]
+args = ["{}"]
 expect = "true"
+
 [[tests]]
-args = ["[5]"]
+args = ["{5}"]
 expect = "true"
+
 [[tests]]
-args = ["[2, 1]"]
+args = ["{2, 1}"]
 expect = "false"
+
 [[generate]]
 seed = 51
 count = 8
 args = [{ kind = "vec_int", len = [0, 8], range = [0, 5], sorted = true }]
+
 [[generate]]
 seed = 52
 count = 8
 args = [{ kind = "vec_int", len = [0, 8], range = [0, 5] }]
+
 [[generate]]
 seed = 53
 count = 2

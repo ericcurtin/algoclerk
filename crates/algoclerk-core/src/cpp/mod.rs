@@ -5,10 +5,13 @@
 pub mod ast;
 pub mod check;
 pub mod diag;
+pub mod harness;
 pub mod interp;
 pub mod lexer;
 pub mod parse;
 pub mod print;
+pub mod run;
+pub mod sig;
 pub mod stdlib;
 pub mod value;
 

@@ -2,17 +2,19 @@
 //! Subcommands of `algoclerk-cli`.
 
 use crate::args::Args;
+use algoclerk_core::cpp::check::CheckOpts;
+use algoclerk_core::cpp::diag::line_col;
+use algoclerk_core::cpp::harness::{DiffOpts, available_compilers, diff_level, translation_unit};
+use algoclerk_core::cpp::interp::Limits;
+use algoclerk_core::cpp::run::compile;
 use algoclerk_core::judge::{FailKind, Judge, Medal};
-use algoclerk_core::lang::check::{Allowed, CheckOpts};
-use algoclerk_core::lang::interp::Limits;
-use algoclerk_core::lang::run::compile;
 use algoclerk_core::level::Level;
 use algoclerk_core::validate::validate_level;
 use algoclerk_levels::Campaign;
 use std::fmt::Write as _;
 use std::path::Path;
 
-const USAGE: &str = "algoclerk-cli: run, judge, validate and translate ClerkScript programs
+const USAGE: &str = "algoclerk-cli: run, judge, validate and test C++ solutions
 
 USAGE:
   algoclerk-cli list [--levels DIR]                      all packs and levels
@@ -25,11 +27,14 @@ USAGE:
   algoclerk-cli validate [LEVEL ...] [--levels DIR]      validate level files (all when none given)
   algoclerk-cli table                                    judge table of every reference solution (markdown)
   algoclerk-cli tune LEVEL|--all [--write]               compute medal targets from the reference
-  algoclerk-cli codegen LEVEL|--file FILE --lang c|cpp|rust [--verify] [--no-prelude]
+  algoclerk-cli codegen LEVEL|--file FILE --lang cpp [--verify] [--no-prelude]
+                                                         print the formatted C++ (other languages: not yet)
+  algoclerk-cli harness LEVEL [FILE]                     print the real-compiler test program for a solution
+  algoclerk-cli diff [LEVEL ...] [--full] [--no-sanitize]  build reference and naive with g++ and clang++ and compare
   algoclerk-cli help
 ";
 
-const VALUE_OPTS: &[&str] = &["levels", "level", "lang", "file", "steps"];
+const VALUE_OPTS: &[&str] = &["levels", "level", "lang", "file", "steps", "cap"];
 
 /// Run a subcommand.
 pub fn dispatch(argv: &[String]) -> Result<u8, String> {
@@ -52,7 +57,8 @@ pub fn dispatch(argv: &[String]) -> Result<u8, String> {
         "judge" => judge(&args),
         "validate" => validate(&args),
         "table" => table(&args),
-        "uses" => uses(&args),
+        "harness" => harness(&args),
+        "diff" => diff(&args),
         "tune" => tune(&args),
         "codegen" => crate::codegen_cmd::codegen(&args),
         other => Err(format!(
@@ -106,7 +112,11 @@ fn show(args: &Args) -> Result<u8, String> {
     let l = find_level(&c, args.positional.first().ok_or("usage: show LEVEL")?)?;
     println!("# {}  [{}]", l.title, l.pack);
     println!("\n{}\n\n{}\n", l.story, l.statement);
-    println!("    {}\n", l.signature.text());
+    if !l.prelude.trim().is_empty() {
+        println!("{}", l.prelude.trim_end());
+        println!();
+    }
+    println!("    {}\n", l.signature_text);
     for (i, e) in l.examples.iter().enumerate() {
         println!(
             "example {}: ({}) -> {}   {}",
@@ -121,16 +131,16 @@ fn show(args: &Args) -> Result<u8, String> {
         println!("  - {x}");
     }
     println!(
-        "\nunlocked types: {}",
-        l.allowed_types().into_iter().collect::<Vec<_>>().join(", ")
+        "\nunlocked headers: {}",
+        if l.unlocked.is_empty() {
+            "(none beyond the prelude)".into()
+        } else {
+            l.unlocked.join(", ")
+        }
     );
     println!(
-        "unlocked tools: {}",
-        if l.builtins.is_empty() {
-            "(none)".into()
-        } else {
-            l.builtins.join(", ")
-        }
+        "helpers: {}  recursion: {}  structs: {}",
+        l.helpers, l.recursion, l.structs
     );
     for k in &l.locked {
         println!("locked: {} ({})", k.name, k.why);
@@ -146,7 +156,7 @@ fn show(args: &Args) -> Result<u8, String> {
 fn starter(args: &Args) -> Result<u8, String> {
     let c = campaign(args);
     let l = find_level(&c, args.positional.first().ok_or("usage: starter LEVEL")?)?;
-    print!("{}", l.starter());
+    print!("{}", l.starter_code());
     Ok(0)
 }
 
@@ -157,39 +167,48 @@ fn reference(args: &Args) -> Result<u8, String> {
     Ok(0)
 }
 
+fn print_diags(file: &str, text: &str, ds: &[algoclerk_core::cpp::Diag]) {
+    for d in ds {
+        let loc = d
+            .span
+            .map(|s| {
+                let (l, c) = line_col(text, s.start);
+                format!("{file}:{l}:{c}: ")
+            })
+            .unwrap_or_default();
+        eprintln!("{loc}{}", d.msg);
+    }
+}
+
 fn check(args: &Args) -> Result<u8, String> {
     let file = args
         .positional
         .first()
         .ok_or("usage: check FILE [--level LEVEL]")?;
     let text = read(file)?;
-    let opts = match args.opt("level") {
-        Some(id) => find_level(&campaign(args), id)?.check_opts(),
-        None => CheckOpts {
-            allowed: Allowed::all(),
-            entry: None,
-        },
+    let (prelude, opts) = match args.opt("level") {
+        Some(id) => {
+            let c = campaign(args);
+            let l = find_level(&c, id)?;
+            (l.prelude.clone(), l.check_opts())
+        }
+        None => (String::new(), CheckOpts::all()),
     };
-    match compile(&text, &opts) {
+    match compile(&prelude, &text, &opts) {
         Ok(c) => {
             println!(
                 "ok: {} functions, size {}",
-                c.program.fns.len(),
-                c.program.size()
+                c.program
+                    .player_items()
+                    .iter()
+                    .filter(|i| matches!(i.kind, algoclerk_core::cpp::ast::ItemKind::Func(_)))
+                    .count(),
+                c.size()
             );
             Ok(0)
         }
         Err(ds) => {
-            for d in ds {
-                let loc = d
-                    .span
-                    .map(|s| {
-                        let (l, c) = algoclerk_core::lang::diag::line_col(&text, s.start);
-                        format!("{file}:{l}:{c}: ")
-                    })
-                    .unwrap_or_default();
-                eprintln!("{loc}{}", d.msg);
-            }
+            print_diags(file, &text, &ds);
             Ok(1)
         }
     }
@@ -200,14 +219,13 @@ fn run(args: &Args) -> Result<u8, String> {
         return Err("usage: run FILE FUNCTION [ARG...]".into());
     };
     let text = read(file)?;
-    let c = compile(
-        &text,
-        &CheckOpts {
-            allowed: Allowed::all(),
-            entry: None,
-        },
-    )
-    .map_err(|d| d.first().map(|d| d.msg.clone()).unwrap_or_default())?;
+    let c = match compile("", &text, &CheckOpts::all()) {
+        Ok(c) => c,
+        Err(ds) => {
+            print_diags(file, &text, &ds);
+            return Ok(1);
+        }
+    };
     let limits = Limits {
         steps: args
             .opt("steps")
@@ -276,6 +294,7 @@ fn judge(args: &Args) -> Result<u8, String> {
                 f.case.expect,
                 f.got.clone().unwrap_or_default()
             ),
+            FailKind::UnorderedOrder => println!("{}", f.kind.friendly()),
             FailKind::TimeLimit => println!(
                 "TIME LIMIT EXCEEDED on {} test ({}): {}",
                 if f.case.large { "a large" } else { "a" },
@@ -329,14 +348,16 @@ fn table(args: &Args) -> Result<u8, String> {
             });
             let naive = match &l.naive {
                 None => "-".to_string(),
-                Some(n) => compile(n, &l.check_opts()).ok().map_or("?".into(), |sol| {
-                    let nv = j.judge_compiled(&sol, false);
-                    match nv.failure {
-                        Some(f) if f.kind == FailKind::TimeLimit => "TLE on large".into(),
-                        Some(_) => "wrong".into(),
-                        None => "passes".into(),
-                    }
-                }),
+                Some(n) => compile(&l.prelude, n, &l.check_opts())
+                    .ok()
+                    .map_or("?".into(), |sol| {
+                        let nv = j.judge_compiled(&sol, false);
+                        match nv.failure {
+                            Some(f) if f.kind == FailKind::TimeLimit => "TLE on large".into(),
+                            Some(_) => "wrong".into(),
+                            None => "passes".into(),
+                        }
+                    }),
             };
             println!(
                 "| {} | {} | {} | {:.0} | {} | {} | {} |",
@@ -415,70 +436,74 @@ fn tune(args: &Args) -> Result<u8, String> {
     Ok(0)
 }
 
-/// Print the type families and tools a program uses (helps authors fill the unlock lists).
-fn uses(args: &Args) -> Result<u8, String> {
-    use algoclerk_core::lang::ast::{ExprKind, StmtKind, stmt_exprs, walk_expr, walk_stmts};
-    let file = args.positional.first().ok_or("usage: uses FILE")?;
-    let text = read(file)?;
-    let c = compile(
-        &text,
-        &CheckOpts {
-            allowed: Allowed::all(),
-            entry: None,
-        },
-    )
-    .map_err(|d| d.first().map(|d| d.msg.clone()).unwrap_or_default())?;
-    let mut tools = std::collections::BTreeSet::new();
-    let mut types = std::collections::BTreeSet::new();
-    let user: Vec<&str> = c.program.fns.iter().map(|f| f.name.as_str()).collect();
-    for f in &c.program.fns {
-        walk_stmts(&f.body, &mut |s| {
-            if let StmtKind::ForEach { iter, .. } = &s.kind
-                && let ExprKind::Call(n, _) = &iter.kind
-            {
-                tools.insert(n.clone());
-            }
-            stmt_exprs(s, &mut |e| {
-                walk_expr(e, &mut |x| match &x.kind {
-                    ExprKind::Call(n, _) if !user.contains(&n.as_str()) => {
-                        tools.insert(n.clone());
-                    }
-                    ExprKind::Method(_, n, _) => {
-                        tools.insert(n.clone());
-                    }
-                    _ => {}
-                });
-            });
-        });
+/// `harness LEVEL [FILE]`: print the complete C++ test program (prelude, solution, generated main).
+fn harness(args: &Args) -> Result<u8, String> {
+    let c = campaign(args);
+    let l = find_level(
+        &c,
+        args.positional
+            .first()
+            .ok_or("usage: harness LEVEL [FILE]")?,
+    )?;
+    let text = match args.positional.get(1) {
+        Some(f) => read(f)?,
+        None => l.reference.clone(),
+    };
+    let cases: Vec<Vec<String>> = algoclerk_core::judge::raw_suite(l, Some(50))?
+        .into_iter()
+        .filter(|t| !t.large)
+        .map(|t| t.args)
+        .collect();
+    print!("{}", translation_unit(l, &text, &cases)?);
+    Ok(0)
+}
+
+/// `diff [LEVEL ...]`: reference and naive solutions with every host compiler, compared with the data.
+fn diff(args: &Args) -> Result<u8, String> {
+    let c = campaign(args);
+    let levels: Vec<&Level> = if args.positional.is_empty() {
+        c.all_levels().collect()
+    } else {
+        args.positional
+            .iter()
+            .map(|i| find_level(&c, i))
+            .collect::<Result<_, _>>()?
+    };
+    let compilers = available_compilers();
+    if compilers.is_empty() {
+        println!("no C++ compiler installed; nothing to compare");
+        return Ok(0);
     }
-    for t in &c.info.types {
-        let mut fams = Vec::new();
-        t.families(&mut fams);
-        types.extend(
-            fams.into_iter()
-                .filter(|f| !matches!(*f, "int" | "bool" | "unit" | "?" | "null"))
-                .map(String::from),
-        );
-    }
-    for f in &c.info.fns {
-        for (_, t) in &f.locals {
-            let mut fams = Vec::new();
-            t.families(&mut fams);
-            types.extend(
-                fams.into_iter()
-                    .filter(|f| !matches!(*f, "int" | "bool" | "unit" | "?" | "null"))
-                    .map(String::from),
+    let dir = std::env::temp_dir().join(format!("algoclerk-diff-{}", std::process::id()));
+    let mut bad = 0;
+    for l in levels {
+        let mut o = DiffOpts::new(dir.clone());
+        o.compilers = compilers.clone();
+        o.sanitize = !args.flag("no-sanitize");
+        if args.flag("full") {
+            o.large_cap = None;
+        } else if let Some(n) = args.opt("cap").and_then(|n| n.parse().ok()) {
+            o.large_cap = Some(n);
+        }
+        let rep = diff_level(l, &o);
+        if rep.problems.is_empty() {
+            println!(
+                "ok    {} ({} cases{})",
+                l.id,
+                rep.cases.len(),
+                if rep.notes.is_empty() {
+                    String::new()
+                } else {
+                    format!("; {}", rep.notes.join("; "))
+                }
             );
+        } else {
+            bad += 1;
+            for p in rep.problems {
+                println!("FAIL  {}: {p}", l.id);
+            }
         }
     }
-    println!("types: {}", types.into_iter().collect::<Vec<_>>().join(","));
-    println!(
-        "tools: {}",
-        tools
-            .into_iter()
-            .filter(|t| t != "range")
-            .collect::<Vec<_>>()
-            .join(",")
-    );
-    Ok(0)
+    let _ = std::fs::remove_dir_all(&dir);
+    Ok(u8::from(bad > 0))
 }

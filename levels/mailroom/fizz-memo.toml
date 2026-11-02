@@ -1,55 +1,64 @@
 title = "The Fizz Memo"
 order = 7
 story = "The CEO insists every memo is numbered, but numbers divisible by 3 must say Fizz, by 5 must say Buzz, and by both FizzBuzz. Nobody knows why."
-statement = "Return a shelf of n words for the numbers 1 to n: \"FizzBuzz\" when divisible by 15, \"Fizz\" when divisible by 3, \"Buzz\" when divisible by 5, otherwise the number itself as a word (use `to_string`)."
-signature = "fn fizz_memo(n: int) -> vec<string>"
+statement = "Return a shelf of n words for the numbers 1 to n: \"FizzBuzz\" when divisible by 15, \"Fizz\" when divisible by 3, \"Buzz\" when divisible by 5, otherwise the number itself as a word (use `std::to_string`)."
+prelude = '''
+#include <string>
+#include <vector>
+'''
+signature = "std::vector<std::string> fizzMemo(int n)"
 constraints = ["0 <= n <= 100000"]
 technique = "Loop with branching"
 big_o = "O(n) time, O(n) space"
-types = ["vec", "string"]
-builtins = ["push", "to_string"]
 hints = [
-  "`let out: vec<string> = [];` makes an empty shelf of words.",
-  "`for i in range(1, n + 1)` counts from 1 to n.",
-  "Check divisibility by 15 first, then 3, then 5: `i % 15 == 0`.",
+  "`std::vector<std::string> out;` makes an empty shelf of words, and `out.push_back(\"Fizz\");` adds one at the end.",
+  "`for (int i = 1; i <= n; ++i)` counts from 1 to n.",
+  "Check divisibility by 15 first, then 3, then 5: `i % 15 == 0`. For every other number `std::to_string(i)` gives the number as a `std::string`.",
 ]
 reference = '''
-fn fizz_memo(n: int) -> vec<string> {
-    let out: vec<string> = [];
-    for i in range(1, n + 1) {
-        if i % 15 == 0 {
-            out.push("FizzBuzz");
-        } else if i % 3 == 0 {
-            out.push("Fizz");
-        } else if i % 5 == 0 {
-            out.push("Buzz");
+std::vector<std::string> fizzMemo(int n) {
+    std::vector<std::string> out;
+    for (int i = 1; i <= n; ++i) {
+        if (i % 15 == 0) {
+            out.push_back("FizzBuzz");
+        } else if (i % 3 == 0) {
+            out.push_back("Fizz");
+        } else if (i % 5 == 0) {
+            out.push_back("Buzz");
         } else {
-            out.push(to_string(i));
+            out.push_back(std::to_string(i));
         }
     }
     return out;
 }
 '''
+
 [medals]
 size = [71, 55, 44]
 speed = [587, 314, 217]
+
 [[examples]]
 args = ["5"]
-expect = '["1", "2", "Fizz", "4", "Buzz"]'
+expect = '{"1", "2", "Fizz", "4", "Buzz"}'
+
 [[examples]]
 args = ["15"]
-expect = '["1", "2", "Fizz", "4", "Buzz", "Fizz", "7", "8", "Fizz", "Buzz", "11", "Fizz", "13", "14", "FizzBuzz"]'
+expect = '{"1", "2", "Fizz", "4", "Buzz", "Fizz", "7", "8", "Fizz", "Buzz", "11", "Fizz", "13", "14", "FizzBuzz"}'
 note = "FizzBuzz appears at 15."
+
 [[tests]]
 args = ["0"]
-expect = "[]"
+expect = "{}"
+
 [[tests]]
 args = ["15"]
-expect = '["1", "2", "Fizz", "4", "Buzz", "Fizz", "7", "8", "Fizz", "Buzz", "11", "Fizz", "13", "14", "FizzBuzz"]'
+expect = '{"1", "2", "Fizz", "4", "Buzz", "Fizz", "7", "8", "Fizz", "Buzz", "11", "Fizz", "13", "14", "FizzBuzz"}'
+
 [[generate]]
 seed = 71
 count = 8
 args = [{ kind = "int", range = [0, 40] }]
+
 [[generate]]
 seed = 72
 count = 1

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-//! Deterministic test generation from the level's generator specs.
+//! Deterministic test generation from the level's generator specs. Literals are emitted in the C++ brace
+//! notation of [`crate::cpp::value`] (`{1, 2}`, `{{1, 2}, {3, 4}}`, `{1, 2, nullptr, 3}` for trees).
 
 use crate::level::GenSpec;
 use std::collections::BTreeSet;
@@ -158,7 +159,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
     let range = bounds(t, "range", (-20, 20), n)?;
     let ints_text = |v: &[i64]| {
         format!(
-            "[{}]",
+            "{{{}}}",
             v.iter().map(i64::to_string).collect::<Vec<_>>().join(", ")
         )
     };
@@ -367,7 +368,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             let v: Vec<bool> = (0..len.max(0)).map(|_| rng.chance(50)).collect();
             Ok(Arg {
                 text: format!(
-                    "[{}]",
+                    "{{{}}}",
                     v.iter().map(bool::to_string).collect::<Vec<_>>().join(", ")
                 ),
                 ints: vec![],
@@ -378,7 +379,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             let s = rand_string(rng, len, alphabet);
             Ok(Arg {
                 text: format!(
-                    "[{}]",
+                    "{{{}}}",
                     s.chars()
                         .map(|c| format!("'{c}'"))
                         .collect::<Vec<_>>()
@@ -414,7 +415,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             }
             Ok(Arg {
                 text: format!(
-                    "[{}]",
+                    "{{{}}}",
                     items
                         .iter()
                         .map(|s| quote(s))
@@ -436,7 +437,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 lists.push(ints_text(&v));
             }
             Ok(Arg {
-                text: format!("[{}]", lists.join(", ")),
+                text: format!("{{{}}}", lists.join(", ")),
                 ints: flat,
             })
         }
@@ -469,7 +470,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 }
             }
             Ok(Arg {
-                text: format!("[{}]", tokens.join(", ")),
+                text: format!("{{{}}}", tokens.join(", ")),
                 ints: vec![],
             })
         }
@@ -490,7 +491,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 })
                 .collect();
             Ok(Arg {
-                text: format!("[{}]", rows_v.join(", ")),
+                text: format!("{{{}}}", rows_v.join(", ")),
                 ints: vec![rows, cols],
             })
         }
@@ -504,7 +505,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             let rows_v: Vec<String> = (0..rows)
                 .map(|_| {
                     format!(
-                        "[{}]",
+                        "{{{}}}",
                         (0..cols)
                             .map(|_| format!(
                                 "'{}'",
@@ -516,7 +517,7 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 })
                 .collect();
             Ok(Arg {
-                text: format!("[{}]", rows_v.join(", ")),
+                text: format!("{{{}}}", rows_v.join(", ")),
                 ints: vec![rows, cols],
             })
         }
@@ -532,12 +533,12 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 } else {
                     rng.range(range.0, range.1)
                 };
-                ps.push(format!("[{a}, {b}]"));
+                ps.push(format!("{{{a}, {b}}}"));
                 flat.push(a);
                 flat.push(b);
             }
             Ok(Arg {
-                text: format!("[{}]", ps.join(", ")),
+                text: format!("{{{}}}", ps.join(", ")),
                 ints: flat,
             })
         }
@@ -560,14 +561,14 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
             if flag(t, "chain") {
                 for v in 1..nodes {
                     seen.insert((v - 1, v));
-                    es.push(format!("[{}, {v}]", v - 1));
+                    es.push(format!("{{{}, {v}}}", v - 1));
                 }
             }
             if flag(t, "connected") {
                 for v in 1..nodes {
                     let u = rng.range(0, v - 1);
                     seen.insert((u.min(v), u.max(v)));
-                    es.push(format!("[{u}, {v}]"));
+                    es.push(format!("{{{u}, {v}}}"));
                 }
             }
             while (es.len() as i64) < m && nodes > 1 && tries < 10 * m + 20 {
@@ -589,11 +590,11 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                     (a.min(b), a.max(b))
                 };
                 if seen.insert(key) {
-                    es.push(format!("[{a}, {b}]"));
+                    es.push(format!("{{{a}, {b}}}"));
                 }
             }
             Ok(Arg {
-                text: format!("[{}]", es.join(", ")),
+                text: format!("{{{}}}", es.join(", ")),
                 ints: vec![nodes],
             })
         }
@@ -673,19 +674,19 @@ fn gen_arg(t: &toml::Table, n: i64, rng: &Rng, earlier: &[Arg]) -> Result<Arg, S
                 q.push_back(0usize);
                 while let Some(x) = q.pop_front() {
                     if x == usize::MAX {
-                        items.push("null".into());
+                        items.push("nullptr".into());
                         continue;
                     }
                     items.push(vals[x].to_string());
                     q.push_back(left[x]);
                     q.push_back(right[x]);
                 }
-                while items.last().is_some_and(|s| s == "null") {
+                while items.last().is_some_and(|s| s == "nullptr") {
                     items.pop();
                 }
             }
             Ok(Arg {
-                text: format!("[{}]", items.join(", ")),
+                text: format!("{{{}}}", items.join(", ")),
                 ints: vals,
             })
         }
@@ -707,4 +708,96 @@ pub fn expand(spec: &GenSpec, n_override: Option<i64>) -> Result<Vec<Vec<String>
         out.push(args.into_iter().map(|a| a.text).collect());
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cpp::ast::Ty;
+    use crate::cpp::value::{Heap, parse_value};
+
+    fn spec(args: &str, n: i64) -> GenSpec {
+        let text = format!("seed = 5\ncount = 6\nn = {n}\nargs = [{args}]\n");
+        toml::from_str(&text).unwrap()
+    }
+
+    /// Every generator kind emits text that the value parser accepts for the matching C++ type.
+    #[test]
+    fn every_kind_emits_valid_brace_notation() {
+        let cases: Vec<(&str, Ty)> = vec![
+            ("{ kind = \"int\", range = [-5, 5] }", Ty::Int),
+            ("{ kind = \"bool\" }", Ty::Bool),
+            ("{ kind = \"char\" }", Ty::Char),
+            ("{ kind = \"string\", len = [0, 9] }", Ty::Str),
+            (
+                "{ kind = \"string\", len = [0, 9], brackets = \"()[]\" }",
+                Ty::Str,
+            ),
+            ("{ kind = \"vec_int\", len = [0, 9] }", Ty::vector(Ty::Int)),
+            (
+                "{ kind = \"vec_bool\", len = [0, 4] }",
+                Ty::vector(Ty::Bool),
+            ),
+            (
+                "{ kind = \"vec_char\", len = [0, 4] }",
+                Ty::vector(Ty::Char),
+            ),
+            (
+                "{ kind = \"vec_string\", len = [0, 4] }",
+                Ty::vector(Ty::Str),
+            ),
+            (
+                "{ kind = \"sorted_lists\" }",
+                Ty::vector(Ty::vector(Ty::Int)),
+            ),
+            ("{ kind = \"rpn\" }", Ty::vector(Ty::Str)),
+            (
+                "{ kind = \"grid_int\", rows = [1, 3], cols = [1, 3] }",
+                Ty::vector(Ty::vector(Ty::Int)),
+            ),
+            (
+                "{ kind = \"grid_char\", rows = [1, 3], cols = [1, 3], alphabet = \"01\" }",
+                Ty::vector(Ty::vector(Ty::Char)),
+            ),
+            ("{ kind = \"pairs\" }", Ty::vector(Ty::vector(Ty::Int))),
+            ("{ kind = \"edges\" }", Ty::vector(Ty::vector(Ty::Int))),
+            (
+                "{ kind = \"list\", len = [0, 5], cycle_pct = 50 }",
+                Ty::Ptr(Box::new(Ty::Struct("ListNode".into()))),
+            ),
+            (
+                "{ kind = \"tree\", nodes = [0, 7] }",
+                Ty::Ptr(Box::new(Ty::Struct("TreeNode".into()))),
+            ),
+        ];
+        for (args, ty) in cases {
+            let rows = expand(&spec(args, 10), None).unwrap_or_else(|e| panic!("{args}: {e}"));
+            assert_eq!(rows.len(), 6, "{args}");
+            for row in rows {
+                let mut heap = Heap::default();
+                parse_value(&row[0], &ty, &mut heap)
+                    .unwrap_or_else(|e| panic!("{args}: `{}` is not a {ty}: {e}", row[0]));
+                if ty != Ty::Str {
+                    assert!(!row[0].contains('['), "{args}: {}", row[0]);
+                }
+                assert!(!row[0].contains("null,") && !row[0].ends_with("null}"));
+            }
+        }
+    }
+
+    #[test]
+    fn trees_use_nullptr_holes_and_are_deterministic() {
+        let s = spec("{ kind = \"tree\", nodes = [5, 7] }", 0);
+        let a = expand(&s, None).unwrap();
+        let b = expand(&s, None).unwrap();
+        assert_eq!(a, b);
+        assert!(a.iter().any(|r| r[0].contains("nullptr")), "{a:?}");
+    }
+
+    #[test]
+    fn n_override_scales_sizes() {
+        let s = spec("{ kind = \"vec_int\", len = \"n\" }", 100);
+        let small = expand(&s, Some(7)).unwrap();
+        assert!(small.iter().all(|r| r[0].matches(',').count() == 6));
+    }
 }

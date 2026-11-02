@@ -1,43 +1,54 @@
 title = "Runner-Up Prize"
 order = 6
 story = "The sales board wants the kth biggest sale of the month, without sorting the entire ledger."
-statement = "Return the kth largest number in nums (counting duplicates: in [5, 5, 3] the 2nd largest is 5)."
-signature = "fn kth_largest(nums: vec<int>, k: int) -> int"
-constraints = ["1 <= k <= len(nums) <= 20000"]
+statement = "Return the kth largest number in nums (counting duplicates: in {5, 5, 3} the 2nd largest is 5)."
+prelude = '''
+#include <vector>
+'''
+signature = "int kthLargest(const std::vector<int>& nums, int k)"
+constraints = ["1 <= k <= nums.size() <= 20000"]
 technique = "Heap of size k"
 big_o = "O(n log k) time, O(k) space"
-types = ["heap", "vec"]
-builtins = ["len", "max", "peek", "pop", "push", "remove"]
+unlocked = ["<queue>", "<functional>"]
 hints = [
-  "A heap keeps the extreme item ready. Ours gives the largest, so store negated numbers to get the smallest.",
-  "Push every number (negated); if the heap grows beyond k, pop once.",
-  "What remains on top is the kth largest (remember to negate it back).",
+  "A `std::priority_queue` keeps the extreme item ready. By default it hands out the largest; `std::priority_queue<int, std::vector<int>, std::greater<int>>` (needs `<functional>`) hands out the smallest.",
+  "Push every number; if the heap grows beyond k, pop once. `heap.size()` is unsigned: compare with `static_cast<int>(heap.size()) > k`.",
+  "What remains on top (`heap.top()`) is the kth largest.",
 ]
 reference = '''
-fn kth_largest(nums: vec<int>, k: int) -> int {
-    let h = heap<int>();
-    for x in nums {
-        h.push(-x);
-        if len(h) > k {
-            h.pop();
+#include <functional>
+#include <queue>
+
+int kthLargest(const std::vector<int>& nums, int k) {
+    std::priority_queue<int, std::vector<int>, std::greater<int>> heap;
+    for (int x : nums) {
+        heap.push(x);
+        if (static_cast<int>(heap.size()) > k) {
+            heap.pop();
         }
     }
-    return -h.peek();
+    return heap.top();
 }
 '''
 naive = '''
-fn kth_largest(nums: vec<int>, k: int) -> int {
-    let rest = nums;
-    for round in range(k - 1) {
-        let best = 0;
-        for i in range(1, len(rest)) {
-            if rest[i] > rest[best] {
+int kthLargest(const std::vector<int>& nums, int k) {
+    std::vector<int> rest = nums;
+    for (int round = 0; round < k - 1; ++round) {
+        int best = 0;
+        for (int i = 1; i < static_cast<int>(rest.size()); ++i) {
+            if (rest[i] > rest[best]) {
                 best = i;
             }
         }
-        rest.remove(best);
+        rest.erase(rest.begin() + best);
     }
-    return max(rest);
+    int top = rest[0];
+    for (int x : rest) {
+        if (x > top) {
+            top = x;
+        }
+    }
+    return top;
 }
 '''
 
@@ -49,19 +60,19 @@ size = [34, 27, 21]
 speed = [191, 102, 71]
 
 [[examples]]
-args = ["[3, 2, 1, 5, 6, 4]", "2"]
+args = ["{3, 2, 1, 5, 6, 4}", "2"]
 expect = "5"
 
 [[examples]]
-args = ["[3, 2, 3, 1, 2, 4, 5, 5, 6]", "4"]
+args = ["{3, 2, 3, 1, 2, 4, 5, 5, 6}", "4"]
 expect = "4"
 
 [[examples]]
-args = ["[7]", "1"]
+args = ["{7}", "1"]
 expect = "7"
 
 [[tests]]
-args = ["[5, 5, 3]", "2"]
+args = ["{5, 5, 3}", "2"]
 expect = "5"
 
 [[generate]]

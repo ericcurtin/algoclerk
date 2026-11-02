@@ -2,29 +2,35 @@ title = "How Tall Is the Org Chart?"
 order = 6
 story = "The company org chart is a tree: every manager has at most a left and a right report. How many levels does it have?"
 statement = "Return the maximum depth of the binary tree: the number of nodes on the longest path from the root down to a leaf. An empty tree has depth 0. A tree node has `val`, `left` and `right`."
-signature = "fn max_depth(root: tnode) -> int"
+prelude = '''
+struct TreeNode {
+    int val;
+    TreeNode* left;
+    TreeNode* right;
+    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}
+};
+'''
+signature = "int maxDepth(TreeNode* root)"
 constraints = ["0 <= nodes <= 20000", "the depth is below 150"]
 technique = "Recursion on a tree"
 big_o = "O(n) time, O(n) space"
-types = ["tnode"]
-builtins = ["max"]
+unlocked = ["<algorithm>"]
+unlock = { recursion = true }
 hints = [
   "The depth of a tree is 1 plus the larger depth of its two subtrees.",
-  "The depth of an empty tree (null) is 0.",
-  "A function may call itself here: recursion is unlocked.",
+  "The depth of an empty tree (`nullptr`) is 0.",
+  "A function may call itself here: recursion is unlocked. `#include <algorithm>` gives you `std::max`, which needs two arguments of the same type.",
 ]
 reference = '''
-fn max_depth(root: tnode) -> int {
-    if root == null {
+#include <algorithm>
+
+int maxDepth(TreeNode* root) {
+    if (root == nullptr) {
         return 0;
     }
-    return 1 + max(max_depth(root.left), max_depth(root.right));
+    return 1 + std::max(maxDepth(root->left), maxDepth(root->right));
 }
 '''
-
-[unlock]
-helpers = false
-recursion = true
 
 [budgets]
 large_steps = 3000000
@@ -34,19 +40,19 @@ size = [26, 20, 16]
 speed = [156, 83, 59]
 
 [[examples]]
-args = ["[3, 9, 20, null, null, 15, 7]"]
+args = ["{3, 9, 20, nullptr, nullptr, 15, 7}"]
 expect = "3"
 
 [[examples]]
-args = ["[1, null, 2]"]
+args = ["{1, nullptr, 2}"]
 expect = "2"
 
 [[examples]]
-args = ["[]"]
+args = ["{}"]
 expect = "0"
 
 [[tests]]
-args = ["[1]"]
+args = ["{1}"]
 expect = "1"
 
 [[generate]]
