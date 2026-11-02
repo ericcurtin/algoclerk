@@ -1,0 +1,82 @@
+title = "First Repeat Offender"
+order = 4
+story = "The security desk logs badge numbers. The guard wants the first badge that gets scanned a second time."
+statement = "Scan nums left to right. Return the value that is seen for the second time earliest (the smallest index of a repeated sighting), or -1 if all values are different."
+signature = "fn first_recurring(nums: vec<int>) -> int"
+constraints = ["0 <= len(nums) <= 20000"]
+technique = "Hash set membership"
+big_o = "O(n) time, O(n) space"
+types = ["set", "vec"]
+builtins = ["add", "contains", "len"]
+hints = [
+  "Walk left to right and remember the numbers you have seen.",
+  "The first number that is already remembered is the answer.",
+  "Return -1 after the loop if nothing repeated.",
+]
+reference = '''
+fn first_recurring(nums: vec<int>) -> int {
+    let seen = set<int>();
+    for x in nums {
+        if seen.contains(x) {
+            return x;
+        }
+        seen.add(x);
+    }
+    return -1;
+}
+'''
+naive = '''
+fn first_recurring(nums: vec<int>) -> int {
+    for j in range(len(nums)) {
+        for i in range(j) {
+            if nums[i] == nums[j] {
+                return nums[j];
+            }
+        }
+    }
+    return -1;
+}
+'''
+
+[budgets]
+large_steps = 2500000
+
+[medals]
+size = [26, 20, 16]
+speed = [40, 22, 16]
+
+[[examples]]
+args = ["[2, 1, 3, 5, 3, 2]"]
+expect = "3"
+
+[[examples]]
+args = ["[1, 2, 3]"]
+expect = "-1"
+
+[[examples]]
+args = ["[5, 5]"]
+expect = "5"
+
+[[tests]]
+args = ["[]"]
+expect = "-1"
+
+[[tests]]
+args = ["[1, 2, 1, 2]"]
+expect = "1"
+
+[[generate]]
+seed = 231
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 8], range = [0, 9] },
+]
+
+[[generate]]
+seed = 232
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [0, 1000000], distinct = true },
+]

@@ -1,0 +1,89 @@
+title = "Cut-Out Letters"
+order = 9
+story = "A prankster builds a note by cutting letters out of a magazine. Can the magazine supply every letter of the note?"
+statement = "Return true if note can be written using letters cut from magazine, each magazine letter used at most once."
+signature = "fn can_build(note: string, magazine: string) -> bool"
+constraints = ["0 <= len(note), len(magazine) <= 20000"]
+technique = "Hash map counting"
+big_o = "O(n) time, O(k) space"
+types = ["char", "map", "string", "vec"]
+builtins = ["chars", "get", "index_of", "remove"]
+hints = [
+  "Count how many of each letter the magazine has.",
+  "Walk the note and use up one count for each letter.",
+  "If a count is already zero, the note cannot be built.",
+]
+reference = '''
+fn can_build(note: string, magazine: string) -> bool {
+    let stock = map<char, int>();
+    for c in magazine {
+        stock[c] = stock.get(c, 0) + 1;
+    }
+    for c in note {
+        let left = stock.get(c, 0);
+        if left == 0 {
+            return false;
+        }
+        stock[c] = left - 1;
+    }
+    return true;
+}
+'''
+naive = '''
+fn can_build(note: string, magazine: string) -> bool {
+    let rest = magazine.chars();
+    for c in note {
+        let i = rest.index_of(c);
+        if i < 0 {
+            return false;
+        }
+        rest.remove(i);
+    }
+    return true;
+}
+'''
+
+[budgets]
+large_steps = 2500000
+
+[medals]
+size = [58, 45, 36]
+speed = [95, 51, 36]
+
+[[examples]]
+args = ["\"a\"", "\"b\""]
+expect = "false"
+
+[[examples]]
+args = ["\"aa\"", "\"aab\""]
+expect = "true"
+
+[[examples]]
+args = ["\"\"", "\"\""]
+expect = "true"
+
+[[tests]]
+args = ["\"aab\"", "\"baa\""]
+expect = "true"
+
+[[tests]]
+args = ["\"aaa\"", "\"aa\""]
+expect = "false"
+
+[[generate]]
+seed = 281
+count = 10
+args = [
+  { kind = "string", len = [0, 6], alphabet = "abc" },
+  { kind = "string", len = [0, 8], alphabet = "abc" },
+]
+
+[[generate]]
+seed = 282
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "string", len = "n", alphabet = "abcdefghijklmnopqrstuvwxyz" },
+  { kind = "string", anagram_of = 0, alphabet = "abcdefghijklmnopqrstuvwxyz" },
+]

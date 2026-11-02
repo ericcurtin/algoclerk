@@ -1,0 +1,82 @@
+title = "Double Filed"
+order = 2
+story = "Somebody filed the same invoice twice. Before the audit, find out whether any invoice number shows up more than once."
+statement = "Return true if some value appears at least twice in nums."
+signature = "fn has_duplicate(nums: vec<int>) -> bool"
+constraints = ["0 <= len(nums) <= 20000"]
+technique = "Hash set membership"
+big_o = "O(n) time, O(n) space"
+types = ["set", "vec"]
+builtins = ["add", "contains", "len"]
+hints = [
+  "Remember every number you have already seen.",
+  "A `set<int>` answers `contains` in one step.",
+  "If the current number is in the set, return true; otherwise add it.",
+]
+reference = '''
+fn has_duplicate(nums: vec<int>) -> bool {
+    let seen = set<int>();
+    for x in nums {
+        if seen.contains(x) {
+            return true;
+        }
+        seen.add(x);
+    }
+    return false;
+}
+'''
+naive = '''
+fn has_duplicate(nums: vec<int>) -> bool {
+    for i in range(len(nums)) {
+        for j in range(i + 1, len(nums)) {
+            if nums[i] == nums[j] {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+'''
+
+[budgets]
+large_steps = 2500000
+
+[medals]
+size = [26, 20, 16]
+speed = [57, 30, 22]
+
+[[examples]]
+args = ["[1, 2, 3, 1]"]
+expect = "true"
+
+[[examples]]
+args = ["[1, 2, 3]"]
+expect = "false"
+
+[[examples]]
+args = ["[]"]
+expect = "false"
+
+[[tests]]
+args = ["[7, 7]"]
+expect = "true"
+
+[[tests]]
+args = ["[0]"]
+expect = "false"
+
+[[generate]]
+seed = 211
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 8], range = [0, 12] },
+]
+
+[[generate]]
+seed = 212
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [0, 1000000], distinct = true },
+]

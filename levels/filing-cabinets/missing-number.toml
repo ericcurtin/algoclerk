@@ -1,0 +1,74 @@
+title = "The Missing Folder"
+order = 3
+story = "Folders are numbered 0 to n and one went missing from the cart. Which number is gone?"
+statement = "nums holds the numbers 0..n in some order with exactly one of them missing (n is the length of nums). Return the missing number."
+signature = "fn missing_number(nums: vec<int>) -> int"
+constraints = ["1 <= len(nums) <= 20000", "values are different and in 0..=len(nums)"]
+technique = "Sum formula or XOR"
+big_o = "O(n) time, O(1) space"
+types = ["vec"]
+builtins = ["contains", "len"]
+hints = [
+  "If nothing were missing the total would be n * (n + 1) / 2.",
+  "Subtract what is actually on the shelf.",
+  "n is `len(nums)`.",
+]
+reference = '''
+fn missing_number(nums: vec<int>) -> int {
+    let n = len(nums);
+    let total = n * (n + 1) / 2;
+    for x in nums {
+        total -= x;
+    }
+    return total;
+}
+'''
+naive = '''
+fn missing_number(nums: vec<int>) -> int {
+    for want in range(len(nums) + 1) {
+        if !nums.contains(want) {
+            return want;
+        }
+    }
+    return -1;
+}
+'''
+
+[budgets]
+large_steps = 2500000
+
+[medals]
+size = [29, 23, 18]
+speed = [62, 33, 24]
+
+[[examples]]
+args = ["[3, 0, 1]"]
+expect = "2"
+
+[[examples]]
+args = ["[0, 1]"]
+expect = "2"
+
+[[examples]]
+args = ["[1]"]
+expect = "0"
+
+[[tests]]
+args = ["[0]"]
+expect = "1"
+
+[[generate]]
+seed = 221
+count = 10
+args = [
+  { kind = "vec_int", len = [1, 9], perm_missing = true },
+]
+
+[[generate]]
+seed = 222
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", perm_missing = true },
+]

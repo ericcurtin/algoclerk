@@ -1,0 +1,86 @@
+title = "Matching Pair"
+order = 1
+story = "The accountant has a shelf of invoices and one cheque. Two invoices add up exactly to the cheque, and she wants to know which two."
+statement = "Find two different positions i < j with nums[i] + nums[j] == target. If several pairs work, return the one with the smallest j. Return [] when no pair works. All numbers are different."
+signature = "fn two_sum(nums: vec<int>, target: int) -> vec<int>"
+constraints = ["0 <= len(nums) <= 20000", "all values in nums are different", "result is [i, j]"]
+technique = "Hash map lookup"
+big_o = "O(n) time, O(n) space"
+types = ["map", "vec"]
+builtins = ["contains", "len"]
+hints = [
+  "For each number x you need target - x. Have you seen it already?",
+  "Keep a map from value to index of every number you have walked past.",
+  "`if seen.contains(want) { return [seen[want], i]; }` then record `seen[nums[i]] = i;`.",
+]
+reference = '''
+fn two_sum(nums: vec<int>, target: int) -> vec<int> {
+    let seen = map<int, int>();
+    for i in range(len(nums)) {
+        let want = target - nums[i];
+        if seen.contains(want) {
+            return [seen[want], i];
+        }
+        seen[nums[i]] = i;
+    }
+    return [];
+}
+'''
+naive = '''
+fn two_sum(nums: vec<int>, target: int) -> vec<int> {
+    for j in range(len(nums)) {
+        for i in range(j) {
+            if nums[i] + nums[j] == target {
+                return [i, j];
+            }
+        }
+    }
+    return [];
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [48, 38, 30]
+speed = [78, 42, 30]
+
+[[examples]]
+args = ["[2, 7, 11, 15]", "9"]
+expect = "[0, 1]"
+
+[[examples]]
+args = ["[3, 2, 4]", "6"]
+expect = "[1, 2]"
+
+[[examples]]
+args = ["[1, 2]", "10"]
+expect = "[]"
+note = "No pair adds up."
+
+[[tests]]
+args = ["[]", "0"]
+expect = "[]"
+
+[[tests]]
+args = ["[5, -5]", "0"]
+expect = "[0, 1]"
+
+[[generate]]
+seed = 201
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 8], range = [-15, 15], distinct = true },
+  { kind = "int", sum_of = 0, miss = 20, range = [-30, 30] },
+]
+
+[[generate]]
+seed = 202
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [-1000000, 1000000], distinct = true },
+  { kind = "int", range = [3000000, 3000000] },
+]

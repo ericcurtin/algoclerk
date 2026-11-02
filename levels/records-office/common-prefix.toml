@@ -1,0 +1,78 @@
+title = "Shared Beginnings"
+order = 6
+story = "Filing codes in one drawer all start the same way. The clerk wants the longest start they share, so she can print it on the drawer label."
+statement = "Return the longest string that every word in words starts with. Return \"\" for an empty shelf or when nothing is shared."
+signature = "fn common_prefix(words: vec<string>) -> string"
+constraints = ["0 <= len(words) <= 1000", "0 <= len(words[i]) <= 100"]
+technique = "Vertical scan / shrinking prefix"
+big_o = "O(n) time, O(1) space"
+types = ["char", "string", "vec"]
+builtins = ["is_empty", "len"]
+hints = [
+  "Start with the first word as the candidate prefix.",
+  "For each other word, keep only the letters that agree with the candidate.",
+  "`prefix = prefix[0..i];` cuts the candidate down to its first i letters.",
+]
+reference = '''
+fn common_prefix(words: vec<string>) -> string {
+    if words.is_empty() {
+        return "";
+    }
+    let prefix = words[0];
+    for w in words {
+        let i = 0;
+        while i < len(prefix) and i < len(w) and prefix[i] == w[i] {
+            i += 1;
+        }
+        prefix = prefix[0..i];
+    }
+    return prefix;
+}
+'''
+
+[budgets]
+large_steps = 1500000
+
+[medals]
+size = [68, 53, 42]
+speed = [312, 167, 116]
+
+[[examples]]
+args = ["[\"flower\", \"flow\", \"flight\"]"]
+expect = "\"fl\""
+
+[[examples]]
+args = ["[\"dog\", \"car\"]"]
+expect = "\"\""
+
+[[examples]]
+args = ["[]"]
+expect = "\"\""
+
+[[tests]]
+args = ["[\"a\"]"]
+expect = "\"a\""
+
+[[tests]]
+args = ["[\"abc\", \"abc\"]"]
+expect = "\"abc\""
+
+[[tests]]
+args = ["[\"\", \"a\"]"]
+expect = "\"\""
+
+[[generate]]
+seed = 151
+count = 10
+args = [
+  { kind = "vec_string", len = [0, 6], item_len = [0, 4], alphabet = "ab", common_prefix = true },
+]
+
+[[generate]]
+seed = 152
+count = 1
+large = true
+n = 2000
+args = [
+  { kind = "vec_string", len = "n/20", item_len = [50, 60], alphabet = "ab", common_prefix = true },
+]

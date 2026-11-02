@@ -1,0 +1,95 @@
+title = "Mirror Mirror"
+order = 2
+story = "The office sign painter loves symmetric names on doors. Check whether a name reads the same backwards before he buys the paint."
+statement = "Return true if s reads the same forwards and backwards (case and punctuation count). The empty string is a palindrome."
+signature = "fn is_palindrome(s: string) -> bool"
+constraints = ["0 <= len(s) <= 20000"]
+technique = "Two pointers"
+big_o = "O(n) time, O(1) space"
+types = ["char", "string"]
+builtins = ["len"]
+hints = [
+  "Compare the first letter with the last, the second with the second to last...",
+  "Keep two indices: `i = 0` and `j = len(s) - 1`, and move them towards each other.",
+  "Stop with `false` at the first mismatch; when they cross, return `true`.",
+]
+reference = '''
+fn is_palindrome(s: string) -> bool {
+    let i = 0;
+    let j = len(s) - 1;
+    while i < j {
+        if s[i] != s[j] {
+            return false;
+        }
+        i += 1;
+        j -= 1;
+    }
+    return true;
+}
+'''
+naive = '''
+fn is_palindrome(s: string) -> bool {
+    let rest = s;
+    while len(rest) > 1 {
+        if rest[0] != rest[len(rest) - 1] {
+            return false;
+        }
+        rest = rest[1..len(rest) - 1];
+    }
+    return true;
+}
+'''
+
+[budgets]
+large_steps = 1500000
+
+[medals]
+size = [47, 37, 29]
+speed = [65, 35, 25]
+
+[[examples]]
+args = ["\"racecar\""]
+expect = "true"
+
+[[examples]]
+args = ["\"abca\""]
+expect = "false"
+
+[[examples]]
+args = ["\"\""]
+expect = "true"
+
+[[tests]]
+args = ["\"a\""]
+expect = "true"
+
+[[tests]]
+args = ["\"Aa\""]
+expect = "false"
+
+[[tests]]
+args = ["\"abba\""]
+expect = "true"
+
+[[generate]]
+seed = 111
+count = 8
+args = [
+  { kind = "string", len = [0, 7], alphabet = "ab" },
+]
+
+[[generate]]
+seed = 112
+count = 8
+args = [
+  { kind = "string", len = [0, 12], alphabet = "abc", palindrome_pct = 80 },
+]
+
+[[generate]]
+seed = 113
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "string", len = "n", alphabet = "abc", palindrome = true },
+]

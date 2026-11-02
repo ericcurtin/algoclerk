@@ -1,0 +1,104 @@
+title = "Anagram Check"
+order = 1
+story = "The records clerk swears two files with the same letters in a different order are the same family. Prove it before she stamps them as duplicates."
+statement = "Return true when b is a rearrangement of the letters of a: same letters, same number of each. Case matters."
+signature = "fn is_anagram(a: string, b: string) -> bool"
+constraints = ["0 <= len(a), len(b) <= 20000", "plain ASCII text"]
+technique = "Hash map counting"
+big_o = "O(n) time, O(k) space"
+types = ["char", "map", "string", "vec"]
+builtins = ["chars", "get", "index_of", "len", "remove"]
+hints = [
+  "Two words are anagrams when every letter occurs equally often in both.",
+  "Count the letters of a in a map: `counts[c] = counts.get(c, 0) + 1;`.",
+  "Walk b and count down; if a letter has no count left, return false.",
+]
+reference = '''
+fn is_anagram(a: string, b: string) -> bool {
+    if len(a) != len(b) {
+        return false;
+    }
+    let counts = map<char, int>();
+    for c in a {
+        counts[c] = counts.get(c, 0) + 1;
+    }
+    for c in b {
+        let left = counts.get(c, 0);
+        if left == 0 {
+            return false;
+        }
+        counts[c] = left - 1;
+    }
+    return true;
+}
+'''
+naive = '''
+fn is_anagram(a: string, b: string) -> bool {
+    if len(a) != len(b) {
+        return false;
+    }
+    let rest = b.chars();
+    for c in a {
+        let i = rest.index_of(c);
+        if i < 0 {
+            return false;
+        }
+        rest.remove(i);
+    }
+    return true;
+}
+'''
+
+[budgets]
+large_steps = 2000000
+
+[medals]
+size = [71, 55, 44]
+speed = [157, 84, 59]
+
+[[examples]]
+args = ["\"listen\"", "\"silent\""]
+expect = "true"
+
+[[examples]]
+args = ["\"rat\"", "\"car\""]
+expect = "false"
+
+[[examples]]
+args = ["\"\"", "\"\""]
+expect = "true"
+note = "Two empty words match."
+
+[[tests]]
+args = ["\"aab\"", "\"abb\""]
+expect = "false"
+
+[[tests]]
+args = ["\"Aa\"", "\"aA\""]
+expect = "true"
+
+[[generate]]
+seed = 101
+count = 8
+args = [
+  { kind = "string", len = [0, 8], alphabet = "abc" },
+  { kind = "string", len = [0, 8], alphabet = "abc" },
+]
+
+[[generate]]
+seed = 102
+count = 8
+args = [
+  { kind = "string", len = [1, 10], alphabet = "abcd" },
+  { kind = "string", anagram_of = 0, change_pct = 30, alphabet = "abcd" },
+]
+
+[[generate]]
+seed = 103
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "string", len = "n", alphabet = "abcdefghijklmnopqrstuvwxyz" },
+  { kind = "string", anagram_of = 0, alphabet = "abcdefghijklmnopqrstuvwxyz" },
+]

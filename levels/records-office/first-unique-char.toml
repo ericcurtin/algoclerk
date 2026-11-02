@@ -1,0 +1,82 @@
+title = "The Lonely Letter"
+order = 5
+story = "One letter in every title is printed only once and the archivist wants to know which, so she can start filing from it."
+statement = "Return the index of the first character of s that occurs exactly once in s, or -1 if there is none."
+signature = "fn first_unique(s: string) -> int"
+constraints = ["0 <= len(s) <= 20000"]
+technique = "Hash map counting"
+big_o = "O(n) time, O(k) space"
+types = ["char", "map", "string"]
+builtins = ["count", "get", "len"]
+hints = [
+  "Counting how often each letter appears needs one pass.",
+  "A second pass finds the first letter whose count is 1.",
+  "`counts.get(c, 0)` reads a count with a default.",
+]
+reference = '''
+fn first_unique(s: string) -> int {
+    let counts = map<char, int>();
+    for c in s {
+        counts[c] = counts.get(c, 0) + 1;
+    }
+    for i in range(len(s)) {
+        if counts[s[i]] == 1 {
+            return i;
+        }
+    }
+    return -1;
+}
+'''
+naive = '''
+fn first_unique(s: string) -> int {
+    for i in range(len(s)) {
+        if s.count(s[i]) == 1 {
+            return i;
+        }
+    }
+    return -1;
+}
+'''
+
+[budgets]
+large_steps = 1500000
+
+[medals]
+size = [47, 37, 29]
+speed = [119, 64, 45]
+
+[[examples]]
+args = ["\"leetcode\""]
+expect = "0"
+
+[[examples]]
+args = ["\"loveleetcode\""]
+expect = "2"
+
+[[examples]]
+args = ["\"aabb\""]
+expect = "-1"
+
+[[tests]]
+args = ["\"\""]
+expect = "-1"
+
+[[tests]]
+args = ["\"z\""]
+expect = "0"
+
+[[generate]]
+seed = 141
+count = 10
+args = [
+  { kind = "string", len = [0, 10], alphabet = "abcd" },
+]
+
+[[generate]]
+seed = 142
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "string", len = "n", alphabet = "abcdefgh" },
+]

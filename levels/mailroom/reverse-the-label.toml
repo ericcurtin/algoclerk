@@ -25,7 +25,7 @@ fn reverse_label(s: string) -> string {
 '''
 [medals]
 size = [26, 20, 16]
-speed = [135, 72, 51]
+speed = [108, 58, 41]
 [[examples]]
 args = ['"stamp"']
 expect = '"pmats"'

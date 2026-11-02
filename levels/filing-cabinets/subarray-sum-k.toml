@@ -1,0 +1,89 @@
+title = "Ledger Stretches"
+order = 7
+story = "The auditor wants to know how many consecutive runs of entries in the ledger add up to exactly k."
+statement = "Return the number of contiguous, non-empty subarrays of nums whose sum equals k."
+signature = "fn count_subarrays(nums: vec<int>, k: int) -> int"
+constraints = ["0 <= len(nums) <= 20000", "-5 <= nums[i] <= 5"]
+technique = "Prefix sums with a hash map"
+big_o = "O(n) time, O(n) space"
+types = ["map", "vec"]
+builtins = ["get", "len"]
+hints = [
+  "The sum of nums[i..j] is prefix[j] - prefix[i].",
+  "While walking, keep a running prefix sum and a map: how many times has each prefix sum been seen?",
+  "At every step add `seen.get(prefix - k, 0)` to the answer, then record the current prefix.",
+]
+reference = '''
+fn count_subarrays(nums: vec<int>, k: int) -> int {
+    let seen = map<int, int>();
+    seen[0] = 1;
+    let prefix = 0;
+    let total = 0;
+    for x in nums {
+        prefix += x;
+        total += seen.get(prefix - k, 0);
+        seen[prefix] = seen.get(prefix, 0) + 1;
+    }
+    return total;
+}
+'''
+naive = '''
+fn count_subarrays(nums: vec<int>, k: int) -> int {
+    let total = 0;
+    for i in range(len(nums)) {
+        let sum = 0;
+        for j in range(i, len(nums)) {
+            sum += nums[j];
+            if sum == k {
+                total += 1;
+            }
+        }
+    }
+    return total;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [58, 45, 36]
+speed = [159, 85, 60]
+
+[[examples]]
+args = ["[1, 1, 1]", "2"]
+expect = "2"
+
+[[examples]]
+args = ["[1, 2, 3]", "3"]
+expect = "2"
+
+[[examples]]
+args = ["[]", "0"]
+expect = "0"
+
+[[tests]]
+args = ["[0, 0, 0]", "0"]
+expect = "6"
+
+[[tests]]
+args = ["[-1, 1]", "0"]
+expect = "1"
+
+[[generate]]
+seed = 261
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 10], range = [-3, 3] },
+  { kind = "int", range = [-4, 4] },
+]
+
+[[generate]]
+seed = 262
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [-5, 5] },
+  { kind = "int", range = [3, 3] },
+]

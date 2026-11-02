@@ -1,0 +1,93 @@
+title = "The Longest Clean Stretch"
+order = 7
+story = "A ticker tape prints letters all day. The supervisor wants the longest stretch of tape where no letter appears twice, to test a new typewriter."
+statement = "Return the length of the longest substring of s in which all characters are different."
+signature = "fn longest_unique(s: string) -> int"
+constraints = ["0 <= len(s) <= 20000"]
+technique = "Sliding window"
+big_o = "O(n) time, O(k) space"
+types = ["char", "map", "set", "string"]
+builtins = ["add", "contains", "len", "max"]
+hints = [
+  "Keep a window [start, i] of unique letters and slide it right.",
+  "Remember the last index where each letter was seen in a map.",
+  "When the current letter was last seen inside the window, move `start` just past that spot.",
+]
+reference = '''
+fn longest_unique(s: string) -> int {
+    let last = map<char, int>();
+    let best = 0;
+    let start = 0;
+    for i in range(len(s)) {
+        let c = s[i];
+        if last.contains(c) and last[c] >= start {
+            start = last[c] + 1;
+        }
+        last[c] = i;
+        best = max(best, i - start + 1);
+    }
+    return best;
+}
+'''
+naive = '''
+fn longest_unique(s: string) -> int {
+    let best = 0;
+    for i in range(len(s)) {
+        let seen = set<char>();
+        let j = i;
+        while j < len(s) and !seen.contains(s[j]) {
+            seen.add(s[j]);
+            j += 1;
+        }
+        best = max(best, j - i);
+    }
+    return best;
+}
+'''
+
+[budgets]
+large_steps = 2000000
+
+[medals]
+size = [74, 58, 46]
+speed = [201, 108, 75]
+
+[[examples]]
+args = ["\"abcabcbb\""]
+expect = "3"
+
+[[examples]]
+args = ["\"bbbbb\""]
+expect = "1"
+
+[[examples]]
+args = ["\"\""]
+expect = "0"
+
+[[examples]]
+args = ["\"pwwkew\""]
+expect = "3"
+
+[[tests]]
+args = ["\"abba\""]
+expect = "2"
+
+[[tests]]
+args = ["\" \""]
+expect = "1"
+
+[[generate]]
+seed = 161
+count = 10
+args = [
+  { kind = "string", len = [0, 12], alphabet = "abcd" },
+]
+
+[[generate]]
+seed = 162
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "string", len = "n", alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", periodic = true },
+]

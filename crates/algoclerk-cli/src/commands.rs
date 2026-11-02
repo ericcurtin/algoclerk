@@ -52,6 +52,7 @@ pub fn dispatch(argv: &[String]) -> Result<u8, String> {
         "judge" => judge(&args),
         "validate" => validate(&args),
         "table" => table(&args),
+        "uses" => uses(&args),
         "tune" => tune(&args),
         "codegen" => crate::codegen_cmd::codegen(&args),
         other => Err(format!("unknown command \"{other}\" (try `algoclerk-cli help`)")),
@@ -271,7 +272,13 @@ fn tune(args: &Args) -> Result<u8, String> {
     let levels: Vec<&Level> = if args.flag("all") { c.all_levels().collect() } else { vec![find_level(&c, args.positional.first().ok_or("usage: tune LEVEL|--all")?)?] };
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../levels");
     for l in levels {
-        let j = Judge::new(l)?;
+        let j = match Judge::new(l) {
+            Ok(j) => j,
+            Err(e) => {
+                println!("{}: cannot build the test suite: {}", l.id, e.chars().take(300).collect::<String>());
+                continue;
+            }
+        };
         let v = j.reference_verdict();
         if !v.passed {
             println!("{}: reference does not pass", l.id);
@@ -302,5 +309,51 @@ fn tune(args: &Args) -> Result<u8, String> {
         }
     }
     let _ = Medal::Gold;
+    Ok(0)
+}
+
+/// Print the type families and tools a program uses (helps authors fill the unlock lists).
+fn uses(args: &Args) -> Result<u8, String> {
+    use algoclerk_core::lang::ast::{ExprKind, StmtKind, stmt_exprs, walk_expr, walk_stmts};
+    let file = args.positional.first().ok_or("usage: uses FILE")?;
+    let text = read(file)?;
+    let c = compile(&text, &CheckOpts { allowed: Allowed::all(), entry: None }).map_err(|d| d.first().map(|d| d.msg.clone()).unwrap_or_default())?;
+    let mut tools = std::collections::BTreeSet::new();
+    let mut types = std::collections::BTreeSet::new();
+    let user: Vec<&str> = c.program.fns.iter().map(|f| f.name.as_str()).collect();
+    for f in &c.program.fns {
+        walk_stmts(&f.body, &mut |s| {
+            if let StmtKind::ForEach { iter, .. } = &s.kind
+                && let ExprKind::Call(n, _) = &iter.kind
+            {
+                tools.insert(n.clone());
+            }
+            stmt_exprs(s, &mut |e| {
+                walk_expr(e, &mut |x| match &x.kind {
+                    ExprKind::Call(n, _) if !user.contains(&n.as_str()) => {
+                        tools.insert(n.clone());
+                    }
+                    ExprKind::Method(_, n, _) => {
+                        tools.insert(n.clone());
+                    }
+                    _ => {}
+                });
+            });
+        });
+    }
+    for t in &c.info.types {
+        let mut fams = Vec::new();
+        t.families(&mut fams);
+        types.extend(fams.into_iter().filter(|f| !matches!(*f, "int" | "bool" | "unit" | "?" | "null")).map(String::from));
+    }
+    for f in &c.info.fns {
+        for (_, t) in &f.locals {
+            let mut fams = Vec::new();
+            t.families(&mut fams);
+            types.extend(fams.into_iter().filter(|f| !matches!(*f, "int" | "bool" | "unit" | "?" | "null")).map(String::from));
+        }
+    }
+    println!("types: {}", types.into_iter().collect::<Vec<_>>().join(","));
+    println!("tools: {}", tools.into_iter().filter(|t| t != "range").collect::<Vec<_>>().join(","));
     Ok(0)
 }

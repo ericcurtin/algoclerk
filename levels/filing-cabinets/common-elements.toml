@@ -1,0 +1,80 @@
+title = "Both Cabinets"
+order = 6
+story = "Two cabinets hold lists of client numbers. Which clients are in both?"
+statement = "Return the numbers that occur in both a and b, each exactly once, in ascending order."
+signature = "fn common_elements(a: vec<int>, b: vec<int>) -> vec<int>"
+constraints = ["0 <= len(a), len(b) <= 20000"]
+technique = "Hash set intersection"
+big_o = "O(n log n) time, O(n) space"
+types = ["set", "vec"]
+builtins = ["add", "contains", "intersection", "push", "sorted"]
+hints = [
+  "Turn each shelf into a set.",
+  "Sets know how to `intersection` with each other.",
+  "Finish with `sorted(...)` to get an ascending shelf.",
+]
+reference = '''
+fn common_elements(a: vec<int>, b: vec<int>) -> vec<int> {
+    let left = set<int>();
+    for x in a {
+        left.add(x);
+    }
+    let right = set<int>();
+    for x in b {
+        right.add(x);
+    }
+    return sorted(left.intersection(right));
+}
+'''
+naive = '''
+fn common_elements(a: vec<int>, b: vec<int>) -> vec<int> {
+    let out: vec<int> = [];
+    for x in a {
+        if b.contains(x) and !out.contains(x) {
+            out.push(x);
+        }
+    }
+    return sorted(out);
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [34, 27, 21]
+speed = [115, 62, 43]
+
+[[examples]]
+args = ["[1, 2, 2, 1]", "[2, 2]"]
+expect = "[2]"
+
+[[examples]]
+args = ["[4, 9, 5]", "[9, 4, 9, 8, 4]"]
+expect = "[4, 9]"
+
+[[examples]]
+args = ["[1]", "[2]"]
+expect = "[]"
+
+[[tests]]
+args = ["[]", "[1]"]
+expect = "[]"
+
+[[generate]]
+seed = 251
+count = 10
+args = [
+  { kind = "vec_int", len = [0, 8], range = [0, 9] },
+  { kind = "vec_int", len = [0, 8], range = [0, 9] },
+]
+
+[[generate]]
+seed = 252
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n/2", range = [0, 40000] },
+  { kind = "vec_int", len = "n/2", range = [0, 40000] },
+]

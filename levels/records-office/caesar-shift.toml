@@ -1,0 +1,75 @@
+title = "The Cipher Wheel"
+order = 10
+story = "The night guard writes notes with a brass cipher wheel: every letter moves forward k places around the alphabet. Digits and punctuation stay as they are."
+statement = "Shift each letter of s forward by k places, wrapping z to a and Z to A, keeping case. All other characters are unchanged."
+signature = "fn caesar(s: string, k: int) -> string"
+constraints = ["0 <= len(s) <= 20000", "0 <= k <= 1000"]
+technique = "Character arithmetic with ord and chr"
+big_o = "O(n) time, O(n) space"
+types = ["char", "string"]
+builtins = ["chr", "is_lower", "is_upper", "ord"]
+hints = [
+  "`ord(c)` turns a letter into its number, `chr(n)` turns it back.",
+  "For a lowercase letter, the shifted number is `(ord(c) - ord('a') + k) % 26 + ord('a')`.",
+  "Handle uppercase the same way with 'A', and leave other characters alone.",
+]
+reference = '''
+fn caesar(s: string, k: int) -> string {
+    let out = "";
+    for c in s {
+        if c.is_lower() {
+            out += chr((ord(c) - ord('a') + k) % 26 + ord('a'));
+        } else if c.is_upper() {
+            out += chr((ord(c) - ord('A') + k) % 26 + ord('A'));
+        } else {
+            out += c;
+        }
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 1500000
+
+[medals]
+size = [72, 57, 45]
+speed = [194, 104, 72]
+
+[[examples]]
+args = ["\"abc xyz\"", "3"]
+expect = "\"def abc\""
+
+[[examples]]
+args = ["\"Hello, World!\"", "13"]
+expect = "\"Uryyb, Jbeyq!\""
+
+[[examples]]
+args = ["\"\"", "5"]
+expect = "\"\""
+
+[[tests]]
+args = ["\"Zz9\"", "1"]
+expect = "\"Aa9\""
+
+[[tests]]
+args = ["\"abc\"", "26"]
+expect = "\"abc\""
+
+[[generate]]
+seed = 191
+count = 10
+args = [
+  { kind = "string", len = [0, 12], alphabet = "abcxyzABCXYZ 09!" },
+  { kind = "int", range = [0, 1000] },
+]
+
+[[generate]]
+seed = 192
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "string", len = "n", alphabet = "abcxyzABCXYZ 09!" },
+  { kind = "int", range = [0, 1000] },
+]

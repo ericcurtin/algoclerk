@@ -1,0 +1,78 @@
+title = "Reverse the Memo"
+order = 4
+story = "The boss dictates memos from the last word to the first when he is in a mood. The typist needs the words in reverse order, each word spelled normally."
+statement = "The words of s are separated by single spaces. Return the same words in reverse order, separated by single spaces."
+signature = "fn reverse_words(s: string) -> string"
+constraints = ["0 <= len(s) <= 20000", "words are separated by exactly one space; no leading or trailing space"]
+technique = "Split and join"
+big_o = "O(n) time, O(n) space"
+types = ["char", "string", "vec"]
+builtins = ["join", "len", "push", "split"]
+hints = [
+  "`s.split(' ')` gives a shelf of the words.",
+  "Walk the shelf from the last index to the first and push each word on a new shelf.",
+  "`join(words, \" \")` glues them back together.",
+]
+reference = '''
+fn reverse_words(s: string) -> string {
+    let parts = s.split(' ');
+    let out: vec<string> = [];
+    for i in range(len(parts) - 1, -1, -1) {
+        out.push(parts[i]);
+    }
+    return join(out, " ");
+}
+'''
+naive = '''
+fn reverse_words(s: string) -> string {
+    let parts = s.split(' ');
+    let out = "";
+    for w in parts {
+        if len(out) > 0 {
+            out = w + " " + out;
+        } else {
+            out = w;
+        }
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 1500000
+
+[medals]
+size = [37, 29, 23]
+speed = [127, 68, 48]
+
+[[examples]]
+args = ["\"the sky is blue\""]
+expect = "\"blue is sky the\""
+
+[[examples]]
+args = ["\"hello\""]
+expect = "\"hello\""
+
+[[examples]]
+args = ["\"\""]
+expect = "\"\""
+
+[[tests]]
+args = ["\"a b\""]
+expect = "\"b a\""
+
+[[generate]]
+seed = 131
+count = 10
+args = [
+  { kind = "string", words = true, len = [0, 6], alphabet = "abcde", word_len = [1, 5] },
+]
+
+[[generate]]
+seed = 132
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "string", words = true, len = "n/4", alphabet = "abcde", word_len = [1, 5] },
+]

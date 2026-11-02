@@ -797,7 +797,8 @@ impl<'a> Machine<'a> {
         }
         let mut vals = Vec::with_capacity(args.len());
         for a in args {
-            vals.push(self.eval_owned(a)?);
+            // only constructors keep their arguments; everything else just reads them
+            vals.push(if name == "some" { self.eval_owned(a)? } else { self.eval(a)? });
         }
         self.charge(id, 1)?;
         self.builtin_fn(id, name, vals)

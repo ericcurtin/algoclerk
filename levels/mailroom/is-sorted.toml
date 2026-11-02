@@ -26,7 +26,7 @@ fn is_sorted(nums: vec<int>) -> bool {
 '''
 [medals]
 size = [29, 23, 18]
-speed = [57, 31, 22]
+speed = [44, 24, 17]
 [[examples]]
 args = ["[1, 2, 2, 9]"]
 expect = "true"

@@ -1,0 +1,91 @@
+title = "Telegraph Shorthand"
+order = 9
+story = "The telegraph office charges per character, so repeated letters are written as the letter followed by how many times it repeats."
+statement = "Compress s: each run of the same character becomes that character followed by the run length as digits. \"aaabcc\" becomes \"a3b1c2\"."
+signature = "fn compress(s: string) -> string"
+constraints = ["0 <= len(s) <= 20000", "s has no digits"]
+technique = "Run counting with a string builder"
+big_o = "O(n) time, O(n) space"
+types = ["char", "string"]
+builtins = ["len", "to_string"]
+hints = [
+  "Walk the string and count how long the current run is.",
+  "When the letter changes (or the string ends), append the letter and the count.",
+  "`out += c;` appends one letter in place; `to_string(count)` makes the number a word.",
+]
+reference = '''
+fn compress(s: string) -> string {
+    let out = "";
+    let i = 0;
+    while i < len(s) {
+        let c = s[i];
+        let j = i;
+        while j < len(s) and s[j] == c {
+            j += 1;
+        }
+        out += c;
+        out += to_string(j - i);
+        i = j;
+    }
+    return out;
+}
+'''
+naive = '''
+fn compress(s: string) -> string {
+    let out = "";
+    let i = 0;
+    while i < len(s) {
+        let c = s[i];
+        let j = i;
+        while j < len(s) and s[j] == c {
+            j += 1;
+        }
+        out = out + c + to_string(j - i);
+        i = j;
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 2500000
+
+[medals]
+size = [69, 54, 43]
+speed = [396, 211, 146]
+
+[[examples]]
+args = ["\"aaabcc\""]
+expect = "\"a3b1c2\""
+
+[[examples]]
+args = ["\"\""]
+expect = "\"\""
+
+[[examples]]
+args = ["\"z\""]
+expect = "\"z1\""
+
+[[tests]]
+args = ["\"aaaaaaaaaaaa\""]
+expect = "\"a12\""
+
+[[tests]]
+args = ["\"abab\""]
+expect = "\"a1b1a1b1\""
+
+[[generate]]
+seed = 181
+count = 10
+args = [
+  { kind = "string", len = [0, 14], alphabet = "ab" },
+]
+
+[[generate]]
+seed = 182
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "string", len = "n", alphabet = "abcdefghijklmnopqrstuvwxyz" },
+]
