@@ -1011,6 +1011,20 @@ fn prologue_inbox(g: &mut Gen<'_>, ps: &[&ParamSpec], single_list: bool) {
         }
         return;
     }
+    // Only single values: a fixed-size inbox.
+    if !ps.is_empty() && ps.iter().all(|p| p.kind == ParamKind::Scalar) {
+        let names: Vec<&str> = ps.iter().map(|p| p.name.as_str()).collect();
+        let list = names.join(", ");
+        match lang {
+            Lang::C => {
+                g.line(format!("const int inbox[] = {{{list}}};"));
+                g.line("const size_t inbox_len = sizeof inbox / sizeof inbox[0];");
+            }
+            Lang::Cpp => g.line(format!("const std::vector<int> inbox{{{list}}};")),
+            Lang::Rust => g.line(format!("let inbox = [{list}];")),
+        }
+        return;
+    }
     match lang {
         Lang::C => {
             let mut terms: Vec<String> = Vec::new();

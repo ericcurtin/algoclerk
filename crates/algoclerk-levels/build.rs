@@ -5,9 +5,8 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(rd) = std::fs::read_dir(dir) else {
-        return;
-    };
+    let rd = std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("cannot read the levels directory {}: {e}", dir.display()));
     for e in rd.filter_map(Result::ok) {
         let p = e.path();
         if p.is_dir() {
@@ -24,6 +23,11 @@ fn main() {
     let mut files = Vec::new();
     collect(&root, &mut files);
     files.sort();
+    assert!(
+        !files.is_empty(),
+        "no level files (*.toml) found under {}; refusing to build a game without levels",
+        root.display()
+    );
     let mut out = String::from(
         "/// `(relative path, file contents)` of every embedded level file.\npub static FILES: &[(&str, &str)] = &[\n",
     );

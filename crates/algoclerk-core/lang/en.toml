@@ -106,7 +106,7 @@ reference_yes = "Yes, show it"
 
 [editor]
 title = "Program"
-instructions = "instructions"
+size = "size:"
 label = "+ label"
 comment = "+ note"
 delete = "Remove this line"

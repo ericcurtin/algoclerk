@@ -269,8 +269,8 @@ impl OfficeView {
         );
 
         // Belts.
-        self.draw_belt(&p, lay.inbox_belt, true, pal);
-        self.draw_belt(&p, lay.outbox_belt, false, pal);
+        self.draw_belt(&p, lay.inbox_belt, pal);
+        self.draw_belt(&p, lay.outbox_belt, pal);
         let label_font = FontId::proportional((12.0 * lay.unit).clamp(10.0, 15.0));
         p.text(
             pos2(lay.inbox_belt.left(), lay.inbox_belt.top() - 4.0),
@@ -468,10 +468,10 @@ impl OfficeView {
         }
     }
 
-    fn draw_belt(&self, p: &Painter, r: Rect, inbox: bool, pal: &Palette) {
+    fn draw_belt(&self, p: &Painter, r: Rect, pal: &Palette) {
         p.rect_filled(r, r.height() * 0.2, pal.belt);
         let step = r.height() * 0.5;
-        let offset = (self.time * 20.0) % step * if inbox { 1.0 } else { 1.0 };
+        let offset = (self.time * 20.0) % step;
         let mut x = r.left() - step + offset;
         while x < r.right() {
             if x > r.left() {

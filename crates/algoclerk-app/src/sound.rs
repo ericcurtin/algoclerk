@@ -15,7 +15,7 @@ pub enum Sfx {
 pub struct Sound {
     enabled: Cell<bool>,
     #[cfg(feature = "audio")]
-    inner: Option<(rodio::OutputStream, rodio::Sink)>,
+    inner: Option<(rodio::MixerDeviceSink, rodio::Player)>,
 }
 
 impl std::fmt::Debug for Sound {
@@ -76,12 +76,12 @@ impl Sound {
             return;
         }
         #[cfg(feature = "audio")]
-        if let Some((_, sink)) = &self.inner {
+        if let Some((_, player)) = &self.inner {
             let samples = synthesize(notes(sfx), 44_100);
             let ch = std::num::NonZero::new(1u16);
             let sr = std::num::NonZero::new(44_100u32);
             if let (Some(ch), Some(sr)) = (ch, sr) {
-                sink.append(rodio::buffer::SamplesBuffer::new(ch, sr, samples));
+                player.append(rodio::buffer::SamplesBuffer::new(ch, sr, samples));
             }
         }
         #[cfg(not(feature = "audio"))]
@@ -96,10 +96,11 @@ impl Default for Sound {
 }
 
 #[cfg(feature = "audio")]
-fn open() -> Option<(rodio::OutputStream, rodio::Sink)> {
-    let stream = rodio::OutputStreamBuilder::open_default_stream().ok()?;
-    let sink = rodio::Sink::connect_new(stream.mixer());
-    Some((stream, sink))
+fn open() -> Option<(rodio::MixerDeviceSink, rodio::Player)> {
+    // The device sink must stay alive for as long as sounds should play.
+    let device = rodio::DeviceSinkBuilder::open_default_sink().ok()?;
+    let player = rodio::Player::connect_new(device.mixer());
+    Some((device, player))
 }
 
 #[cfg(test)]

@@ -294,6 +294,31 @@ mod tests {
     }
 
     #[test]
+    fn extra_packs_load_from_a_directory() {
+        let dir =
+            std::env::temp_dir().join(format!("algoclerk-extra-packs-{}", std::process::id()));
+        let pack = dir.join("community");
+        std::fs::create_dir_all(&pack).unwrap();
+        std::fs::write(
+            pack.join("pack.toml"),
+            "title=\"Community\"\nblurb=\"x\"\norder=99",
+        )
+        .unwrap();
+        std::fs::write(pack.join("extra-one.toml"), lvl("extra-one", 1)).unwrap();
+        std::fs::write(pack.join("broken.toml"), "this is not toml").unwrap();
+        let mut c = Campaign::shipped();
+        let before = c.level_count();
+        assert_eq!(c.load_dir(&dir), 3);
+        assert_eq!(c.level_count(), before + 1);
+        assert!(c.find("extra-one").is_some());
+        assert!(c.load_errors.iter().any(|e| e.contains("broken.toml")));
+        assert_eq!(c.packs.last().unwrap().info.id, "community");
+        // A missing directory is not an error.
+        assert_eq!(Campaign::shipped().load_dir(&dir.join("nope")), 0);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn shipped_campaign_loads_cleanly() {
         let c = Campaign::shipped();
         assert!(c.load_errors.is_empty(), "{:?}", c.load_errors);

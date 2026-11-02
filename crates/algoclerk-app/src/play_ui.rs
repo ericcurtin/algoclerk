@@ -145,15 +145,17 @@ fn shortcuts(ui: &mut Ui, env: &mut Env<'_>, play: &mut PlayState) {
 }
 
 fn wide_layout(ui: &mut Ui, env: &mut Env<'_>, play: &mut PlayState, nav: &mut Option<Nav>) {
-    Panel::left("brief-panel")
-        .default_size(320.0)
-        .size_range(240.0..=440.0)
-        .resizable(true)
-        .show(ui, |ui| {
-            ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| brief_ui(ui, env, play));
-        });
+    if play.show_brief {
+        Panel::left("brief-panel")
+            .default_size(320.0)
+            .size_range(240.0..=440.0)
+            .resizable(true)
+            .show(ui, |ui| {
+                ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| brief_ui(ui, env, play));
+            });
+    }
     if play.show_text {
         Panel::right("text-panel")
             .default_size(270.0)
@@ -219,15 +221,24 @@ fn program_panel(ui: &mut Ui, env: &mut Env<'_>, play: &mut PlayState) {
         ui.label(
             RichText::new(format!(
                 "{} {}",
-                play.listing.instruction_count(),
-                env.tr.t("editor.instructions")
+                env.tr.t("editor.size"),
+                play.listing.instruction_count()
             ))
             .small()
             .color(pal.dim),
         );
         if !env.narrow {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.toggle_value(&mut play.show_text, env.tr.t("tab.text"));
+                if ui
+                    .toggle_value(&mut play.show_text, env.tr.t("tab.text"))
+                    .changed()
+                    && play.show_text
+                    && ui.ctx().content_rect().width() < 1500.0
+                {
+                    // Make room for the text panel on medium-sized windows.
+                    play.show_brief = false;
+                }
+                ui.toggle_value(&mut play.show_brief, env.tr.t("tab.brief"));
             });
         }
     });
@@ -309,26 +320,20 @@ fn office_panel(ui: &mut Ui, env: &mut Env<'_>, play: &mut PlayState, nav: &mut 
     let (rect, _) = ui.allocate_exact_size(vec2(avail.x, scene_h), Sense::hover());
     // Scene input from the machine or the initial test.
     let test = play.current_test().clone();
-    let (inbox_left, outbox, floor, hand, status): (
-        Vec<i32>,
-        Vec<i32>,
-        Vec<Option<i32>>,
-        Option<i32>,
-        Option<Status>,
-    ) = match &play.machine {
+    let (inbox_left, outbox, floor, hand) = match &play.machine {
         Some(m) => (
             m.inbox_remaining().to_vec(),
             m.outbox.clone(),
             m.floor.clone(),
             m.hand,
-            Some(m.status.clone()),
         ),
         None => {
             let mut f = test.floor.clone();
             f.resize(play.floor_len, None);
-            (test.inbox.clone(), Vec::new(), f, None, None)
+            (test.inbox.clone(), Vec::new(), f, None)
         }
     };
+    let status = play.machine.as_ref().map(|m| m.status.clone());
     let mood = match (&status, play.finished_ok) {
         (Some(Status::Error(_)), _) | (_, Some(false)) => Mood::Sad,
         (_, Some(true)) => Mood::Happy,

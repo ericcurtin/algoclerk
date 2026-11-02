@@ -70,6 +70,23 @@ jobs:
         with:
           command: check
 
+  gui-smoke:
+    name: real window smoke test (Xvfb + software Vulkan)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb xdotool imagemagick mesa-vulkan-drivers libvulkan1 \
+            libxkbcommon-x11-0 libxcursor1 libxi6 libxrandr2
+      - run: scripts/gui-smoke.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gui-smoke
+          path: dist/gui-smoke
+
   android-check:
     name: Android type-check
     runs-on: ubuntu-latest

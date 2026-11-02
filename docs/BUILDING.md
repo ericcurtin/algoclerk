@@ -12,6 +12,21 @@ Set `CARGO_TARGET_DIR` if you want build output outside the repository
 | Android | `android/build-android.sh release --aab` | see "Verification status" |
 | iOS | `ios/build-ios.sh simulator` or `archive` | see "Verification status" |
 
+## Verification status (be skeptical, read this before relying on a platform)
+
+The project was developed on a Linux x86_64 host without Xcode, Windows or an Android SDK/JDK. What was
+actually verified, with the commands:
+
+| Platform | Status | Evidence |
+| --- | --- | --- |
+| Linux | built and run (software rendering) | `cargo test --workspace`; `linux/package-linux.sh`; `scripts/gui-smoke.sh` runs the real window under Xvfb with Mesa's software Vulkan driver and real input events |
+| Windows | type-checked only | `cargo check --workspace --lib --bins --target x86_64-pc-windows-gnu` (and `-msvc`) |
+| macOS | type-checked only | `cargo check --workspace --lib --bins --target aarch64-apple-darwin` (and `x86_64-apple-darwin`) |
+| Android | native library built, not run | `cargo ndk -t arm64-v8a build -p algoclerk-app --lib` with NDK r27c; Gradle packaging not run |
+| iOS | type-checked only | `cargo check --workspace --lib --bins --target aarch64-apple-ios` (and `-sim`) |
+
+CI (`.github/workflows/ci.yml`, `release.yml`) contains the jobs that verify the rest on real runners.
+
 ## Everyday development
 
 ```sh
