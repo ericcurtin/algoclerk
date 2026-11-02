@@ -841,6 +841,11 @@ impl<'a> Checker<'a> {
                 for x in [start, step].into_iter().flatten() {
                     self.expect(x, &Ty::Int)?;
                 }
+                if let Some(st) = step
+                    && !matches!(st.kind, ExprKind::Int(k) if k != 0)
+                {
+                    return self.err(st.id, "range.step", "The step of a range must be a plain number other than 0, like 2 or -1.");
+                }
                 self.expect(end, &Ty::Int)?;
                 self.cx.scopes.push(Scope { names: HashMap::new() });
                 let slot = self.declare(s.id, var, Ty::Int);
@@ -849,7 +854,11 @@ impl<'a> Checker<'a> {
                     Ok(slot) => {
                         self.slots.resize(self.slots.len().max(s.id as usize + 1), u32::MAX);
                         self.slots[s.id as usize] = slot;
-                        self.block(body, false)
+                        let r = self.block(body, false);
+                        if r.is_ok() && self.cx.mutated.get(slot as usize).copied().unwrap_or(false) {
+                            return self.err(s.id, "range.mutate", format!("Do not change the counter `{var}` inside its own loop; make a copy if you need to."));
+                        }
+                        r
                     }
                     Err(()) => Err(()),
                 };

@@ -6,6 +6,7 @@
 #![warn(missing_docs)]
 
 pub mod i18n;
+pub mod codegen;
 pub mod complexity;
 pub mod judge;
 pub mod lang;
