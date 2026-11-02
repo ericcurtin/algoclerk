@@ -7,6 +7,13 @@ crates are all permissively licensed; `cargo deny check licenses` verifies this 
 accepted licence list is in `deny.toml`. The full list of dependencies and their licences can be
 produced with `cargo deny list`.
 
+### Dual-licensed dependencies
+
+Two dependencies offer a copyleft licence as one alternative of an `OR` expression:
+`self_cell` (`Apache-2.0 OR GPL-2.0-only`) and `r-efi` (`MIT OR Apache-2.0 OR LGPL-2.1-or-later`).
+AlgoClerk uses them under their permissive alternative (Apache-2.0 or MIT), which `cargo deny`
+accepts because `deny.toml` does not allow the copyleft alternatives.
+
 ## Fonts
 
 | Asset | Author | Licence | Where |

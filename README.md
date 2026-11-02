@@ -20,7 +20,7 @@ beat a level, the game translates **your own program** into readable **C, C++ an
   with syntax highlighting and a copy button, plus a note naming the standard algorithm you just
   wrote. The translation is a real decompiler (control flow is recovered into `while` / `if` where
   possible, and a correct `goto` or state-machine form is used otherwise) and it is **compiled and
-  tested against the interpreter** on every level and on thousands of random programs.
+  tested against the interpreter** on every level and on hundreds of random programs per test run.
   See [docs/CODEGEN.md](docs/CODEGEN.md).
 - **48 levels in 7 wings** covering sums, max/min, prefix sums, majority vote, factorial, gcd,
   primes, FizzBuzz, bit tricks, stacks, queues, sorting (insertion, selection, bubble), binary

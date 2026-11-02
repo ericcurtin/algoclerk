@@ -18,7 +18,7 @@ any valid program, read well for typical ones, and never be wrong.
 - Per-level `[code]` metadata maps inbox and floor to interview-style parameters and return values
   (see LEVEL_FORMAT.md); without it a generic `clerk_run(inbox)` form is used.
 - Trust is established by tests, not by argument: every shipped reference solution in both calling
-  conventions and thousands of random programs (including forced fallback forms) are compiled with
+  conventions and hundreds of random programs per run (each in both the structured and the forced fallback form) are compiled with
   every installed compiler (gcc, clang, g++, clang++, rustc, warnings as errors for shipped
   levels) and compared with the interpreter.
 
