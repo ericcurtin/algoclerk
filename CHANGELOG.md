@@ -26,5 +26,5 @@ First public version.
 - Headless software renderer for screenshots (`algoclerk --screenshot`).
 - Packaging for Linux, macOS, Windows, Android and iOS; CI and release workflows.
 
-[Unreleased]: https://github.com/algoclerk/algoclerk/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/algoclerk/algoclerk/releases/tag/v0.1.0
+[Unreleased]: https://github.com/ericcurtin/algoclerk/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/ericcurtin/algoclerk/releases/tag/v0.1.0

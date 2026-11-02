@@ -1,6 +1,6 @@
 # AlgoClerk
 
-[![CI](https://github.com/algoclerk/algoclerk/actions/workflows/ci.yml/badge.svg)](https://github.com/algoclerk/algoclerk/actions/workflows/ci.yml)
+[![CI](https://github.com/ericcurtin/algoclerk/actions/workflows/ci.yml/badge.svg)](https://github.com/ericcurtin/algoclerk/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Rust 1.95+](https://img.shields.io/badge/rust-1.95%2B-orange.svg)](docs/BUILDING.md)
 [![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-lightgrey.svg)](docs/BUILDING.md)

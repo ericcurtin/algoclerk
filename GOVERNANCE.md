@@ -39,4 +39,4 @@ Keep a Changelog.
 ## Contact
 
 The maintainers must list a contact address for conduct and security reports here when the
-repository is published:  `<contact address to be filled in by the project owner>`.
+repository is published:  `GitHub private security advisories at https://github.com/ericcurtin/algoclerk/security/advisories/new`.

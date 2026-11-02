@@ -13,8 +13,8 @@ edition = "2024"
 rust-version = "1.95"
 license = "Apache-2.0"
 authors = ["The AlgoClerk contributors"]
-repository = "https://github.com/algoclerk/algoclerk"
-homepage = "https://github.com/algoclerk/algoclerk"
+repository = "https://github.com/ericcurtin/algoclerk"
+homepage = "https://github.com/ericcurtin/algoclerk"
 publish = false
 
 [workspace.dependencies]
