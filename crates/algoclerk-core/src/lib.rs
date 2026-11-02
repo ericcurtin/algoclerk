@@ -9,6 +9,7 @@ pub mod codegen;
 pub mod complexity;
 pub mod i18n;
 pub mod judge;
+pub mod cpp;
 pub mod lang;
 pub mod level;
 pub mod progress;
