@@ -2,33 +2,33 @@ title = "Adding Without Plus"
 order = 4
 story = "The pocket calculator's plus key is jammed. The engineer wants a way to add two numbers using only the logic gates: and, xor and shifts."
 statement = "Return a + b for non-negative a and b without using the + operator on a and b themselves. (The `+` and `-` operators are not locked, but a solution that counts up one at a time runs out of time on large inputs.)"
-signature = "fn add_bits(a: int, b: int) -> int"
+prelude = '''
+'''
+signature = "long long addBits(long long a, long long b)"
 constraints = ["0 <= a, b <= 1000000000", "a + b fits in 64 bits"]
 technique = "Carry propagation with xor and and"
 big_o = "O(1) time, O(1) space"
-types = []
-builtins = []
 hints = [
   "xor adds two bits without the carry; and, shifted left by one, is the carry.",
-  "Replace (a, b) by (a xor b, (a and b) << 1) and repeat.",
+  "Replace (a, b) by (a ^ b, (a & b) << 1) and repeat. The numbers are `long long` so the shifted carry never overflows.",
   "Stop when the carry is 0.",
 ]
 reference = '''
-fn add_bits(a: int, b: int) -> int {
-    let x = a;
-    let y = b;
-    while y != 0 {
-        let carry = (x & y) << 1;
-        x = x ^ y;
+long long addBits(long long a, long long b) {
+    long long x = a;
+    long long y = b;
+    while (y != 0) {
+        const long long carry = (x & y) << 1;
+        x ^= y;
         y = carry;
     }
     return x;
 }
 '''
 naive = '''
-fn add_bits(a: int, b: int) -> int {
-    let x = a;
-    for i in range(b) {
+long long addBits(long long a, long long b) {
+    long long x = a;
+    for (long long i = 0; i < b; ++i) {
         x += 1;
     }
     return x;
@@ -40,8 +40,8 @@ large_steps = 2000000
 sweep_n0 = 0
 
 [medals]
-size = [39, 30, 24]
-speed = [101, 54, 38]
+size = [40, 32, 25]
+speed = [124, 66, 47]
 
 [[examples]]
 args = ["1", "2"]

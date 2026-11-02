@@ -2,52 +2,61 @@ title = "The Longest Climb"
 order = 3
 story = "A hiker records altitudes along a trail. What is the longest stretch of points she can choose, in order, so that each is higher than the one before?"
 statement = "Return the length of the longest strictly increasing subsequence of nums (not necessarily contiguous)."
-signature = "fn lis(nums: vec<int>) -> int"
-constraints = ["0 <= len(nums) <= 3000"]
+prelude = '''
+#include <vector>
+'''
+signature = "int lis(const std::vector<int>& nums)"
+constraints = ["0 <= nums.size() <= 3000"]
 technique = "Patience sorting with binary search"
 big_o = "O(n log n) time, O(n) space"
-types = ["vec"]
-builtins = ["len", "max", "push"]
+unlocked = ["<algorithm>"]
+locked = [
+  { name = "std::lower_bound", why = "The binary search is the lesson: write the halving loop yourself." },
+  { name = "std::upper_bound", why = "The binary search is the lesson: write the halving loop yourself." },
+  { name = "std::binary_search", why = "The binary search is the lesson: write the halving loop yourself." },
+]
 hints = [
   "The simple table `best[i] = longest climb ending at i` takes O(n squared).",
-  "Faster: keep `tails`, where tails[k] is the smallest possible last value of a climb of length k + 1.",
-  "For each number, binary-search the first tail that is not smaller; replace it, or append if there is none.",
+  "Faster: keep a `std::vector<int> tails`, where `tails[k]` is the smallest possible last value of a climb of length k + 1.",
+  "For each number, binary-search the first tail that is not smaller (`lo`, `hi`, `mid`); replace it, or `push_back` if there is none. Take `nums` by `const&` so the input is not copied.",
 ]
 reference = '''
-fn lis(nums: vec<int>) -> int {
-    let tails: vec<int> = [];
-    for x in nums {
-        let lo = 0;
-        let hi = len(tails);
-        while lo < hi {
-            let mid = lo + (hi - lo) / 2;
-            if tails[mid] < x {
+int lis(const std::vector<int>& nums) {
+    std::vector<int> tails;
+    for (int x : nums) {
+        int lo = 0;
+        int hi = static_cast<int>(tails.size());
+        while (lo < hi) {
+            const int mid = lo + (hi - lo) / 2;
+            if (tails[mid] < x) {
                 lo = mid + 1;
             } else {
                 hi = mid;
             }
         }
-        if lo == len(tails) {
-            tails.push(x);
+        if (lo == static_cast<int>(tails.size())) {
+            tails.push_back(x);
         } else {
             tails[lo] = x;
         }
     }
-    return len(tails);
+    return static_cast<int>(tails.size());
 }
 '''
 naive = '''
-fn lis(nums: vec<int>) -> int {
-    let n = len(nums);
-    let best = [1; n];
-    let answer = 0;
-    for i in range(n) {
-        for j in range(i) {
-            if nums[j] < nums[i] and best[j] + 1 > best[i] {
-                best[i] = best[j] + 1;
+#include <algorithm>
+
+int lis(const std::vector<int>& nums) {
+    const int n = static_cast<int>(nums.size());
+    std::vector<int> best(n, 1);
+    int answer = 0;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < i; ++j) {
+            if (nums[j] < nums[i]) {
+                best[i] = std::max(best[i], best[j] + 1);
             }
         }
-        answer = max(answer, best[i]);
+        answer = std::max(answer, best[i]);
     }
     return answer;
 }
@@ -57,31 +66,31 @@ fn lis(nums: vec<int>) -> int {
 large_steps = 3000000
 
 [medals]
-size = [84, 65, 52]
-speed = [508, 271, 188]
+size = [108, 84, 67]
+speed = [608, 325, 224]
 
 [[examples]]
-args = ["[10, 9, 2, 5, 3, 7, 101, 18]"]
+args = ["{10, 9, 2, 5, 3, 7, 101, 18}"]
 expect = "4"
 
 [[examples]]
-args = ["[0, 1, 0, 3, 2, 3]"]
+args = ["{0, 1, 0, 3, 2, 3}"]
 expect = "4"
 
 [[examples]]
-args = ["[7, 7, 7]"]
+args = ["{7, 7, 7}"]
 expect = "1"
 
 [[examples]]
-args = ["[]"]
+args = ["{}"]
 expect = "0"
 
 [[tests]]
-args = ["[1, 2, 3, 4]"]
+args = ["{1, 2, 3, 4}"]
 expect = "4"
 
 [[tests]]
-args = ["[4, 3, 2, 1]"]
+args = ["{4, 3, 2, 1}"]
 expect = "1"
 
 [[generate]]

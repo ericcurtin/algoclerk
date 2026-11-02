@@ -2,44 +2,46 @@ title = "Making Change"
 order = 2
 story = "The cashier has coins of a few values, as many of each as she likes. What is the fewest coins that make an exact amount?"
 statement = "Return the fewest coins (values from coins, each usable any number of times) that add up to amount, or -1 if it cannot be done. amount 0 needs 0 coins."
-signature = "fn min_coins(coins: vec<int>, amount: int) -> int"
-constraints = ["1 <= len(coins) <= 12", "1 <= coins[i] <= 100", "0 <= amount <= 10000"]
+prelude = '''
+#include <vector>
+'''
+signature = "int minCoins(const std::vector<int>& coins, int amount)"
+constraints = ["1 <= coins.size() <= 12", "1 <= coins[i] <= 100", "0 <= amount <= 10000"]
 technique = "Dynamic programming over amounts"
 big_o = "O(n) time, O(n) space"
-types = ["vec"]
-builtins = []
+unlocked = ["<algorithm>"]
+unlock = { recursion = true }
 hints = [
-  "Let best[a] be the fewest coins for amount a. best[0] = 0.",
-  "best[a] is 1 + the smallest best[a - c] over coins c that fit.",
-  "Fill the table from 1 up to amount; use a big placeholder for 'impossible'.",
+  "Let `best[a]` be the fewest coins for amount a. `best[0] = 0`: a `std::vector<int> best(amount + 1, ...)` gives you the table in one line.",
+  "`best[a]` is 1 + the smallest `best[a - c]` over coins c that fit (`c <= a`). Pass `coins` as `const std::vector<int>&` and loop with `for (int c : coins)`: no copy of the coin list is made.",
+  "Fill the table from 1 up to amount; use a big placeholder such as `amount + 1` for 'impossible' and return -1 if it is still there at the end.",
 ]
 reference = '''
-fn min_coins(coins: vec<int>, amount: int) -> int {
-    let best = [amount + 1; amount + 1];
+#include <algorithm>
+
+int minCoins(const std::vector<int>& coins, int amount) {
+    std::vector<int> best(amount + 1, amount + 1);
     best[0] = 0;
-    for a in range(1, amount + 1) {
-        for c in coins {
-            if c <= a and best[a - c] + 1 < best[a] {
-                best[a] = best[a - c] + 1;
+    for (int a = 1; a <= amount; ++a) {
+        for (int c : coins) {
+            if (c <= a) {
+                best[a] = std::min(best[a], best[a - c] + 1);
             }
         }
     }
-    if best[amount] > amount {
-        return -1;
-    }
-    return best[amount];
+    return best[amount] > amount ? -1 : best[amount];
 }
 '''
 naive = '''
-fn min_coins(coins: vec<int>, amount: int) -> int {
-    if amount == 0 {
+int minCoins(const std::vector<int>& coins, int amount) {
+    if (amount == 0) {
         return 0;
     }
-    let best = -1;
-    for c in coins {
-        if c <= amount {
-            let sub = min_coins(coins, amount - c);
-            if sub >= 0 and (best < 0 or sub + 1 < best) {
+    int best = -1;
+    for (int c : coins) {
+        if (c <= amount) {
+            const int sub = minCoins(coins, amount - c);
+            if (sub >= 0 && (best < 0 || sub + 1 < best)) {
                 best = sub + 1;
             }
         }
@@ -48,36 +50,32 @@ fn min_coins(coins: vec<int>, amount: int) -> int {
 }
 '''
 
-[unlock]
-helpers = false
-recursion = true
-
 [budgets]
 steps = 30000000
 large_steps = 3000000
 
 [medals]
 size = [95, 74, 59]
-speed = [1111, 593, 409]
+speed = [1240, 662, 456]
 
 [[examples]]
-args = ["[1, 2, 5]", "11"]
+args = ["{1, 2, 5}", "11"]
 expect = "3"
 
 [[examples]]
-args = ["[2]", "3"]
+args = ["{2}", "3"]
 expect = "-1"
 
 [[examples]]
-args = ["[1]", "0"]
+args = ["{1}", "0"]
 expect = "0"
 
 [[tests]]
-args = ["[5, 7]", "11"]
+args = ["{5, 7}", "11"]
 expect = "-1"
 
 [[tests]]
-args = ["[3, 7]", "13"]
+args = ["{3, 7}", "13"]
 expect = "3"
 
 [[generate]]
@@ -92,7 +90,7 @@ args = [
 seed = 812
 count = 1
 large = true
-n = 120
+n = 36
 args = [
   { kind = "vec_int", len = [4, 4], range = [1, 9], distinct = true },
   { kind = "int", range = ["n", "n"] },

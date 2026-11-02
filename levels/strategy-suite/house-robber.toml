@@ -2,23 +2,28 @@ title = "The Careful Burglar"
 order = 5
 story = "A row of houses each hold some cash, but neighbouring houses share an alarm: robbing two adjacent houses calls the police. (Please do not do this. It is an exercise.)"
 statement = "Return the maximum total of nums you can pick when no two picked items are next to each other."
-signature = "fn rob(nums: vec<int>) -> int"
-constraints = ["0 <= len(nums) <= 20000", "0 <= nums[i] <= 1000"]
+prelude = '''
+#include <vector>
+'''
+signature = "int rob(const std::vector<int>& nums)"
+constraints = ["0 <= nums.size() <= 20000", "0 <= nums[i] <= 1000"]
 technique = "Dynamic programming with two variables"
 big_o = "O(n) time, O(1) space"
-types = ["vec"]
-builtins = ["len", "max"]
+unlocked = ["<algorithm>"]
+unlock = { helpers = true, recursion = true }
 hints = [
   "At each house you either take it (plus the best up to two houses ago) or skip it.",
-  "So the best up to house i is `max(best two ago + nums[i], best one ago)`.",
-  "Two variables are enough: no table needed.",
+  "So the best up to house i is `std::max(best two ago + nums[i], best one ago)` (`#include <algorithm>`).",
+  "Two `int` variables are enough: no table needed. A range-for `for (int x : nums)` walks the houses without copying the vector.",
 ]
 reference = '''
-fn rob(nums: vec<int>) -> int {
-    let take = 0;
-    let skip = 0;
-    for x in nums {
-        let next = max(skip + x, take);
+#include <algorithm>
+
+int rob(const std::vector<int>& nums) {
+    int take = 0;
+    int skip = 0;
+    for (int x : nums) {
+        const int next = std::max(skip + x, take);
         skip = take;
         take = next;
     }
@@ -26,48 +31,46 @@ fn rob(nums: vec<int>) -> int {
 }
 '''
 naive = '''
-fn best_from(nums: vec<int>, i: int) -> int {
-    if i >= len(nums) {
+#include <algorithm>
+
+int bestFrom(const std::vector<int>& nums, int i) {
+    if (i >= static_cast<int>(nums.size())) {
         return 0;
     }
-    return max(nums[i] + best_from(nums, i + 2), best_from(nums, i + 1));
+    return std::max(nums[i] + bestFrom(nums, i + 2), bestFrom(nums, i + 1));
 }
 
-fn rob(nums: vec<int>) -> int {
-    return best_from(nums, 0);
+int rob(const std::vector<int>& nums) {
+    return bestFrom(nums, 0);
 }
 '''
-
-[unlock]
-helpers = true
-recursion = true
 
 [budgets]
 steps = 30000000
 large_steps = 3000000
 
 [medals]
-size = [32, 25, 20]
-speed = [87, 47, 33]
+size = [39, 30, 24]
+speed = [118, 63, 44]
 
 [[examples]]
-args = ["[1, 2, 3, 1]"]
+args = ["{1, 2, 3, 1}"]
 expect = "4"
 
 [[examples]]
-args = ["[2, 7, 9, 3, 1]"]
+args = ["{2, 7, 9, 3, 1}"]
 expect = "12"
 
 [[examples]]
-args = ["[]"]
+args = ["{}"]
 expect = "0"
 
 [[tests]]
-args = ["[5]"]
+args = ["{5}"]
 expect = "5"
 
 [[tests]]
-args = ["[2, 1, 1, 2]"]
+args = ["{2, 1, 1, 2}"]
 expect = "4"
 
 [[generate]]

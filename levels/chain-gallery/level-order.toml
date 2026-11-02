@@ -2,39 +2,51 @@ title = "Floor by Floor"
 order = 10
 story = "The building directory lists employees by org-chart level: the boss first, then their reports, then their reports' reports."
 statement = "Return the values of the tree level by level, left to right, as a shelf of shelves (one inner shelf per level). An empty tree gives an empty shelf."
-signature = "fn level_order(root: tnode) -> vec<vec<int>>"
+prelude = '''
+#include <vector>
+
+struct TreeNode {
+    int val;
+    TreeNode* left;
+    TreeNode* right;
+    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}
+};
+'''
+signature = "std::vector<std::vector<int>> levelOrder(TreeNode* root)"
 constraints = ["0 <= nodes <= 20000"]
 technique = "Breadth-first search with a queue"
 big_o = "O(n) time, O(n) space"
-types = ["queue", "tnode", "vec"]
-builtins = ["is_empty", "len", "pop", "push"]
+unlocked = ["<queue>"]
 hints = [
-  "A queue holds the nodes of the level you are about to read.",
-  "For each level, take exactly `len(q)` nodes from the queue (measure the size first).",
-  "Push each node's children as you go; they form the next level.",
+  "A `std::queue<TreeNode*>` (`#include <queue>`) holds the nodes of the level you are about to read.",
+  "For each level, take exactly `size` nodes from the queue: measure `q.size()` first (store it in an `int` with `static_cast<int>`), because the queue keeps growing while you work.",
+  "Push each node's non-null children as you go; they form the next level. Use `q.front()` then `q.pop()` to take a node.",
 ]
 reference = '''
-fn level_order(root: tnode) -> vec<vec<int>> {
-    let out: vec<vec<int>> = [];
-    if root == null {
+#include <queue>
+
+std::vector<std::vector<int>> levelOrder(TreeNode* root) {
+    std::vector<std::vector<int>> out;
+    if (root == nullptr) {
         return out;
     }
-    let q = queue<tnode>();
+    std::queue<TreeNode*> q;
     q.push(root);
-    while !q.is_empty() {
-        let size = len(q);
-        let level: vec<int> = [];
-        for i in range(size) {
-            let node = q.pop();
-            level.push(node.val);
-            if node.left != null {
-                q.push(node.left);
+    while (!q.empty()) {
+        const int size = static_cast<int>(q.size());
+        std::vector<int> level;
+        for (int i = 0; i < size; ++i) {
+            TreeNode* node = q.front();
+            q.pop();
+            level.push_back(node->val);
+            if (node->left != nullptr) {
+                q.push(node->left);
             }
-            if node.right != null {
-                q.push(node.right);
+            if (node->right != nullptr) {
+                q.push(node->right);
             }
         }
-        out.push(level);
+        out.push_back(level);
     }
     return out;
 }
@@ -44,24 +56,24 @@ fn level_order(root: tnode) -> vec<vec<int>> {
 large_steps = 3000000
 
 [medals]
-size = [95, 74, 59]
-speed = [266, 142, 99]
+size = [128, 100, 80]
+speed = [405, 216, 150]
 
 [[examples]]
-args = ["[3, 9, 20, null, null, 15, 7]"]
-expect = "[[3], [9, 20], [15, 7]]"
+args = ["{3, 9, 20, nullptr, nullptr, 15, 7}"]
+expect = "{{3}, {9, 20}, {15, 7}}"
 
 [[examples]]
-args = ["[1]"]
-expect = "[[1]]"
+args = ["{1}"]
+expect = "{{1}}"
 
 [[examples]]
-args = ["[]"]
-expect = "[]"
+args = ["{}"]
+expect = "{}"
 
 [[tests]]
-args = ["[1, 2, null, 3]"]
-expect = "[[1], [2], [3]]"
+args = ["{1, 2, nullptr, 3}"]
+expect = "{{1}, {2}, {3}}"
 
 [[generate]]
 seed = 791

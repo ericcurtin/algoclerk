@@ -2,33 +2,34 @@ title = "Boss: Every Possible Team"
 order = 4
 story = "The HR manager wants to list every possible team that can be picked from a short list of staff, including the empty team and the full team."
 statement = "Return all subsets of nums (the power set). The order of the subsets, and the order inside a subset, does not matter. nums has no duplicates."
-signature = "fn subsets(nums: vec<int>) -> vec<vec<int>>"
-constraints = ["0 <= len(nums) <= 10", "values are different"]
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<std::vector<int>> subsets(const std::vector<int>& nums)"
+constraints = ["0 <= nums.size() <= 10", "values are different"]
 technique = "Backtracking"
 big_o = "O(2^n) time, O(2^n) space"
 compare = "sort_all"
-types = ["vec"]
-builtins = ["len", "pop", "push"]
 hints = [
   "For each item there are two choices: leave it out or take it.",
-  "A helper can walk through the indices; it needs the current team and the result shelf, passed as `&mut` parameters.",
-  "At the end of the list, push a copy of the current team. After taking an item, remember to pop it again.",
+  "A helper can walk through the indices; it needs the current team and the result shelf, passed as non-const references (`std::vector<int>& cur`, `std::vector<std::vector<int>>& out`). Pass `nums` as `const&` too, or every call copies it.",
+  "At the end of the list, `out.push_back(cur)` stores a copy of the current team. After taking an item with `cur.push_back(nums[i])`, remember to `cur.pop_back()` it again.",
 ]
 reference = '''
-fn walk(nums: vec<int>, i: int, cur: &mut vec<int>, out: &mut vec<vec<int>>) {
-    if i == len(nums) {
-        out.push(cur);
+void walk(const std::vector<int>& nums, int i, std::vector<int>& cur, std::vector<std::vector<int>>& out) {
+    if (i == static_cast<int>(nums.size())) {
+        out.push_back(cur);
         return;
     }
     walk(nums, i + 1, cur, out);
-    cur.push(nums[i]);
+    cur.push_back(nums[i]);
     walk(nums, i + 1, cur, out);
-    cur.pop();
+    cur.pop_back();
 }
 
-fn subsets(nums: vec<int>) -> vec<vec<int>> {
-    let out: vec<vec<int>> = [];
-    let cur: vec<int> = [];
+std::vector<std::vector<int>> subsets(const std::vector<int>& nums) {
+    std::vector<std::vector<int>> out;
+    std::vector<int> cur;
     walk(nums, 0, cur, out);
     return out;
 }
@@ -43,24 +44,24 @@ large_steps = 3000000
 sweep_n0 = 0
 
 [medals]
-size = [76, 59, 47]
-speed = [1554, 829, 571]
+size = [87, 68, 54]
+speed = [1613, 861, 593]
 
 [[examples]]
-args = ["[1, 2]"]
-expect = "[[], [1], [2], [1, 2]]"
+args = ["{1, 2}"]
+expect = "{{}, {1}, {2}, {1, 2}}"
 
 [[examples]]
-args = ["[]"]
-expect = "[[]]"
+args = ["{}"]
+expect = "{{}}"
 
 [[examples]]
-args = ["[5]"]
-expect = "[[], [5]]"
+args = ["{5}"]
+expect = "{{}, {5}}"
 
 [[tests]]
-args = ["[1, 2, 3]"]
-expect = "[[], [1], [2], [3], [1, 2], [1, 3], [2, 3], [1, 2, 3]]"
+args = ["{1, 2, 3}"]
+expect = "{{}, {1}, {2}, {3}, {1, 2}, {1, 3}, {2, 3}, {1, 2, 3}}"
 
 [[generate]]
 seed = 1031

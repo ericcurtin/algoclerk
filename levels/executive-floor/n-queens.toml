@@ -2,68 +2,75 @@ title = "Boss: Eight Chess Queens"
 order = 3
 story = "The CEO collects chess queens and wants to know in how many ways n of them can sit on an n by n board without any two attacking each other."
 statement = "Return the number of ways to place n queens on an n x n board so that no two share a row, column or diagonal."
-signature = "fn count_queens(n: int) -> int"
+prelude = '''
+'''
+signature = "int countQueens(int n)"
 constraints = ["0 <= n <= 8"]
 technique = "Backtracking"
 big_o = "O(n) time, O(n) space"
-types = ["set", "vec"]
-builtins = ["abs", "add", "contains", "push", "remove"]
+unlocked = ["<unordered_set>", "<vector>", "<cstdlib>"]
 hints = [
   "Place queens one row at a time.",
-  "Keep three sets: used columns, used diagonals (row - col) and anti-diagonals (row + col).",
-  "A helper with `&mut` parameters, like `fn place(row: int, n: int, cols: &mut set<int>, d1: &mut set<int>, d2: &mut set<int>) -> int`, lets the recursion share the sets: add before the recursive call, remove after.",
+  "Keep three sets: used columns, used diagonals (row - col) and anti-diagonals (row + col). `std::unordered_set<int>` from `<unordered_set>` has `count`, `insert` and `erase`.",
+  "A helper with reference parameters, like `int place(int row, int n, std::unordered_set<int>& cols, std::unordered_set<int>& d1, std::unordered_set<int>& d2)`, lets the recursion share the sets (a by-value set would be copied on every call): insert before the recursive call, erase after.",
 ]
 reference = '''
-fn place(row: int, n: int, cols: &mut set<int>, d1: &mut set<int>, d2: &mut set<int>) -> int {
-    if row == n {
+#include <unordered_set>
+
+int place(int row, int n, std::unordered_set<int>& cols, std::unordered_set<int>& d1,
+          std::unordered_set<int>& d2) {
+    if (row == n) {
         return 1;
     }
-    let total = 0;
-    for c in range(n) {
-        if cols.contains(c) or d1.contains(row - c) or d2.contains(row + c) {
+    int total = 0;
+    for (int c = 0; c < n; ++c) {
+        if (cols.count(c) != 0 || d1.count(row - c) != 0 || d2.count(row + c) != 0) {
             continue;
         }
-        cols.add(c);
-        d1.add(row - c);
-        d2.add(row + c);
+        cols.insert(c);
+        d1.insert(row - c);
+        d2.insert(row + c);
         total += place(row + 1, n, cols, d1, d2);
-        cols.remove(c);
-        d1.remove(row - c);
-        d2.remove(row + c);
+        cols.erase(c);
+        d1.erase(row - c);
+        d2.erase(row + c);
     }
     return total;
 }
 
-fn count_queens(n: int) -> int {
-    let cols = set<int>();
-    let d1 = set<int>();
-    let d2 = set<int>();
+int countQueens(int n) {
+    std::unordered_set<int> cols;
+    std::unordered_set<int> d1;
+    std::unordered_set<int> d2;
     return place(0, n, cols, d1, d2);
 }
 '''
 naive = '''
-fn count_queens(n: int) -> int {
-    let total = 0;
-    let limit = 1;
-    for i in range(n) {
+#include <cstdlib>
+#include <vector>
+
+int countQueens(int n) {
+    int total = 0;
+    int limit = 1;
+    for (int i = 0; i < n; ++i) {
         limit *= n;
     }
-    for code in range(limit) {
-        let cols: vec<int> = [];
-        let x = code;
-        for r in range(n) {
-            cols.push(x % n);
-            x = x / n;
+    for (int code = 0; code < limit; ++code) {
+        std::vector<int> cols;
+        int x = code;
+        for (int r = 0; r < n; ++r) {
+            cols.push_back(x % n);
+            x /= n;
         }
-        let ok = true;
-        for a in range(n) {
-            for b in range(a + 1, n) {
-                if cols[a] == cols[b] or abs(cols[a] - cols[b]) == b - a {
+        bool ok = true;
+        for (int a = 0; a < n; ++a) {
+            for (int b = a + 1; b < n; ++b) {
+                if (cols[a] == cols[b] || std::abs(cols[a] - cols[b]) == b - a) {
                     ok = false;
                 }
             }
         }
-        if ok {
+        if (ok) {
             total += 1;
         }
     }
@@ -81,8 +88,8 @@ large_steps = 3000000
 sweep_n0 = 0
 
 [medals]
-size = [135, 105, 84]
-speed = [8194, 4370, 3006]
+size = [173, 135, 108]
+speed = [11099, 5920, 4071]
 
 [[examples]]
 args = ["4"]

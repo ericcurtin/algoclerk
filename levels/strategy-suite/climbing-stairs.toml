@@ -2,23 +2,23 @@ title = "Stairs of the Skyscraper"
 order = 1
 story = "The skyscraper's staircase can be climbed one or two steps at a time. How many different ways are there to reach the top?"
 statement = "Return the number of distinct ways to climb n steps taking 1 or 2 steps at a time, modulo 1000000007."
-signature = "fn climb(n: int) -> int"
+signature = "int climb(int n)"
 constraints = ["0 <= n <= 100000"]
 technique = "Dynamic programming (Fibonacci)"
 big_o = "O(n) time, O(1) space"
-types = []
-builtins = []
+unlock = { recursion = true }
 hints = [
   "The ways to reach step n are the ways to reach n-1 plus the ways to reach n-2.",
   "A naive recursion repeats the same sub-problems and explodes for n around 40.",
-  "Keep just the last two answers in two variables and loop; take `% 1000000007` as you go.",
+  "Keep just the last two answers in two `int` variables and loop; take `% 1000000007` as you go. Two residues below 1000000007 add up to less than 2^31, so `int` is still safe.",
 ]
 reference = '''
-fn climb(n: int) -> int {
-    let a = 1;
-    let b = 1;
-    for i in range(n) {
-        let next = (a + b) % 1000000007;
+int climb(int n) {
+    const int mod = 1000000007;
+    int a = 1;
+    int b = 1;
+    for (int i = 0; i < n; ++i) {
+        const int next = (a + b) % mod;
         a = b;
         b = next;
     }
@@ -26,25 +26,21 @@ fn climb(n: int) -> int {
 }
 '''
 naive = '''
-fn climb(n: int) -> int {
-    if n <= 1 {
+int climb(int n) {
+    if (n <= 1) {
         return 1;
     }
     return (climb(n - 1) + climb(n - 2)) % 1000000007;
 }
 '''
 
-[unlock]
-helpers = false
-recursion = true
-
 [budgets]
 steps = 5000000
 large_steps = 3000000
 
 [medals]
-size = [32, 25, 20]
-speed = [147, 79, 55]
+size = [50, 39, 31]
+speed = [255, 136, 95]
 
 [[examples]]
 args = ["2"]

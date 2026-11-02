@@ -2,58 +2,61 @@ title = "Is It Sorted by Branch?"
 order = 8
 story = "A search tree only works if everything left of a node is smaller and everything right is larger. The auditor suspects somebody hand-edited this one."
 statement = "Return true if the tree is a valid binary search tree: for every node all values in its left subtree are smaller and all values in its right subtree are larger. All values are different."
-signature = "fn is_bst(root: tnode) -> bool"
+prelude = '''
+struct TreeNode {
+    int val;
+    TreeNode* left;
+    TreeNode* right;
+    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}
+};
+'''
+signature = "bool isBst(TreeNode* root)"
 constraints = ["0 <= nodes <= 20000", "values are different", "-1000000 <= val <= 1000000"]
 technique = "Recursion with value bounds"
 big_o = "O(n) time, O(n) space"
-types = ["tnode"]
-builtins = []
+unlock = { helpers = true, recursion = true }
 hints = [
   "Checking only a node against its children is not enough.",
   "Pass down the open interval (lo, hi) in which a subtree's values must lie.",
-  "A helper `check(node, lo, hi)`: the left child gets hi = node.val, the right child gets lo = node.val.",
+  "A helper `check(node, lo, hi)`: the left child gets `hi = node->val`, the right child gets `lo = node->val`. Start with bounds far outside -1000000..1000000, such as -1000000000 and 1000000000 (they fit an `int`).",
 ]
 reference = '''
-fn check(node: tnode, lo: int, hi: int) -> bool {
-    if node == null {
+bool check(TreeNode* node, int lo, int hi) {
+    if (node == nullptr) {
         return true;
     }
-    if node.val <= lo or node.val >= hi {
+    if (node->val <= lo || node->val >= hi) {
         return false;
     }
-    return check(node.left, lo, node.val) and check(node.right, node.val, hi);
+    return check(node->left, lo, node->val) && check(node->right, node->val, hi);
 }
 
-fn is_bst(root: tnode) -> bool {
+bool isBst(TreeNode* root) {
     return check(root, -1000000000, 1000000000);
 }
 '''
-
-[unlock]
-helpers = true
-recursion = true
 
 [budgets]
 large_steps = 3000000
 
 [medals]
-size = [60, 47, 37]
-speed = [193, 103, 72]
+size = [69, 54, 43]
+speed = [300, 160, 112]
 
 [[examples]]
-args = ["[2, 1, 3]"]
+args = ["{2, 1, 3}"]
 expect = "true"
 
 [[examples]]
-args = ["[5, 1, 4, null, null, 3, 6]"]
+args = ["{5, 1, 4, nullptr, nullptr, 3, 6}"]
 expect = "false"
 
 [[examples]]
-args = ["[]"]
+args = ["{}"]
 expect = "true"
 
 [[tests]]
-args = ["[5, 4, 6, null, null, 3, 7]"]
+args = ["{5, 4, 6, nullptr, nullptr, 3, 7}"]
 expect = "false"
 
 [[generate]]

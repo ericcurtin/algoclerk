@@ -2,30 +2,42 @@ title = "Reading the Tree in Order"
 order = 7
 story = "The records are stored in a tree, and the archivist reads them left subtree, node, right subtree. She does not trust recursion on long chains, so a stack it is."
 statement = "Return the values of the binary tree in in-order (left, node, right). Try it without recursion, using a stack of nodes."
-signature = "fn inorder(root: tnode) -> vec<int>"
+prelude = '''
+#include <vector>
+
+struct TreeNode {
+    int val;
+    TreeNode* left;
+    TreeNode* right;
+    TreeNode(int v) : val(v), left(nullptr), right(nullptr) {}
+};
+'''
+signature = "std::vector<int> inorder(TreeNode* root)"
 constraints = ["0 <= nodes <= 20000"]
 technique = "Iterative traversal with a stack"
 big_o = "O(n) time, O(n) space"
-types = ["stack", "tnode", "vec"]
-builtins = ["is_empty", "pop", "push"]
+unlocked = ["<stack>"]
 hints = [
-  "Go left as far as you can, remembering the nodes on a stack.",
-  "Then pop a node, record its value and move to its right child.",
-  "Stop when the current node is null and the stack is empty.",
+  "Go left as far as you can, remembering the nodes on a `std::stack<TreeNode*>` (`#include <stack>`).",
+  "Then take `todo.top()`, call `todo.pop()`, record its `val` and move to its right child.",
+  "Stop when the current node is `nullptr` and the stack is empty.",
 ]
 reference = '''
-fn inorder(root: tnode) -> vec<int> {
-    let out: vec<int> = [];
-    let todo = stack<tnode>();
-    let cur = root;
-    while cur != null or !todo.is_empty() {
-        while cur != null {
+#include <stack>
+
+std::vector<int> inorder(TreeNode* root) {
+    std::vector<int> out;
+    std::stack<TreeNode*> todo;
+    TreeNode* cur = root;
+    while (cur != nullptr || !todo.empty()) {
+        while (cur != nullptr) {
             todo.push(cur);
-            cur = cur.left;
+            cur = cur->left;
         }
-        cur = todo.pop();
-        out.push(cur.val);
-        cur = cur.right;
+        cur = todo.top();
+        todo.pop();
+        out.push_back(cur->val);
+        cur = cur->right;
     }
     return out;
 }
@@ -35,24 +47,24 @@ fn inorder(root: tnode) -> vec<int> {
 large_steps = 3000000
 
 [medals]
-size = [66, 52, 41]
-speed = [197, 105, 73]
+size = [84, 65, 52]
+speed = [346, 185, 128]
 
 [[examples]]
-args = ["[1, null, 2, 3]"]
-expect = "[1, 3, 2]"
+args = ["{1, nullptr, 2, 3}"]
+expect = "{1, 3, 2}"
 
 [[examples]]
-args = ["[]"]
-expect = "[]"
+args = ["{}"]
+expect = "{}"
 
 [[examples]]
-args = ["[2, 1, 3]"]
-expect = "[1, 2, 3]"
+args = ["{2, 1, 3}"]
+expect = "{1, 2, 3}"
 
 [[tests]]
-args = ["[1]"]
-expect = "[1]"
+args = ["{1}"]
+expect = "{1}"
 
 [[generate]]
 seed = 761

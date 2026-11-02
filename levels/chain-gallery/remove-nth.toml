@@ -2,30 +2,36 @@ title = "Drop the Tag from the End"
 order = 5
 story = "The nth tag from the end of the chain was misprinted and has to be removed, but the chain is too long to count by hand."
 statement = "Remove the nth node from the end of the list (n is at least 1 and at most the length) and return the head."
-signature = "fn remove_nth(head: lnode, n: int) -> lnode"
+prelude = '''
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int v) : val(v), next(nullptr) {}
+};
+'''
+signature = "ListNode* removeNth(ListNode* head, int n)"
 constraints = ["1 <= n <= length <= 20000"]
 technique = "Two pointers with a gap"
 big_o = "O(n) time, O(1) space"
-types = ["lnode"]
-builtins = ["lnode"]
 hints = [
-  "Put a dummy node in front so removing the first node is not special.",
-  "Move a `fast` pointer n steps ahead of a `slow` pointer.",
-  "Then move both until fast is at the last node: slow is just before the node to remove.",
+  "Put a dummy node in front so removing the first node is not special: `ListNode dummy(0); dummy.next = head;` lives on the stack, so the real chain stays untouched.",
+  "Move a `ListNode* fast` pointer n steps ahead of a `ListNode* slow` pointer, both starting at `&dummy`.",
+  "Then move both until `fast->next` is `nullptr`: `slow` is just before the node to remove. Unlink it with `slow->next = slow->next->next;` and return `dummy.next`.",
 ]
 reference = '''
-fn remove_nth(head: lnode, n: int) -> lnode {
-    let dummy = lnode(0, head);
-    let fast = dummy;
-    let slow = dummy;
-    for i in range(n) {
-        fast = fast.next;
+ListNode* removeNth(ListNode* head, int n) {
+    ListNode dummy(0);
+    dummy.next = head;
+    ListNode* fast = &dummy;
+    ListNode* slow = &dummy;
+    for (int i = 0; i < n; ++i) {
+        fast = fast->next;
     }
-    while fast.next != null {
-        fast = fast.next;
-        slow = slow.next;
+    while (fast->next != nullptr) {
+        fast = fast->next;
+        slow = slow->next;
     }
-    slow.next = slow.next.next;
+    slow->next = slow->next->next;
     return dummy.next;
 }
 '''
@@ -34,24 +40,24 @@ fn remove_nth(head: lnode, n: int) -> lnode {
 large_steps = 2000000
 
 [medals]
-size = [58, 45, 36]
-speed = [103, 55, 39]
+size = [85, 67, 53]
+speed = [245, 131, 91]
 
 [[examples]]
-args = ["[1, 2, 3, 4, 5]", "2"]
-expect = "[1, 2, 3, 5]"
+args = ["{1, 2, 3, 4, 5}", "2"]
+expect = "{1, 2, 3, 5}"
 
 [[examples]]
-args = ["[1]", "1"]
-expect = "[]"
+args = ["{1}", "1"]
+expect = "{}"
 
 [[examples]]
-args = ["[1, 2]", "1"]
-expect = "[1]"
+args = ["{1, 2}", "1"]
+expect = "{1}"
 
 [[tests]]
-args = ["[1, 2]", "2"]
-expect = "[2]"
+args = ["{1, 2}", "2"]
+expect = "{2}"
 
 [[generate]]
 seed = 741

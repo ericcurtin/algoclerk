@@ -2,24 +2,29 @@ title = "Halfway Down the Chain"
 order = 4
 story = "The inspector wants to start in the middle of the chain of tags, but nobody counted how long it is."
 statement = "Return the middle node of the list (the second of the two middle nodes when the length is even). The result is shown as the rest of the list from that node."
-signature = "fn middle(head: lnode) -> lnode"
+prelude = '''
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int v) : val(v), next(nullptr) {}
+};
+'''
+signature = "ListNode* middle(ListNode* head)"
 constraints = ["0 <= length <= 20000"]
 technique = "Fast and slow pointers"
 big_o = "O(n) time, O(1) space"
-types = ["lnode"]
-builtins = []
 hints = [
-  "Counting first and then walking half the length works.",
-  "Or move a slow pointer one step while a fast pointer moves two.",
-  "When the fast pointer reaches the end, the slow one is in the middle.",
+  "Counting first and then walking half the length works, but it walks the chain twice.",
+  "Or move a `ListNode* slow` one step while a `ListNode* fast` moves two. Check `fast != nullptr && fast->next != nullptr` before every double step.",
+  "When the fast pointer reaches the end, the slow one is in the middle. Returning a node pointer costs nothing: no list is copied.",
 ]
 reference = '''
-fn middle(head: lnode) -> lnode {
-    let slow = head;
-    let fast = head;
-    while fast != null and fast.next != null {
-        slow = slow.next;
-        fast = fast.next.next;
+ListNode* middle(ListNode* head) {
+    ListNode* slow = head;
+    ListNode* fast = head;
+    while (fast != nullptr && fast->next != nullptr) {
+        slow = slow->next;
+        fast = fast->next->next;
     }
     return slow;
 }
@@ -29,24 +34,24 @@ fn middle(head: lnode) -> lnode {
 large_steps = 2000000
 
 [medals]
-size = [39, 30, 24]
-speed = [75, 40, 29]
+size = [44, 34, 27]
+speed = [149, 80, 56]
 
 [[examples]]
-args = ["[1, 2, 3, 4, 5]"]
-expect = "[3, 4, 5]"
+args = ["{1, 2, 3, 4, 5}"]
+expect = "{3, 4, 5}"
 
 [[examples]]
-args = ["[1, 2, 3, 4]"]
-expect = "[3, 4]"
+args = ["{1, 2, 3, 4}"]
+expect = "{3, 4}"
 
 [[examples]]
-args = ["[]"]
-expect = "[]"
+args = ["{}"]
+expect = "{}"
 
 [[tests]]
-args = ["[7]"]
-expect = "[7]"
+args = ["{7}"]
+expect = "{7}"
 
 [[generate]]
 seed = 731

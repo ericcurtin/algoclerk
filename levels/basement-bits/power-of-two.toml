@@ -2,26 +2,26 @@ title = "Is It a Power of Two?"
 order = 3
 story = "The warehouse only stocks crates in sizes 1, 2, 4, 8, 16 and so on. Is this order size acceptable?"
 statement = "Return true if n is a power of two (1, 2, 4, 8, ...). Zero and negative numbers are not."
-signature = "fn is_power_of_two(n: int) -> bool"
+prelude = '''
+'''
+signature = "bool isPowerOfTwo(long long n)"
 constraints = ["-1000000000000 <= n <= 1000000000000"]
 technique = "Bit trick with n & (n - 1)"
 big_o = "O(1) time, O(1) space"
-types = []
-builtins = []
 hints = [
   "A power of two has exactly one 1 bit.",
   "`n & (n - 1)` removes the lowest 1 bit.",
-  "So n must be positive and `n & (n - 1) == 0`.",
+  "So n must be positive and `(n & (n - 1)) == 0`. Mind the parentheses: `==` binds tighter than `&` in C++.",
 ]
 reference = '''
-fn is_power_of_two(n: int) -> bool {
-    return n > 0 and n & (n - 1) == 0;
+bool isPowerOfTwo(long long n) {
+    return n > 0 && (n & (n - 1)) == 0;
 }
 '''
 
 [medals]
 size = [20, 15, 12]
-speed = [17, 10, 8]
+speed = [23, 13, 10]
 
 [[examples]]
 args = ["16"]

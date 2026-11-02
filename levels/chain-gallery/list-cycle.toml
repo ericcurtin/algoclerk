@@ -1,26 +1,32 @@
 title = "Going in Circles"
 order = 2
 story = "Somebody tied the end of the chain back onto one of its tags. Anyone following it will walk forever. Is the chain a loop?"
-statement = "Return true if following `next` from head ever revisits a node (the list has a cycle), false if it ends at null. Aim for O(1) extra space."
-signature = "fn has_cycle(head: lnode) -> bool"
+statement = "Return true if following `next` from head ever revisits a node (the list has a cycle), false if it ends at nullptr. Aim for O(1) extra space."
+prelude = '''
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int v) : val(v), next(nullptr) {}
+};
+'''
+signature = "bool hasCycle(ListNode* head)"
 constraints = ["0 <= length <= 20000"]
 technique = "Fast and slow pointers"
 big_o = "O(n) time, O(1) space"
-types = ["lnode", "vec"]
-builtins = ["contains", "push"]
+unlocked = ["<vector>", "<algorithm>"]
 hints = [
-  "Remembering every visited node works but is slow with long lists.",
-  "Move one pointer one step at a time and another two steps at a time.",
-  "If there is a cycle the fast pointer eventually catches the slow one.",
+  "Remembering every visited node in a `std::vector<ListNode*>` works but is slow with long lists: every lookup walks the whole memory.",
+  "Move one pointer one step at a time and another two steps at a time. Test `fast != nullptr && fast->next != nullptr` before stepping twice.",
+  "If there is a cycle the fast pointer eventually catches the slow one (`slow == fast`); if it reaches `nullptr` there is none.",
 ]
 reference = '''
-fn has_cycle(head: lnode) -> bool {
-    let slow = head;
-    let fast = head;
-    while fast != null and fast.next != null {
-        slow = slow.next;
-        fast = fast.next.next;
-        if slow == fast {
+bool hasCycle(ListNode* head) {
+    ListNode* slow = head;
+    ListNode* fast = head;
+    while (fast != nullptr && fast->next != nullptr) {
+        slow = slow->next;
+        fast = fast->next->next;
+        if (slow == fast) {
             return true;
         }
     }
@@ -28,15 +34,16 @@ fn has_cycle(head: lnode) -> bool {
 }
 '''
 naive = '''
-fn has_cycle(head: lnode) -> bool {
-    let seen: vec<lnode> = [];
-    let cur = head;
-    while cur != null {
-        if seen.contains(cur) {
+#include <algorithm>
+#include <vector>
+
+bool hasCycle(ListNode* head) {
+    std::vector<ListNode*> seen;
+    for (ListNode* cur = head; cur != nullptr; cur = cur->next) {
+        if (std::find(seen.begin(), seen.end(), cur) != seen.end()) {
             return true;
         }
-        seen.push(cur);
-        cur = cur.next;
+        seen.push_back(cur);
     }
     return false;
 }
@@ -46,27 +53,27 @@ fn has_cycle(head: lnode) -> bool {
 large_steps = 2000000
 
 [medals]
-size = [48, 38, 30]
-speed = [93, 50, 36]
+size = [55, 43, 34]
+speed = [183, 98, 69]
 
 [[examples]]
-args = ["[3, 2, 0, -4] @1"]
+args = ["{3, 2, 0, -4} @1"]
 expect = "true"
 
 [[examples]]
-args = ["[1, 2]"]
+args = ["{1, 2}"]
 expect = "false"
 
 [[examples]]
-args = ["[]"]
+args = ["{}"]
 expect = "false"
 
 [[examples]]
-args = ["[1] @0"]
+args = ["{1} @0"]
 expect = "true"
 
 [[tests]]
-args = ["[1, 2, 3] @0"]
+args = ["{1, 2, 3} @0"]
 expect = "true"
 
 [[generate]]

@@ -2,40 +2,39 @@ title = "Corridors to the Corner"
 order = 7
 story = "A robot vacuum starts in the top-left room of a grid of rooms and may only move right or down. How many different routes lead to the bottom-right room?"
 statement = "Return the number of paths from the top-left to the bottom-right cell of a rows x cols grid moving only right or down, modulo 1000000007."
-signature = "fn unique_paths(rows: int, cols: int) -> int"
+signature = "int uniquePaths(int rows, int cols)"
 constraints = ["1 <= rows, cols <= 300"]
 technique = "Dynamic programming over a grid"
 big_o = "O(n^2) time, O(n) space"
-types = ["vec"]
-builtins = []
+unlocked = ["<vector>"]
+unlock = { recursion = true }
 hints = [
   "Every room in the first row or column can be reached in exactly one way.",
-  "Any other room is reached from above or from the left: add the two counts.",
-  "You only need one row of the table at a time.",
+  "Any other room is reached from above or from the left: add the two counts (take `% 1000000007`; the sum of two residues fits an `int`).",
+  "You only need one row of the table at a time: `std::vector<int> row(cols, 1);` and update it in place, left to right.",
 ]
 reference = '''
-fn unique_paths(rows: int, cols: int) -> int {
-    let row = [1; cols];
-    for r in range(1, rows) {
-        for c in range(1, cols) {
-            row[c] = (row[c] + row[c - 1]) % 1000000007;
+#include <vector>
+
+int uniquePaths(int rows, int cols) {
+    const int mod = 1000000007;
+    std::vector<int> row(cols, 1);
+    for (int r = 1; r < rows; ++r) {
+        for (int c = 1; c < cols; ++c) {
+            row[c] = (row[c] + row[c - 1]) % mod;
         }
     }
     return row[cols - 1];
 }
 '''
 naive = '''
-fn unique_paths(rows: int, cols: int) -> int {
-    if rows == 1 or cols == 1 {
+int uniquePaths(int rows, int cols) {
+    if (rows == 1 || cols == 1) {
         return 1;
     }
-    return (unique_paths(rows - 1, cols) + unique_paths(rows, cols - 1)) % 1000000007;
+    return (uniquePaths(rows - 1, cols) + uniquePaths(rows, cols - 1)) % 1000000007;
 }
 '''
-
-[unlock]
-helpers = false
-recursion = true
 
 [budgets]
 steps = 30000000
@@ -43,8 +42,8 @@ large_steps = 3000000
 sweep_n0 = 16
 
 [medals]
-size = [50, 39, 31]
-speed = [387, 207, 143]
+size = [72, 57, 45]
+speed = [582, 311, 215]
 
 [[examples]]
 args = ["3", "7"]
