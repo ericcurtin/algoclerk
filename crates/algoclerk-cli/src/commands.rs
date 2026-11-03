@@ -26,6 +26,7 @@ USAGE:
   algoclerk-cli judge LEVEL FILE [--json]                judge a solution against a level
   algoclerk-cli validate [LEVEL ...] [--levels DIR]      validate level files (all when none given)
   algoclerk-cli table                                    judge table of every reference solution (markdown)
+  algoclerk-cli subset-table                             the supported C++ library members (markdown, as in docs/CPP_SUBSET.md)
   algoclerk-cli tune LEVEL|--all [--write]               compute medal targets from the reference
   algoclerk-cli codegen LEVEL|--file FILE --lang cpp [--verify] [--no-prelude]
                                                          print the formatted C++ (other languages: not yet)
@@ -57,6 +58,10 @@ pub fn dispatch(argv: &[String]) -> Result<u8, String> {
         "judge" => judge(&args),
         "validate" => validate(&args),
         "table" => table(&args),
+        "subset-table" => {
+            print!("{}", algoclerk_core::cpp::stdlib::markdown_table());
+            Ok(0)
+        }
         "harness" => harness(&args),
         "diff" => diff(&args),
         "tune" => tune(&args),

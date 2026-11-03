@@ -140,3 +140,13 @@ fn codegen_prints_cpp_and_is_polite_about_other_languages() {
     assert!(!o.status.success());
     assert!(text(&o).contains("use c, cpp or rust"), "{}", text(&o));
 }
+
+#[test]
+fn subset_table_prints_the_library_table() {
+    let o = cli(&["subset-table"]);
+    assert!(o.status.success());
+    let t = text(&o);
+    assert!(t.starts_with("| Receiver | Name | Header | Signature | Cost | Card |"));
+    assert!(t.contains("`std::partial_sum`") && t.contains("`std::for_each`"));
+    assert_eq!(t, algoclerk_core::cpp::stdlib::markdown_table());
+}

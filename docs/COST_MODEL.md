@@ -21,7 +21,11 @@ Rules that apply everywhere:
   operations add the extra cost listed below on top of that 1.
 * **Copies are charged** (see "Copies and references"), references are not.
 * Costs in the tables are the **total** for the call including the call node (so "1" means "only the call
-  node"); the interpreter charges `total - 1` extra for them.
+  node"), **not** counting the evaluation of the arguments: an argument costs what it costs on its own (a
+  literal or a plain scalar name 0, `v.begin()` 1 for the call, a named iterator 1 because it is copied, a
+  lambda expression 1). The tests in `tests/cpp_cost_model.rs` lock the rows against the interpreter.
+* Calling a lambda or function from a library algorithm (`for_each`, `count_if`, comparators ...) costs 1
+  for the call plus whatever the body executes.
 
 `log` below is `ceil(log2(n + 1))` (number of bits of `n`) unless written `cl2(n) = ceil(log2 n)`.
 
@@ -29,7 +33,8 @@ Rules that apply everywhere:
 
 | Situation | Cost |
 | --- | --- |
-| Copy of a scalar, pointer, iterator, `std::function`, `string_view` | 0 extra |
+| Copy of a scalar (`bool`, `char`, integers) | 0 extra |
+| Copy of a pointer, iterator, lambda, `std::function` or `string_view` held in a variable (`auto c = b;`, an iterator passed by name) | 1 |
 | Copy of a `std::string` | its length |
 | Copy of a container (`vector`, `deque`, `list`, `map`, `set`, `unordered_*`, stacks, queues) | the number of **leaf elements**: for `vector<vector<int>>` all the ints, for a `vector<string>` the sum of the string lengths |
 | Copy of a `pair`, `tuple`, `optional`, struct | the leaves inside |
@@ -53,16 +58,20 @@ refuses it), so the only moves are the implicit ones above.
 | --- | --- |
 | `size`, `length`, `empty`, `[]`, `at`, `front`, `back`, `push_back`, `pop_back`, `begin`, `end` | 1 |
 | `s += t`, `s.append(t)` | 1 + length of the added part (`s += c` is 1 + 1) |
-| `s + t`, `s + c`, `c + s` (new string) | 1 + `|s| + |t|` |
+| `s + t`, `s + c`, `c + s` (new string) | 1 + `|s| + |t|` (the `+` node is the 1) |
 | `substr(i, k)` | 1 + length of the result (a `string_view` slice costs 1) |
-| `find`, `rfind` | 1 + positions scanned + needle length |
-| `find_first_of`, `find_last_of`, `find_first_not_of`, `find_last_not_of` | 1 + positions scanned |
-| `compare`, `==`, `<` ... | 1 + min of the two lengths |
-| `insert(pos, ...)`, `replace`, `erase(pos, n)`, `erase(it)` | 1 + the characters moved (tail length plus inserted) |
-| `clear`, `resize(n)`, `assign` | 1 + the new or old length |
-| `std::string(n, c)` | 1 + `n` |
+| `find`, `rfind` | 2 + positions examined (up to and including the hit, all of them on a miss) + needle length |
+| `find_first_of`, `find_last_of`, `find_first_not_of`, `find_last_not_of` | 2 + positions examined |
+| `compare`, `==`, `<` ... | 2 + min of the two lengths (the operator forms: the operator node is the extra 1) |
+| `insert(pos, t)` | 1 + the characters moved (tail length) + the inserted length |
+| `erase(pos, n)` | 1 + the tail length; `erase(it)` 1 + the string length |
+| `replace` | 1 + the characters moved plus the inserted length (see `tests/cpp_cost_model.rs` for exact rows) |
+| `clear` | 1 + the old length |
+| `resize(n)` | 1 + `n` when growing, 1 + the new length when shrinking |
+| `assign(t)` | 1 + the new length |
+| `std::string(n, c)`, `s.append(n, c)` | 1 + `n` |
 | `std::to_string(x)` | 1 + number of digits |
-| `std::stoi`, `stoll`, `stoul`, `stoull` | 1 + length of the text |
+| `std::stoi`, `stoll` | 1 + length of the text |
 
 ## `std::vector`, `std::array`
 
@@ -71,25 +80,31 @@ refuses it), so the only moves are the implicit ones above.
 | `[]`, `at`, `size`, `empty`, `front`, `back`, `begin`, `end`, `rbegin`, `rend` | 1 |
 | `push_back`, `emplace_back`, `pop_back` | 1 (amortised) |
 | `insert(pos, x)` at index `i` of `n` | `n - i + 1` |
-| `insert(pos, k, x)` / range insert | `n - i + k` |
+| `insert(pos, k, x)` / range insert | `n - i + k + 1` |
 | `erase(pos)` / `erase(a, b)` at index `i` | `n - i + 1` |
-| `resize(n)`, `assign`, `clear`, `fill` (array), `vector<T>(n)`, `vector<T>(n, x)` | `n` (`clear`: the leaves released) |
+| `resize(n)`, `assign(n, x)`, `fill` (array) | `1 + n` (the new size) |
+| `clear` | `1 +` the leaves released |
+| `vector<T>(n)`, `vector<T>(n, x)` (a declaration, no call node) | `n` |
 | `reserve`, `shrink_to_fit` | 1 (`reserve` is refused when huge) |
 | `swap` | 1 (the contents are exchanged) |
 | copy (`vector<T> b = a;` ...) | leaves (see above) |
-| `==`, `<` on vectors | 1 + min length |
+| `==`, `<` on vectors | 2 + min length (the operator node is the extra 1) |
 
 ## `std::deque`, `std::queue`, `std::stack`, `std::list`
 
 | Operation | Cost |
 | --- | --- |
 | deque: `push_front`, `push_back`, `pop_front`, `pop_back`, `front`, `back`, `[]`, `at`, `size`, `empty` | 1 |
-| deque: `insert`, `erase` at index `i` of `n` | `min(i, n - i) + 1` |
+| deque: `insert(pos, x)` at index `i` of `n` | `min(i, n - i) + k + 1` (`k` elements inserted) |
+| deque: `erase(pos)` at index `i` of `n` | `min(i, n - i) + 1` |
+| deque: `clear` | `1 +` the leaves released |
 | queue: `push`, `pop`, `front`, `back`, `size`, `empty`, `emplace`; stack: `push`, `pop`, `top`, `size`, `empty`, `emplace` | 1 |
-| list: `push_*`, `pop_*`, `front`, `back`, `size`, `empty`, `insert(it, x)`, `erase(it)` | 1 |
-| list: `erase(a, b)` | 1 + elements removed |
-| list: `sort`, `sort(cmp)` | `n * cl2(n)` (comparator bodies are charged on top) |
-| list: `reverse`, `remove`, `remove_if`, `unique`, `clear`, `resize` | `n` |
+| list: `push_*`, `pop_*`, `front`, `back`, `size`, `empty`, `erase(it)` | 1 |
+| list: `insert(it, x)` | 1 + the number of elements inserted |
+| list: `erase(a, b)` | the number of elements removed (at least 1) |
+| list: `sort`, `sort(cmp)` | `1 + n * cl2(n)` (comparator bodies are charged on top) |
+| list: `reverse`, `remove`, `remove_if`, `unique`, `clear` | `1 + n` |
+| list: `resize(k)` | `1 + k` |
 
 ## `std::map`, `std::set`, `std::unordered_map`, `std::unordered_set`, `std::priority_queue`
 
@@ -97,10 +112,10 @@ refuses it), so the only moves are the implicit ones above.
 | --- | --- |
 | `map` / `set`: `find`, `count`, `insert`, `emplace`, `try_emplace`, `insert_or_assign`, `erase(key)`, `erase(it)`, `[]`, `at`, `lower_bound`, `upper_bound`, `equal_range` | `log + 1` |
 | `map` / `set`: `begin`, `end`, `rbegin`, `rend`, `size`, `empty`, iterator `++` / `*` / `->` | 1 |
-| `map` / `set`: `clear` | `n` |
+| `map` / `set`: `clear` | `1 + n` |
 | `unordered_map` / `unordered_set`: `find`, `count`, `insert`, `emplace`, `try_emplace`, `erase`, `[]`, `at` | 1 |
-| `unordered_*`: `clear` | `n` |
-| `priority_queue`: `push`, `emplace`, `pop` | `log + 1` (comparator bodies on top) |
+| `unordered_*`: `clear` | `1 + n` |
+| `priority_queue`: `push`, `emplace`, `pop` | `1 +` the number of bits of `n + 1`, `n` being the size before the call (comparator bodies on top) |
 | `priority_queue`: `top`, `size`, `empty` | 1 |
 | Range-`for` over a map or set | 1 per element, plus 1 per iteration |
 | Construct from a braced list of `k` elements | `k` |
@@ -113,13 +128,17 @@ find solutions that depend on the unspecified order of the real containers.
 
 | Function | Cost |
 | --- | --- |
-| `std::sort`, `std::stable_sort` | `n * cl2(n)` (the sort is stable; each comparator call also costs its body) |
-| `reverse`, `fill`, `iota`, `unique`, `remove`, `remove_if`, `rotate`, `next_permutation`, `prev_permutation` | `n` |
-| `accumulate`, `count`, `count_if`, `find` (positions scanned), `find_if`, `any_of`, `all_of`, `none_of`, `min_element`, `max_element`, `equal`, `is_sorted` | `n` (or the elements visited) |
+| `std::sort`, `std::stable_sort` | `1 + n * cl2(n)` (the sort is stable; each comparator call also costs 1 plus its body) |
+| `reverse`, `fill`, `iota`, `unique`, `remove`, `remove_if`, `rotate`, `next_permutation`, `prev_permutation` | `1 + n` (the predicate of `remove_if` is called `n` times, 1 plus its body each) |
+| `accumulate`, `count`, `count_if`, `find` (positions scanned), `find_if`, `any_of`, `all_of`, `none_of`, `min_element`, `max_element`, `equal` | `1 + n` (or the elements visited) |
+| `copy` | `1 + 2n` (`n` read, `n` written) |
+| `lexicographical_compare` | `1 +` both range lengths `+` the positions compared |
+| `for_each` | `1 + n`, plus 1 plus the body of the function for each element |
+| `partial_sum` | `1 + 2n` (`n` elements read, `n` written) |
 | `binary_search`, `lower_bound`, `upper_bound` on a random access range | `cl2(n) + 1` |
-| `std::distance`, `std::advance`, `std::next`, `std::prev` on random access iterators | 1 (on `map`, `set`, `list` iterators: the number of steps) |
+| `std::distance`, `std::advance`, `std::next`, `std::prev` on random access iterators | 1 (on `map`, `set`, `list` iterators: 1 plus the number of steps) |
 | `std::swap`, `std::iter_swap` | 1 (containers are swapped, not copied) |
-| `std::max`, `std::min`, `std::clamp`, `std::abs`, `std::gcd`, `std::lcm`, `std::make_pair`, `std::get`, `std::make_tuple` | 1 (the initializer-list form of `max` / `min` adds the list length) |
+| `std::max`, `std::min`, `std::abs`, `std::make_pair`, `std::get`, `std::make_tuple` | 1 (the initializer-list form of `max` / `min` adds the list length) |
 | `std::isdigit` ... `std::toupper`, `std::numeric_limits<T>::max()` | 1 |
 | `new T(...)` | 1 plus the construction |
 

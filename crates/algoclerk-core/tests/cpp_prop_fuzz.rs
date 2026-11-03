@@ -452,11 +452,11 @@ fn pipeline(src: &str) -> Result<Outcome, String> {
             continue;
         };
         out.ran += 1;
-        if let Err(e) = &called.report.result {
-            if e.kind == RtKind::Internal && !KNOWN_INTERNAL.iter().any(|(m, _)| e.msg.contains(m))
-            {
-                return Err(format!("interpreter failure in `{}`: {}", f.name, e.msg));
-            }
+        if let Err(e) = &called.report.result
+            && e.kind == RtKind::Internal
+            && !KNOWN_INTERNAL.iter().any(|(m, _)| e.msg.contains(m))
+        {
+            return Err(format!("interpreter failure in `{}`: {}", f.name, e.msg));
         }
     }
     Ok(out)
@@ -550,14 +550,15 @@ fn mutants_cover_every_stage_of_the_pipeline() {
             .collect();
         let m = mutate(src, &muts);
         let o = bounded(m.clone()).unwrap_or_else(|e| panic!("{e}\n--- mutant:\n{m}"));
-        if !o.parsed && std::env::var("ALGOCLERK_PROP_DEBUG").is_ok() {
-            if let Err(d) = parse(&m, &ParseOpts::default()) {
-                eprintln!(
-                    "PARSE FAIL kinds {:?}: {}",
-                    muts.iter().map(|m| m.kind % 16).collect::<Vec<_>>(),
-                    d[0].msg
-                );
-            }
+        if !o.parsed
+            && std::env::var("ALGOCLERK_PROP_DEBUG").is_ok()
+            && let Err(d) = parse(&m, &ParseOpts::default())
+        {
+            eprintln!(
+                "PARSE FAIL kinds {:?}: {}",
+                muts.iter().map(|m| m.kind % 16).collect::<Vec<_>>(),
+                d[0].msg
+            );
         }
         total += 1;
         parsed += usize::from(o.parsed);

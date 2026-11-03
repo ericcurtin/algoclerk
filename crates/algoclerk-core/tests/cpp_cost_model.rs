@@ -26,15 +26,18 @@ fn cost(body: &str) -> Result<u64, String> {
 /// (setup, statement, documented cost of the statement's expression).
 type Row = (&'static str, &'static str, u64);
 
-const STR: &str = "std::string s = \"abcdef\"; std::string t = \"xy\"; char c = 'd'; size_t i = 2; size_t k = 2;";
+const STR: &str =
+    "std::string s = \"abcdef\"; std::string t = \"xy\"; char c = 'd'; size_t i = 2; size_t k = 2;";
 const VEC: &str = "std::vector<int> v(10); std::vector<int> w(10); auto b = v.begin() + 3; auto e = v.begin() + 5; int x = 1; size_t k = 2;";
 const ALG: &str = "std::vector<int> v = {3, 1, 2, 5, 4}; auto b = v.begin(); auto e = v.end(); auto m = b + 1; int x = 2;";
-const SORTED: &str = "std::vector<int> v = {1, 2, 3, 4, 5}; auto b = v.begin(); auto e = v.end(); int x = 3;";
+const SORTED: &str =
+    "std::vector<int> v = {1, 2, 3, 4, 5}; auto b = v.begin(); auto e = v.end(); int x = 3;";
 const LST: &str = "std::list<int> l = {1, 2, 3, 4, 5}; auto b = l.begin(); auto e = l.end(); int x = 1; size_t k = 2;";
 const MAP: &str = "std::map<int, int> m = {{1, 1}, {2, 2}, {3, 3}}; auto it = m.begin(); int x = 5; std::pair<int, int> p = {5, 5};";
 const UMAP: &str = "std::unordered_map<int, int> m = {{1, 1}, {2, 2}, {3, 3}}; int x = 2;";
 const PQ: &str = "std::priority_queue<int> q; q.push(1); q.push(2); q.push(3); int x = 4;";
-const DQ: &str = "std::deque<int> d(10); auto b = d.begin() + 2; auto e = d.begin() + 8; int x = 1;";
+const DQ: &str =
+    "std::deque<int> d(10); auto b = d.begin() + 2; auto e = d.begin() + 8; int x = 1;";
 
 fn rows() -> Vec<Row> {
     vec![
@@ -102,6 +105,12 @@ fn rows() -> Vec<Row> {
         (ALG, "std::next_permutation(b, e);", 8),
         (ALG, "std::for_each(b, e, [](int& a) { a = a % 100; });", 29),
         (ALG, "std::partial_sum(b, e, b);", 14),
+        (ALG, "std::copy(b, e, b);", 14),
+        (
+            "std::vector<int> a{1, 2}; std::vector<int> c{1, 3}; auto ab = a.begin(); auto ae = a.end(); auto cb = c.begin(); auto ce = c.end();",
+            "std::lexicographical_compare(ab, ae, cb, ce);",
+            11,
+        ),
         (SORTED, "std::binary_search(b, e, x);", 6),
         (SORTED, "std::lower_bound(b, e, x);", 6),
         (SORTED, "auto d = std::distance(b, e);", 3),
@@ -118,7 +127,9 @@ fn documented_costs_match_the_interpreter() {
             (Ok(b), Ok(f)) => {
                 let got = f - b - 1;
                 if got != want {
-                    bad.push(format!("`{stmt}`: documented {want}, interpreter charges {got}"));
+                    bad.push(format!(
+                        "`{stmt}`: documented {want}, interpreter charges {got}"
+                    ));
                 }
             }
             (Err(e), _) | (_, Err(e)) => bad.push(format!("`{stmt}`: {e}")),
@@ -139,7 +150,19 @@ fn copy_rules() {
     assert_eq!(c(it, "auto d = b;"), 1);
     assert_eq!(c("std::vector<int> v(10);", "auto w = v;"), 10);
     assert_eq!(c("std::vector<int> v(10);", "auto& w = v;"), 0);
-    assert_eq!(c("std::vector<std::vector<int>> v(3, std::vector<int>(4));", "auto w = v;"), 12);
-    assert_eq!(c("std::vector<std::vector<int>> v(3, std::vector<int>(4));", "for (auto& x : v) { }"), 4);
+    assert_eq!(
+        c(
+            "std::vector<std::vector<int>> v(3, std::vector<int>(4));",
+            "auto w = v;"
+        ),
+        12
+    );
+    assert_eq!(
+        c(
+            "std::vector<std::vector<int>> v(3, std::vector<int>(4));",
+            "for (auto& x : v) { }"
+        ),
+        4
+    );
     assert_eq!(c("std::string s = \"abcdef\";", "std::string t = s;"), 6);
 }

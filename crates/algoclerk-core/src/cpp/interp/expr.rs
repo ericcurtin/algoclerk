@@ -441,6 +441,11 @@ impl<'p> Machine<'p> {
         self.charge(1)?;
         match op {
             None => {
+                if let ExprKind::Call { callee, args } = &lhs.kind
+                    && is_std_tie(callee)
+                {
+                    return self.assign_tie(args, rhs);
+                }
                 if let ExprKind::InitList(elems) = &rhs.kind {
                     let p = self.eval_place(lhs)?;
                     let ty = self
@@ -487,7 +492,11 @@ impl<'p> Machine<'p> {
                 let new = match (&old, &rhs_v) {
                     (Value::Iter(it), r) if r.sk().is_some() => {
                         let n = r.as_i128().unwrap_or(0) as i64;
-                        let n = if bop == BinOp::Sub { n.saturating_neg() } else { n };
+                        let n = if bop == BinOp::Sub {
+                            n.saturating_neg()
+                        } else {
+                            n
+                        };
                         Value::Iter(Box::new(self.iter_advance(it, n)?))
                     }
                     (o, r) if o.sk().is_some() && r.sk().is_some() => {
@@ -503,6 +512,28 @@ impl<'p> Machine<'p> {
                 Ok(Rv::Place(p))
             }
         }
+    }
+
+    /// `std::tie(a, b, ...) = pair_or_tuple;`: assign the elements to the variables.
+    fn assign_tie(&mut self, targets: &'p [Expr], rhs: &'p Expr) -> R<Rv> {
+        self.charge(1)?;
+        let rv = self.eval_rv(rhs)?;
+        let v = self.rv_value(rv)?;
+        let v = self.check_init_val(v)?;
+        let items: Vec<Value> = match v {
+            Value::Pair(p) => (*p).into(),
+            Value::Tuple(t) => *t,
+            _ => return Err(self.err(RtKind::BadArg, "std::tie takes a pair or a tuple")),
+        };
+        if items.len() != targets.len() {
+            return Err(self.err(RtKind::BadArg, "std::tie and the tuple differ in size"));
+        }
+        for (t, x) in targets.iter().zip(items) {
+            let p = self.eval_place(t)?;
+            let x = self.convert_for_assign(&p, x)?;
+            self.store(&p, x).map_err(|f| self.fail(f))?;
+        }
+        Ok(Rv::Val(Value::Void))
     }
 
     fn static_ty(&self, e: &Expr) -> Option<Ty> {
@@ -983,6 +1014,15 @@ impl<'p> Machine<'p> {
                 self.call_fn(fi, bound)
             }
         }
+    }
+}
+
+/// Is `callee` `std::tie` (or `tie` after `using namespace std`)?
+fn is_std_tie(callee: &Expr) -> bool {
+    match &callee.kind {
+        ExprKind::Path(segs) => segs.last().is_some_and(|s| s.name == "tie"),
+        ExprKind::Var(name) => name == "tie",
+        _ => false,
     }
 }
 

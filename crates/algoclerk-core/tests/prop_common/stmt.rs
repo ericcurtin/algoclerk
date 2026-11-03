@@ -388,10 +388,10 @@ impl Gen {
         }
         self.line("}");
         self.pop_scope();
-        if let Some((n, was)) = frozen_map {
-            if let Some(v) = self.var_mut(&n) {
-                v.frozen = was;
-            }
+        if let Some((n, was)) = frozen_map
+            && let Some(v) = self.var_mut(&n)
+        {
+            v.frozen = was;
         }
     }
 

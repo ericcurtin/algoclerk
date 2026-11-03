@@ -335,7 +335,11 @@ impl<'p> Machine<'p> {
         match (op, x, y) {
             (BinOp::Add | BinOp::Sub, Value::Iter(it), n) if n.as_i128().is_some() => {
                 let n = n.as_i128().unwrap_or(0) as i64;
-                let n = if op == BinOp::Sub { n.saturating_neg() } else { n };
+                let n = if op == BinOp::Sub {
+                    n.saturating_neg()
+                } else {
+                    n
+                };
                 Ok(Value::Iter(Box::new(self.iter_advance(it, n)?)))
             }
             (BinOp::Add, n, Value::Iter(it)) if n.as_i128().is_some() => {

@@ -32,7 +32,7 @@ struct TreeNode {
 ";
 
 /// Corpus files run through the real parser and the checker (the others still use the test-support parser).
-const REAL_FRONT_END: &[&str] = &["overloads", "smallints"];
+const REAL_FRONT_END: &[&str] = &["overloads", "smallints", "fixes"];
 
 const PRINTER: &str = r#"
 #include <cstdio>
@@ -386,5 +386,5 @@ macro_rules! diff {
 
 diff!(
     arith, control, strings, vectors, assoc, adaptors, algos, lambdas, structs, misc, overloads,
-    smallints
+    smallints, fixes
 );

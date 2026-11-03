@@ -594,7 +594,11 @@ impl<'p> Machine<'p> {
                 } else {
                     1
                 };
-                let n = if name == "prev" { n.saturating_neg() } else { n };
+                let n = if name == "prev" {
+                    n.saturating_neg()
+                } else {
+                    n
+                };
                 let Value::Iter(it) = v else {
                     return Err(self.err(RtKind::BadArg, "next needs an iterator"));
                 };
@@ -722,8 +726,7 @@ impl<'p> Machine<'p> {
                         Some(prev) => {
                             let r = match &op {
                                 Some(f) => {
-                                    let r =
-                                        self.call_value(f, vec![Rv::Val(prev), Rv::Val(x)])?;
+                                    let r = self.call_value(f, vec![Rv::Val(prev), Rv::Val(x)])?;
                                     self.rv_val(r)?
                                 }
                                 None => self.binary_values(BinOp::Add, prev, x)?,
@@ -739,6 +742,53 @@ impl<'p> Machine<'p> {
                     acc = Some(next);
                 }
                 ret(Value::Iter(dst))
+            }
+            "copy" => {
+                self.nargs(name, args, 3, 3)?;
+                let (a, b) = self.range2(args)?;
+                let out = self.val_arg(&args[2])?;
+                let vals = self.range_values(&a, &b)?;
+                let Value::Iter(mut dst) = out else {
+                    return Err(self.err(RtKind::BadArg, "copy needs an output iterator"));
+                };
+                for x in vals {
+                    let p = self.iter_deref(&dst)?;
+                    let v = self.convert_for_assign(&p, x)?;
+                    self.store(&p, v).map_err(|f| self.fail(f))?;
+                    self.charge(1)?;
+                    dst = Box::new(self.iter_advance(&dst, 1)?);
+                }
+                ret(Value::Iter(dst))
+            }
+            "lexicographical_compare" => {
+                self.nargs(name, args, 4, 5)?;
+                let a = self.eval(&args[0])?;
+                let b = self.eval(&args[1])?;
+                let c = self.eval(&args[2])?;
+                let d = self.eval(&args[3])?;
+                let cmp = self.comparator_arg(args, 4)?;
+                let xs = self.range_values(&a, &b)?;
+                let ys = self.range_values(&c, &d)?;
+                let mut i = 0;
+                while i < xs.len() && i < ys.len() {
+                    self.charge(1)?;
+                    if self.less_vals(
+                        cmp.as_ref(),
+                        Rv::Val(xs[i].clone()),
+                        Rv::Val(ys[i].clone()),
+                    )? {
+                        return ret(Value::Bool(true));
+                    }
+                    if self.less_vals(
+                        cmp.as_ref(),
+                        Rv::Val(ys[i].clone()),
+                        Rv::Val(xs[i].clone()),
+                    )? {
+                        return ret(Value::Bool(false));
+                    }
+                    i += 1;
+                }
+                ret(Value::Bool(xs.len() < ys.len()))
             }
             "find" | "count" => {
                 self.nargs(name, args, 3, 3)?;

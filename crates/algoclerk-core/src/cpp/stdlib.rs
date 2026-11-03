@@ -459,6 +459,7 @@ pub static MEMBERS: &[Member] = &[
     m(FR, "std::accumulate", "<numeric>", "T accumulate(InputIt first, InputIt last, T init, BinaryOp op)", "n", false, "std::vector<int> v{1, 2}; int s = std::accumulate(v.begin(), v.end(), 0, [](int a, int b) { return a + b; }); (void)s;"),
     m(FR, "std::iota", "<numeric>", "void iota(ForwardIt first, ForwardIt last, T value)", "n", true, "std::vector<int> v(3); std::iota(v.begin(), v.end(), 0);"),
     m(FR, "std::partial_sum", "<numeric>", "OutputIt partial_sum(InputIt first, InputIt last, OutputIt out)", "n", false, "std::vector<int> v{1, 2, 3}; std::vector<int> p(3); std::partial_sum(v.begin(), v.end(), p.begin());"),
+    m(FR, "std::partial_sum", "<numeric>", "OutputIt partial_sum(InputIt first, InputIt last, OutputIt out, BinaryOp op)", "n", false, "std::vector<int> v{1, 2, 3}; std::vector<int> p(3); std::partial_sum(v.begin(), v.end(), p.begin(), [](int a, int b) { return a + b; });"),
     // ---- <iterator> helpers ----
     m(FR, "std::distance", "<iterator>", "difference_type distance(InputIt first, InputIt last)", "1", false, "std::vector<int> v{1, 2}; auto d = std::distance(v.begin(), v.end()); (void)d;"),
     m(FR, "std::advance", "<iterator>", "void advance(InputIt& it, difference_type n)", "1", false, "std::vector<int> v{1, 2, 3}; auto it = v.begin(); std::advance(it, 2);"),
