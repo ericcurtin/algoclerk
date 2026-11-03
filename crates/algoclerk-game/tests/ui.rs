@@ -231,7 +231,10 @@ fn rendering_stays_close_to_the_stored_coarse_golden_maps() {
             std::fs::write(&path, &map).unwrap();
             continue;
         }
-        let want = std::fs::read_to_string(&path).unwrap();
+        // Windows checkouts may turn the golden files into CRLF.
+        let want = std::fs::read_to_string(&path)
+            .unwrap()
+            .replace("\r\n", "\n");
         let (a, b): (Vec<char>, Vec<char>) = (map.chars().collect(), want.chars().collect());
         assert_eq!(a.len(), b.len(), "{name}: shape changed");
         let same = a
