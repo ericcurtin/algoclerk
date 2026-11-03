@@ -17,9 +17,24 @@ pub const MIGRATION_TITLE: &str = "The office moved";
 pub const GOT_IT: &str = "Got it";
 /// Editor: the read-only prelude line shown above the editable text.
 pub const PRELUDE_BAR: &str = "prelude";
-/// Result screen: a translation is not available yet.
-pub const TRANSLATION_COMING: &str =
-    "Translation coming: this tab will show your solution as idiomatic code in this language.";
+/// Result screen: there is no accepted program to translate.
+pub const NOTHING_TO_TRANSLATE: &str = "there is no program that compiles to translate yet";
+/// Result screen: lead-in of the message that a tab cannot be translated.
+pub const CANNOT_TRANSLATE: &str = "The clerk could not translate this solution to";
+/// Result screen: the reassurance under the message.
+pub const STILL_VALID: &str = "Your C++ is unchanged and the other tabs still work.";
+/// Result screen: toggle to wrap long lines.
+pub const WRAP: &str = "Wrap";
+/// Result screen: toggle to scroll long lines sideways.
+pub const SCROLL: &str = "Scroll";
+/// Result screen: label before the technique note.
+pub const TECHNIQUE: &str = "Technique";
+/// Result screen: what the tab shows, per language.
+pub const TAB_C: &str = "C11 with a small typed-container prelude, same algorithm.";
+/// Result screen: what the Rust tab shows.
+pub const TAB_RUST: &str = "Idiomatic Rust, same algorithm and names.";
+/// Result screen: what the C++ tab shows.
+pub const TAB_CPP: &str = "Your own program, formatted, with the level's includes.";
 /// Autocomplete: no suggestion.
 pub const NO_SUGGESTION: &str = "no suggestions";
 /// Card editor: statement that cards cannot express.

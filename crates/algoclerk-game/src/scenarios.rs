@@ -262,7 +262,6 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
                         "code-cpp" => 1,
                         _ => 2,
                     };
-                    r.show_prelude = false;
                 }
                 tick_n(&mut g, 2);
             }

@@ -9,6 +9,7 @@ use crate::session::Session;
 use crate::syntax::{self, Piece};
 use crate::ui::{Ctx, GameEvent, Nav, View, widget_state};
 use crate::words;
+use algoclerk_core::cpp::codegen::{Lang, generate};
 use algoclerk_core::judge::Medal;
 use algoclerk_media::{Font, Rect};
 
@@ -28,12 +29,12 @@ pub struct Translation {
     pub label: &'static str,
     /// Short id (`c`, `cpp`, `rust`), the value stored in the settings.
     pub id: &'static str,
-    /// Read-only support code above the player's (the level prelude for C++).
+    /// Read-only support code above the player's (includes and helpers).
     pub prelude: String,
     /// The solution.
     pub code: String,
-    /// The translation is not available yet: the tab shows a friendly message instead of code.
-    pub pending: bool,
+    /// The translator could not express the program in this language: the friendly reason.
+    pub error: Option<String>,
 }
 
 impl Translation {
@@ -45,37 +46,51 @@ impl Translation {
             format!("{}\n\n{}", self.prelude.trim_end(), self.code)
         }
     }
+
+    /// There is code to show.
+    pub fn available(&self) -> bool {
+        self.error.is_none()
+    }
 }
 
 /// The tabs of the code reveal, in tab order (C, C++, Rust).
 ///
-/// C++ is the player's own program. The C and Rust translators live in the code generation package: until
-/// they are connected here the tabs are marked `pending` and the screen says that the translation is coming.
-/// Connect them by filling `code` (and `prelude`) and clearing `pending`.
+/// Every tab comes from `algoclerk_core::cpp::codegen::generate` on the accepted program: C and Rust are
+/// translations (helper prelude collapsed by default), C++ is the player's own formatted program with the
+/// level's includes. A construct a translator cannot express turns into the friendly message of the
+/// translator on that tab only.
 pub fn translations(session: &Session) -> Vec<Translation> {
-    let prelude = session
-        .level
-        .as_ref()
-        .map(|l| l.prelude.trim().to_string())
-        .unwrap_or_default();
-    let pending = |label, id| Translation {
-        label,
-        id,
-        prelude: String::new(),
-        code: String::new(),
-        pending: true,
-    };
-    vec![
-        pending("C", "c"),
-        Translation {
-            label: "C++",
-            id: "cpp",
-            prelude,
-            code: session.text(),
-            pending: false,
-        },
-        pending("Rust", "rust"),
+    let entry = session.entry_name();
+    let compiled = session.compiled.as_ref().ok().or(session.last_ok.as_ref());
+    [
+        (Lang::C, "C", "c"),
+        (Lang::Cpp, "C++", "cpp"),
+        (Lang::Rust, "Rust", "rust"),
     ]
+    .into_iter()
+    .map(|(lang, label, id)| {
+        let made = match compiled {
+            Some(c) => generate(c, lang, &entry),
+            None => Err(words::NOTHING_TO_TRANSLATE.to_string()),
+        };
+        match made {
+            Ok(g) => Translation {
+                label,
+                id,
+                prelude: g.prelude.trim().to_string(),
+                code: g.code.trim_end().to_string(),
+                error: None,
+            },
+            Err(e) => Translation {
+                label,
+                id,
+                prelude: String::new(),
+                code: String::new(),
+                error: Some(e),
+            },
+        }
+    })
+    .collect()
 }
 
 /// The screen.
@@ -86,16 +101,21 @@ pub struct ResultScreen {
     pub stage: Stage,
     /// Selected language tab (0 C, 1 C++, 2 Rust).
     pub lang: usize,
-    /// Scroll in lines.
+    /// Vertical scroll in rows.
     pub scroll: i32,
-    /// Show the helper prelude.
-    pub show_prelude: bool,
+    /// Horizontal scroll in columns (only used when lines are not wrapped).
+    pub hscroll: i32,
+    /// Wrap long lines (otherwise scroll sideways).
+    pub wrap: bool,
+    /// Show the helper prelude, per tab.
+    pub show_prelude: [bool; 3],
     /// Ticks since the screen opened.
     pub t: u32,
     /// The solution beat the previous best.
     pub new_best: bool,
     code: Vec<Translation>,
     solved: bool,
+    drag: (i32, i32),
 }
 
 fn medal_sprite(m: Medal) -> &'static str {
@@ -114,9 +134,11 @@ struct Layout {
     retry: Rect,
     levels: Rect,
     tabs: Vec<Rect>,
+    wrap: Rect,
     copy: Rect,
     back: Rect,
     prelude: Rect,
+    note: Rect,
     body: Rect,
 }
 
@@ -128,27 +150,42 @@ fn layout(vp: &Viewport) -> Layout {
     let cols: Vec<Rect> = (0..4)
         .map(|i| Rect::new(panel.x + 6 + i * (bw + 2), by, bw, bh))
         .collect();
-    let tabs: Vec<Rect> = (0..3)
-        .map(|i| Rect::new(panel.x + 6 + i * 62, panel.y + 16, 60, bh))
-        .collect();
-    let body = Rect::new(
-        panel.x + 6,
-        panel.y + 18 + bh + 2,
-        panel.w - 12,
-        by - (panel.y + 18 + bh + 2) - 14,
-    );
+    // tab row: C, C++, Rust, wrap toggle, copy
+    let row = Rect::new(panel.x + 6, panel.y + 16, panel.w - 12, bh);
+    let five = crate::layout::columns(row, 5, 2);
+    let tog_h = if vp.touch { 22 } else { 12 };
+    let note = Rect::new(panel.x + 6, by - 24, panel.w - 12, 22);
+    let prelude = Rect::new(panel.x + 6, note.y - tog_h - 1, panel.w - 12, tog_h);
+    let top = panel.y + 18 + bh + 2;
+    let body = Rect::new(panel.x + 6, top, panel.w - 12, prelude.y - top - 2);
     Layout {
         panel,
         next: cols[0],
         code: cols[1],
         retry: cols[2],
         levels: cols[3],
-        tabs,
-        copy: Rect::new(panel.right() - 66, panel.y + 16, 60, bh),
-        back: cols[0],
-        prelude: Rect::new(panel.x + 6, by - 12, 120, 11),
+        tabs: five[..3].to_vec(),
+        wrap: five[3],
+        copy: five[4],
+        back: Rect::new(panel.x + 6, by, bw * 2 + 2, bh),
+        prelude,
+        note,
         body,
     }
+}
+
+/// Width of the line number gutter in pixels for `n` lines.
+fn gutter_w(n: usize) -> i32 {
+    (n.max(1).to_string().len() as i32 + 1) * 6 + 2
+}
+
+/// One row of the code view.
+struct DRow {
+    pieces: Vec<Piece>,
+    /// One-based line number on the first row of a line.
+    num: Option<usize>,
+    /// The row belongs to the helper prelude.
+    pre: bool,
 }
 
 impl ResultScreen {
@@ -161,21 +198,19 @@ impl ResultScreen {
             _ => 2,
         };
         let solved = play.solved;
-        let lang = if code.get(lang).is_some_and(|t| t.pending) {
-            1
-        } else {
-            lang
-        };
         ResultScreen {
             play,
             stage: if victory { Stage::Victory } else { Stage::Code },
             lang,
             scroll: 0,
-            show_prelude: false,
+            hscroll: 0,
+            wrap: true,
+            show_prelude: [false, true, false],
             t: 0,
             new_best: false,
             code,
             solved,
+            drag: (0, 0),
         }
     }
 
@@ -194,35 +229,87 @@ impl ResultScreen {
                 for (i, t) in l.tabs.iter().enumerate() {
                     v.push(Hit::tap(["tab c", "tab cpp", "tab rust"][i], *t));
                 }
+                v.push(Hit::tap("wrap", l.wrap));
                 v.push(Hit::tap("copy", l.copy));
                 v.push(Hit::tap("back", l.back));
                 v.push(Hit::area("code body", l.body));
+                v.push(Hit::area("code note", l.note));
             }
         }
         v
     }
 
-    fn text_for(&self, cols: usize) -> (Vec<Vec<Piece>>, usize) {
+    /// Columns of code that fit in the body.
+    fn code_cols(&self, body: Rect, total_lines: usize) -> usize {
+        (((body.w - gutter_w(total_lines) - 10) / 6).max(8)) as usize
+    }
+
+    /// The rows to draw for the current tab at the given width, and how many prelude lines there are.
+    fn rows(&self, body: Rect) -> (Vec<DRow>, usize) {
         let Some(g) = self.code.get(self.lang) else {
             return (Vec::new(), 0);
         };
-        if g.pending {
-            return (
-                Font::wrap(words::TRANSLATION_COMING, cols.max(10))
-                    .into_iter()
-                    .map(|l| vec![(l, 'A')])
-                    .collect(),
-                0,
-            );
-        }
-        let pre_lines = g.prelude.lines().count();
+        let pre_lines = if g.prelude.trim().is_empty() {
+            0
+        } else {
+            g.prelude.lines().count()
+        };
+        let show = pre_lines > 0 && self.show_prelude.get(self.lang).copied().unwrap_or(false);
         let mut text = String::new();
-        if self.show_prelude {
-            text.push_str(&g.prelude);
-            text.push('\n');
+        let mut pre_shown = 0;
+        if show {
+            text.push_str(g.prelude.trim_end());
+            text.push_str("\n\n");
+            pre_shown = pre_lines + 1;
         }
         text.push_str(&g.code);
-        (syntax::lines(&text, syntax::dark, 'W'), pre_lines)
+        let colored = syntax::lines(&text, syntax::dark, 'W');
+        let cols = self.code_cols(body, colored.len());
+        let mut rows = Vec::new();
+        for (i, line) in colored.into_iter().enumerate() {
+            let pre = i < pre_shown;
+            if self.wrap {
+                for (k, r) in syntax::wrap_line(&line, cols).into_iter().enumerate() {
+                    rows.push(DRow {
+                        pieces: r,
+                        num: (k == 0).then_some(i + 1),
+                        pre,
+                    });
+                }
+            } else {
+                rows.push(DRow {
+                    pieces: line,
+                    num: Some(i + 1),
+                    pre,
+                });
+            }
+        }
+        (rows, pre_lines)
+    }
+
+    /// The longest line in columns (scroll mode).
+    fn longest(rows: &[DRow]) -> usize {
+        rows.iter()
+            .map(|r| syntax::width(&r.pieces))
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// The text of the message for a tab that cannot be translated.
+    fn error_lines(&self, reason: &str, cols: usize, label: &str) -> Vec<Vec<Piece>> {
+        let mut out: Vec<Vec<Piece>> = Vec::new();
+        for l in Font::wrap(&format!("{} {label}.", words::CANNOT_TRANSLATE), cols) {
+            out.push(vec![(l, 'y')]);
+        }
+        out.push(Vec::new());
+        for l in Font::wrap(reason, cols) {
+            out.push(vec![(l, 'W')]);
+        }
+        out.push(Vec::new());
+        for l in Font::wrap(words::STILL_VALID, cols) {
+            out.push(vec![(l, 'A')]);
+        }
+        out
     }
 
     /// Handle input.
@@ -253,29 +340,54 @@ impl ResultScreen {
             Stage::Code => {
                 for (i, t) in l.tabs.iter().enumerate() {
                     if cx.ptr.tapped_in(t) {
-                        self.lang = i;
-                        self.scroll = 0;
-                        cx.progress.settings.code_lang = ["c", "cpp", "rust"][i].to_string();
-                        cx.touch_progress();
-                        cx.sfx("button");
+                        self.pick_lang(cx, i);
                     }
                 }
-                if cx.input.key(Key::Right) {
-                    self.lang = (self.lang + 1) % 3;
-                    self.scroll = 0;
+                if cx.input.key(Key::Tab) {
+                    self.pick_lang(cx, (self.lang + 1) % 3);
                 }
-                if cx.input.key(Key::Left) {
-                    self.lang = (self.lang + 2) % 3;
-                    self.scroll = 0;
+                for (i, c) in ['1', '2', '3'].into_iter().enumerate() {
+                    if cx.input.ch(c) {
+                        self.pick_lang(cx, i);
+                    }
                 }
-                let (lines, _) = self.text_for(((l.body.w - 8) / 6) as usize);
-                let rows = (l.body.h / 9).max(1);
-                let max_scroll = (lines.len() as i32 - rows).max(0);
+                if cx.ptr.tapped_in(&l.wrap) || cx.input.ch('w') {
+                    self.wrap = !self.wrap;
+                    self.hscroll = 0;
+                    cx.sfx("button");
+                }
+                let (rows, _) = self.rows(l.body);
+                let view_rows = ((l.body.h - 4) / 9).max(1);
+                let max_scroll = (rows.len() as i32 - view_rows).max(0);
+                let view_cols = self.code_cols(l.body, rows.len()) as i32;
+                let max_h = if self.wrap {
+                    0
+                } else {
+                    (Self::longest(&rows) as i32 - view_cols).max(0)
+                };
                 if cx.ptr.wheel != 0.0 {
-                    self.scroll += -(cx.ptr.wheel.signum() as i32) * 3;
+                    let n = -(cx.ptr.wheel.signum() as i32) * 3;
+                    if cx.input.shift && !self.wrap {
+                        self.hscroll += n * 2;
+                    } else {
+                        self.scroll += n;
+                    }
                 }
                 if cx.ptr.down && cx.ptr.moved && l.body.contains(cx.ptr.start.0, cx.ptr.start.1) {
-                    self.scroll -= cx.ptr.delta.1 / 3 + cx.ptr.delta.1.signum();
+                    self.drag.0 += cx.ptr.delta.0;
+                    self.drag.1 += cx.ptr.delta.1;
+                    let dy = self.drag.1 / 9;
+                    self.drag.1 -= dy * 9;
+                    self.scroll -= dy;
+                    if !self.wrap {
+                        let dx = self.drag.0 / 6;
+                        self.drag.0 -= dx * 6;
+                        self.hscroll -= dx;
+                    } else {
+                        self.drag.0 = 0;
+                    }
+                } else if !cx.ptr.down {
+                    self.drag = (0, 0);
                 }
                 if cx.input.key(Key::Down) {
                     self.scroll += 1;
@@ -283,14 +395,33 @@ impl ResultScreen {
                 if cx.input.key(Key::Up) {
                     self.scroll -= 1;
                 }
+                if cx.input.key(Key::PageDown) {
+                    self.scroll += view_rows - 1;
+                }
+                if cx.input.key(Key::PageUp) {
+                    self.scroll -= view_rows - 1;
+                }
+                if cx.input.key(Key::Right) {
+                    self.hscroll += 4;
+                }
+                if cx.input.key(Key::Left) {
+                    self.hscroll -= 4;
+                }
+                if cx.input.key(Key::Home) {
+                    self.hscroll = 0;
+                    self.scroll = 0;
+                }
                 self.scroll = self.scroll.clamp(0, max_scroll);
+                self.hscroll = self.hscroll.clamp(0, max_h);
                 if cx.ptr.tapped_in(&l.prelude) {
-                    self.show_prelude = !self.show_prelude;
+                    if let Some(f) = self.show_prelude.get_mut(self.lang) {
+                        *f = !*f;
+                    }
                     self.scroll = 0;
                 }
                 if cx.ptr.tapped_in(&l.copy) || cx.input.ctrl_ch('c') {
                     if let Some(g) = self.code.get(self.lang) {
-                        if !g.pending {
+                        if g.available() {
                             cx.events.push(GameEvent::Copy(g.full()));
                         }
                         cx.sfx("button");
@@ -306,6 +437,17 @@ impl ResultScreen {
             }
         }
         None
+    }
+
+    fn pick_lang(&mut self, cx: &mut Ctx<'_>, i: usize) {
+        if i != self.lang {
+            self.lang = i;
+            self.scroll = 0;
+            self.hscroll = 0;
+            cx.progress.settings.code_lang = ["c", "cpp", "rust"][i].to_string();
+            cx.touch_progress();
+            cx.sfx("button");
+        }
     }
 
     fn next_id(&self, cx: &Ctx<'_>) -> Option<String> {
@@ -506,69 +648,152 @@ impl ResultScreen {
                 st(t),
             );
         }
+        g.button(
+            l.wrap,
+            if self.wrap {
+                words::SCROLL
+            } else {
+                words::WRAP
+            },
+            Kind::Normal,
+            st(&l.wrap),
+        );
         g.button(l.copy, &v.tr.t("result.copy"), Kind::Normal, st(&l.copy));
         g.rect(l.body, 'K');
         g.frame(l.body, 'k');
-        let (lines, pre_lines) = self.text_for(((l.body.w - 8) / 6) as usize);
+        let tab = self.code.get(self.lang);
+        let mut pre_lines = 0;
+        if let Some(reason) = tab.and_then(|t| t.error.as_deref()) {
+            let cols = ((l.body.w - 12) / 6).max(8) as usize;
+            let label = tab.map_or("", |t| t.label);
+            let saved = g.c.set_clip(l.body.inset(1).offset(g.off.0, g.off.1));
+            for (i, spans) in self.error_lines(reason, cols, label).iter().enumerate() {
+                let y = l.body.y + 4 + i as i32 * 9;
+                let mut x = l.body.x + 5;
+                for (text, class) in spans {
+                    g.text(x, y, text, *class);
+                    x += text.chars().count() as i32 * 6;
+                }
+            }
+            g.c.set_clip(saved);
+        } else {
+            let (rows, pl) = self.rows(l.body);
+            pre_lines = pl;
+            self.draw_rows(g, l, &rows);
+        }
+        // prelude toggle
+        if pre_lines > 0 {
+            let open = self.show_prelude.get(self.lang).copied().unwrap_or(false);
+            let label = v.tr.format(
+                "result.prelude",
+                &[
+                    ("sign", (if open { "-" } else { "+" }).to_string()),
+                    ("n", pre_lines.to_string()),
+                    ("s", (if pre_lines == 1 { "" } else { "s" }).to_string()),
+                ],
+            );
+            g.rect(l.prelude, if st(&l.prelude).hover { 'y' } else { 'A' });
+            g.text(
+                l.prelude.x + 3,
+                l.prelude.y + (l.prelude.h - 7) / 2,
+                &clip(&label, ((l.prelude.w - 6) / 6) as usize),
+                'B',
+            );
+        }
+        self.draw_note(g, l);
+        g.button(l.back, &v.tr.t("result.back"), Kind::Normal, st(&l.back));
+        let _ = State::default();
+    }
+
+    fn draw_rows(&self, g: &mut Gfx<'_>, l: &Layout, rows: &[DRow]) {
+        let gw = gutter_w(rows.iter().filter_map(|r| r.num).max().unwrap_or(1));
+        let view_rows = ((l.body.h - 4) / 9).max(1);
+        let text_x = l.body.x + gw + 3;
+        let cols = self.code_cols(l.body, rows.iter().filter_map(|r| r.num).max().unwrap_or(1));
+        g.rect(Rect::new(l.body.x + 1, l.body.y + 1, gw, l.body.h - 2), 'k');
         let saved = g.c.set_clip(l.body.inset(1).offset(g.off.0, g.off.1));
-        let rows = (l.body.h / 9).max(1);
-        let cols = ((l.body.w - 8) / 6).max(10) as usize;
-        for (i, spans) in lines
+        for (i, row) in rows
             .iter()
             .enumerate()
             .skip(self.scroll as usize)
-            .take(rows as usize + 1)
+            .take(view_rows as usize + 1)
         {
-            let y = l.body.y + 2 + (i as i32 - self.scroll) * 9;
-            let mut x = l.body.x + 3;
+            let y = l.body.y + 3 + (i as i32 - self.scroll) * 9;
+            if let Some(n) = row.num {
+                let t = n.to_string();
+                g.text(
+                    l.body.x + 1 + gw - 4 - t.len() as i32 * 6,
+                    y,
+                    &t,
+                    if row.pre { 'm' } else { 'a' },
+                );
+            }
+            let mut skip = if self.wrap { 0 } else { self.hscroll as usize };
+            let mut x = text_x;
             let mut used = 0usize;
-            for (text, class) in spans {
-                let col = *class;
-                let room = cols.saturating_sub(used);
-                if room == 0 {
+            for (text, class) in &row.pieces {
+                let n = text.chars().count();
+                if skip >= n {
+                    skip -= n;
+                    continue;
+                }
+                let t: String = text.chars().skip(skip).take(cols - used).collect();
+                skip = 0;
+                if t.is_empty() {
                     break;
                 }
-                let t: String = text.chars().take(room).collect();
+                let col = if row.pre { 'A' } else { *class };
                 g.text(x, y, &t, col);
                 x += t.chars().count() as i32 * 6;
                 used += t.chars().count();
+                if used >= cols {
+                    break;
+                }
             }
         }
         g.c.set_clip(saved);
         g.scrollbar(
             Rect::new(l.body.right() - 4, l.body.y + 1, 3, l.body.h - 2),
             self.scroll * 9,
-            lines.len() as i32 * 9,
-            l.body.h,
+            rows.len() as i32 * 9,
+            l.body.h - 4,
         );
-        // prelude toggle
-        if pre_lines > 0 {
-            g.text(
-                l.prelude.x,
-                l.prelude.y + 2,
-                &v.tr.format(
-                    "result.prelude",
-                    &[
-                        (
-                            "sign",
-                            (if self.show_prelude { "-" } else { "+" }).to_string(),
-                        ),
-                        ("n", pre_lines.to_string()),
-                        ("s", (if pre_lines == 1 { "" } else { "s" }).to_string()),
-                    ],
-                ),
-                'B',
-            );
+        if !self.wrap {
+            let longest = Self::longest(rows).max(1) as i32;
+            if longest > cols as i32 {
+                let track = Rect::new(text_x, l.body.bottom() - 4, l.body.right() - text_x - 6, 2);
+                g.rect(track, 'k');
+                let thumb_w = (track.w * cols as i32 / longest).max(6);
+                let thumb_x =
+                    track.x + (track.w - thumb_w) * self.hscroll / (longest - cols as i32).max(1);
+                g.rect(Rect::new(thumb_x, track.y, thumb_w, 2), 'a');
+            }
         }
-        g.button(l.back, &v.tr.t("result.back"), Kind::Normal, st(&l.back));
-        let hint = v.tr.t("result.same_program");
-        g.text(
-            l.code.x,
-            l.code.y + (l.code.h - 7) / 2,
-            &clip(&hint, ((l.panel.right() - l.code.x - 6) / 6) as usize),
-            'k',
-        );
-        let _ = State::default();
+    }
+
+    /// The line under the code: what this tab is, plus the technique and Big-O of the level.
+    fn draw_note(&self, g: &mut Gfx<'_>, l: &Layout) {
+        let cols = ((l.note.w - 2) / 6).max(8) as usize;
+        let what = match self.code.get(self.lang).map(|t| t.id) {
+            Some("c") => words::TAB_C,
+            Some("rust") => words::TAB_RUST,
+            _ => words::TAB_CPP,
+        };
+        let mut text = what.to_string();
+        if self.lang == 1 {
+            if let Some(lv) = &self.play.session.level {
+                text = format!(
+                    "{} {}: {} ({}).",
+                    text,
+                    words::TECHNIQUE,
+                    lv.technique,
+                    lv.big_o
+                );
+            }
+        }
+        for (i, line) in Font::wrap(&text, cols).iter().take(2).enumerate() {
+            g.text(l.note.x + 1, l.note.y + 2 + i as i32 * 10, line, 'k');
+        }
     }
 }
 
