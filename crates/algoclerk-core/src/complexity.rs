@@ -99,9 +99,8 @@ pub fn classify_with_floor(samples: &[f64], floor: f64) -> Class {
     // A constant offset (locals, set-up work) hides growth at small sizes: the steps between sizes do not
     // carry it (`a + b n` has steps that double, `a + b n^2` steps that quadruple). Use them when the
     // series clearly grows at its end.
-    let growing = steps.len() >= 2
-        && steps.iter().all(|d| *d > 0.0)
-        && steps[steps.len() - 1] > floor;
+    let growing =
+        steps.len() >= 2 && steps.iter().all(|d| *d > 0.0) && steps[steps.len() - 1] > floor;
     if growing {
         let sr: Vec<f64> = steps.windows(2).map(|w| w[1] / w[0]).collect();
         let g2 = (sr.iter().map(|r| r.ln()).sum::<f64>() / sr.len() as f64).exp();

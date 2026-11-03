@@ -375,7 +375,11 @@ fn a_locked_header_shows_its_reason() {
     let pre = "#include <vector>\n";
     // the include itself, with every header unlocked or not
     let inc = "#include <vector>\n#include <algorithm>\nint f(int a) { return a; }";
-    for unlocked in [None, Some(Vec::new()), Some(vec!["<algorithm>".to_string()])] {
+    for unlocked in [
+        None,
+        Some(Vec::new()),
+        Some(vec!["<algorithm>".to_string()]),
+    ] {
         o.unlocked_headers = unlocked.map(|v| v.into_iter().collect());
         let ds = level_diags(pre, inc, &o);
         assert!(

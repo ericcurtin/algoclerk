@@ -20,9 +20,9 @@ enum Tok {
 }
 
 const PUNCTS: &[&str] = &[
-    "<<=", ">>=", "->", "++", "--", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||", "+=", "-=", "*=", "/=", "%=",
-    "&=", "|=", "^=", "::", "+", "-", "*", "/", "%", "&", "|", "^", "~", "!", "<", ">", "=", "?", ":", ";", ",", ".",
-    "(", ")", "[", "]", "{", "}",
+    "<<=", ">>=", "->", "++", "--", "<<", ">>", "<=", ">=", "==", "!=", "&&", "||", "+=", "-=",
+    "*=", "/=", "%=", "&=", "|=", "^=", "::", "+", "-", "*", "/", "%", "&", "|", "^", "~", "!",
+    "<", ">", "=", "?", ":", ";", ",", ".", "(", ")", "[", "]", "{", "}",
 ];
 
 fn lex(src: &str) -> Result<Vec<(Tok, u32, u32)>, String> {
@@ -56,7 +56,11 @@ fn lex(src: &str) -> Result<Vec<(Tok, u32, u32)>, String> {
             if let Some(rest) = line.strip_prefix("#include") {
                 let rest = rest.trim();
                 let angle = rest.starts_with('<');
-                out.push((Tok::Inc(rest[1..rest.len() - 1].to_string(), angle), start as u32, end as u32));
+                out.push((
+                    Tok::Inc(rest[1..rest.len() - 1].to_string(), angle),
+                    start as u32,
+                    end as u32,
+                ));
             }
             i = end;
             continue;
@@ -141,9 +145,17 @@ fn lex(src: &str) -> Result<Vec<(Tok, u32, u32)>, String> {
             }
             i += 1;
             if q == b'\'' {
-                out.push((Tok::Chr(s.first().copied().unwrap_or(0)), start as u32, i as u32));
+                out.push((
+                    Tok::Chr(s.first().copied().unwrap_or(0)),
+                    start as u32,
+                    i as u32,
+                ));
             } else {
-                out.push((Tok::Str(String::from_utf8_lossy(&s).into_owned()), start as u32, i as u32));
+                out.push((
+                    Tok::Str(String::from_utf8_lossy(&s).into_owned()),
+                    start as u32,
+                    i as u32,
+                ));
             }
             continue;
         }
@@ -177,8 +189,24 @@ struct P {
 type R<T> = Result<T, String>;
 
 const TEMPLATES: &[&str] = &[
-    "vector", "map", "set", "unordered_map", "unordered_set", "pair", "tuple", "optional", "function", "stack",
-    "queue", "deque", "list", "priority_queue", "array", "greater", "less", "numeric_limits",
+    "vector",
+    "map",
+    "set",
+    "unordered_map",
+    "unordered_set",
+    "pair",
+    "tuple",
+    "optional",
+    "function",
+    "stack",
+    "queue",
+    "deque",
+    "list",
+    "priority_queue",
+    "array",
+    "greater",
+    "less",
+    "numeric_limits",
 ];
 
 impl P {
@@ -227,13 +255,20 @@ impl P {
         if self.eat_p(p) {
             Ok(())
         } else {
-            Err(format!("expected `{p}` at byte {} but found {:?}", self.pos(), self.peek()))
+            Err(format!(
+                "expected `{p}` at byte {} but found {:?}",
+                self.pos(),
+                self.peek()
+            ))
         }
     }
     fn ident(&mut self) -> R<String> {
         match self.bump() {
             Tok::Id(s) => Ok(s),
-            t => Err(format!("expected a name, found {t:?} at byte {}", self.pos())),
+            t => Err(format!(
+                "expected a name, found {t:?} at byte {}",
+                self.pos()
+            )),
         }
     }
     fn id(&mut self, from: u32) -> NodeId {
@@ -243,7 +278,10 @@ impl P {
         if self.spans.len() <= id as usize {
             self.spans.resize(id as usize + 1, Span::default());
         }
-        self.spans[id as usize] = Span { start: from, end: end.max(from) };
+        self.spans[id as usize] = Span {
+            start: from,
+            end: end.max(from),
+        };
         id
     }
     fn expr(&mut self, from: u32, kind: ExprKind) -> Expr {
@@ -257,10 +295,15 @@ impl P {
     fn is_type_start(&self) -> bool {
         match self.peek() {
             Tok::Id(s) => match s.as_str() {
-                "const" | "constexpr" | "static" | "inline" | "unsigned" | "long" | "int" | "char" | "bool" | "void" | "auto"
-                | "size_t" | "decltype" => true,
+                "const" | "constexpr" | "static" | "inline" | "unsigned" | "long" | "int"
+                | "char" | "bool" | "void" | "auto" | "size_t" | "decltype" => true,
                 "std" => matches!(self.peek_at(1), Tok::P("::")),
-                s => self.types.contains_key(s) || self.structs.iter().any(|n| n == s) || (self.std_ns && (TEMPLATES.contains(&s) || s == "string" || s == "string_view")),
+                s => {
+                    self.types.contains_key(s)
+                        || self.structs.iter().any(|n| n == s)
+                        || (self.std_ns
+                            && (TEMPLATES.contains(&s) || s == "string" || s == "string_view"))
+                }
             },
             _ => false,
         }
@@ -308,7 +351,8 @@ impl P {
     /// A type without const/&.
     fn ty_core(&mut self) -> R<Ty> {
         let mut konst_seen = false;
-        while matches!(self.peek(), Tok::Id(s) if matches!(s.as_str(), "const" | "constexpr" | "static" | "inline")) {
+        while matches!(self.peek(), Tok::Id(s) if matches!(s.as_str(), "const" | "constexpr" | "static" | "inline"))
+        {
             self.bump();
             konst_seen = true;
         }
@@ -375,7 +419,8 @@ impl P {
             "string" => Ty::Str,
             "string_view" => Ty::StrView,
             "size_t" => Ty::Size,
-            "vector" | "set" | "unordered_set" | "stack" | "queue" | "deque" | "list" | "optional" => {
+            "vector" | "set" | "unordered_set" | "stack" | "queue" | "deque" | "list"
+            | "optional" => {
                 let a = self.targs()?;
                 let t = Box::new(self.ty_arg(&a, 0)?);
                 match n {
@@ -418,7 +463,14 @@ impl P {
             "greater" | "less" => {
                 let a = self.targs()?;
                 let t = Box::new(self.ty_arg(&a, 0)?);
-                Ty::Functor(if n == "greater" { Functor::Greater } else { Functor::Less }, t)
+                Ty::Functor(
+                    if n == "greater" {
+                        Functor::Greater
+                    } else {
+                        Functor::Less
+                    },
+                    t,
+                )
             }
             "priority_queue" => {
                 let a = self.targs()?;
@@ -451,7 +503,8 @@ impl P {
 
     fn type_spec(&mut self) -> R<TypeSpec> {
         let mut konst = false;
-        while matches!(self.peek(), Tok::Id(s) if matches!(s.as_str(), "const" | "constexpr" | "static" | "inline")) {
+        while matches!(self.peek(), Tok::Id(s) if matches!(s.as_str(), "const" | "constexpr" | "static" | "inline"))
+        {
             konst |= self.is_id("const") || self.is_id("constexpr");
             self.bump();
         }
@@ -475,7 +528,10 @@ impl P {
         while self.is_p(",") {
             self.bump();
             let r = self.assign()?;
-            e = self.expr(from, ExprKind::Binary(BinOp::Comma, Box::new(e), Box::new(r)));
+            e = self.expr(
+                from,
+                ExprKind::Binary(BinOp::Comma, Box::new(e), Box::new(r)),
+            );
         }
         Ok(e)
     }
@@ -499,8 +555,19 @@ impl P {
         };
         if let Some(op) = op {
             self.bump();
-            let rhs = if self.is_p("{") { self.init_list()? } else { self.assign()? };
-            return Ok(self.expr(from, ExprKind::Assign { op, lhs: Box::new(lhs), rhs: Box::new(rhs) }));
+            let rhs = if self.is_p("{") {
+                self.init_list()?
+            } else {
+                self.assign()?
+            };
+            return Ok(self.expr(
+                from,
+                ExprKind::Assign {
+                    op,
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                },
+            ));
         }
         Ok(lhs)
     }
@@ -512,7 +579,10 @@ impl P {
             let a = self.assign()?;
             self.expect_p(":")?;
             let b = self.assign()?;
-            return Ok(self.expr(from, ExprKind::Ternary(Box::new(c), Box::new(a), Box::new(b))));
+            return Ok(self.expr(
+                from,
+                ExprKind::Ternary(Box::new(c), Box::new(a), Box::new(b)),
+            ));
         }
         Ok(c)
     }
@@ -591,14 +661,23 @@ impl P {
             return Ok(self.expr(from, ExprKind::Delete(Box::new(e))));
         }
         // C style cast
-        if self.is_p("(") && matches!(self.peek_at(1), Tok::Id(s) if matches!(s.as_str(), "int" | "char" | "bool" | "unsigned" | "long" | "size_t")) {
+        if self.is_p("(")
+            && matches!(self.peek_at(1), Tok::Id(s) if matches!(s.as_str(), "int" | "char" | "bool" | "unsigned" | "long" | "size_t"))
+        {
             let save = self.i;
             self.bump();
-            if let Ok(ty) = self.type_spec() {
-                if self.eat_p(")") {
-                    let e = self.unary()?;
-                    return Ok(self.expr(from, ExprKind::Cast { style: CastStyle::CStyle, ty, e: Box::new(e) }));
-                }
+            if let Ok(ty) = self.type_spec()
+                && self.eat_p(")")
+            {
+                let e = self.unary()?;
+                return Ok(self.expr(
+                    from,
+                    ExprKind::Cast {
+                        style: CastStyle::CStyle,
+                        ty,
+                        e: Box::new(e),
+                    },
+                ));
             }
             self.i = save;
         }
@@ -609,7 +688,11 @@ impl P {
         self.expect_p("(")?;
         let mut v = Vec::new();
         while !self.is_p(")") {
-            v.push(if self.is_p("{") { self.init_list()? } else { self.assign()? });
+            v.push(if self.is_p("{") {
+                self.init_list()?
+            } else {
+                self.assign()?
+            });
             if !self.eat_p(",") {
                 break;
             }
@@ -622,7 +705,11 @@ impl P {
         self.expect_p("{")?;
         let mut v = Vec::new();
         while !self.is_p("}") {
-            v.push(if self.is_p("{") { self.init_list()? } else { self.assign()? });
+            v.push(if self.is_p("{") {
+                self.init_list()?
+            } else {
+                self.assign()?
+            });
             if !self.eat_p(",") {
                 break;
             }
@@ -643,7 +730,13 @@ impl P {
         loop {
             if self.is_p("(") {
                 let args = self.call_args()?;
-                e = self.expr(from, ExprKind::Call { callee: Box::new(e), args });
+                e = self.expr(
+                    from,
+                    ExprKind::Call {
+                        callee: Box::new(e),
+                        args,
+                    },
+                );
             } else if self.is_p("[") {
                 self.bump();
                 let i = self.parse_expr()?;
@@ -653,7 +746,14 @@ impl P {
                 let arrow = self.is_p("->");
                 self.bump();
                 let name = self.ident()?;
-                e = self.expr(from, ExprKind::Member { obj: Box::new(e), name, arrow });
+                e = self.expr(
+                    from,
+                    ExprKind::Member {
+                        obj: Box::new(e),
+                        name,
+                        arrow,
+                    },
+                );
             } else if self.is_p("++") {
                 self.bump();
                 e = self.expr(from, ExprKind::Unary(UnOp::PostInc, Box::new(e)));
@@ -698,8 +798,16 @@ impl P {
             while !self.is_p(")") {
                 let pf = self.pos();
                 let spec = self.type_spec()?;
-                let name = if let Tok::Id(_) = self.peek() { self.ident()? } else { String::new() };
-                params.push(Param { id: self.id(pf), name, spec });
+                let name = if let Tok::Id(_) = self.peek() {
+                    self.ident()?
+                } else {
+                    String::new()
+                };
+                params.push(Param {
+                    id: self.id(pf),
+                    name,
+                    spec,
+                });
                 if !self.eat_p(",") {
                     break;
                 }
@@ -707,15 +815,22 @@ impl P {
             self.expect_p(")")?;
         }
         let mutable = self.eat_id("mutable");
-        let ret = if self.eat_p("->") { Some(self.type_spec()?) } else { None };
+        let ret = if self.eat_p("->") {
+            Some(self.type_spec()?)
+        } else {
+            None
+        };
         let body = self.block()?;
-        Ok(self.expr(from, ExprKind::Lambda(Box::new(Lambda {
-            captures: Captures { default, items },
-            params,
-            ret,
-            mutable,
-            body,
-        }))))
+        Ok(self.expr(
+            from,
+            ExprKind::Lambda(Box::new(Lambda {
+                captures: Captures { default, items },
+                params,
+                ret,
+                mutable,
+                body,
+            })),
+        ))
     }
 
     fn primary(&mut self) -> R<Expr> {
@@ -723,7 +838,14 @@ impl P {
         match self.peek().clone() {
             Tok::Num(value, suffix, base) => {
                 self.bump();
-                Ok(self.expr(from, ExprKind::Int { value, suffix, base }))
+                Ok(self.expr(
+                    from,
+                    ExprKind::Int {
+                        value,
+                        suffix,
+                        base,
+                    },
+                ))
             }
             Tok::Chr(c) => {
                 self.bump();
@@ -764,42 +886,72 @@ impl P {
                         self.expect_p("(")?;
                         let e = self.parse_expr()?;
                         self.expect_p(")")?;
-                        return Ok(self.expr(from, ExprKind::Cast { style: CastStyle::Static, ty, e: Box::new(e) }));
+                        return Ok(self.expr(
+                            from,
+                            ExprKind::Cast {
+                                style: CastStyle::Static,
+                                ty,
+                                e: Box::new(e),
+                            },
+                        ));
                     }
                     "int" | "char" | "bool" | "size_t" | "unsigned" => {
                         let ty = self.type_spec()?;
                         self.expect_p("(")?;
                         let e = self.parse_expr()?;
                         self.expect_p(")")?;
-                        return Ok(self.expr(from, ExprKind::Cast { style: CastStyle::Functional, ty, e: Box::new(e) }));
+                        return Ok(self.expr(
+                            from,
+                            ExprKind::Cast {
+                                style: CastStyle::Functional,
+                                ty,
+                                e: Box::new(e),
+                            },
+                        ));
                     }
                     _ => {}
                 }
                 // a type used as a constructor: vector<int>(..), std::string(..), ListNode(..), Point{..}
-                let is_ctor_type = (name == "std" && matches!(self.peek_at(2), Tok::Id(n) if TEMPLATES.contains(&n.as_str()) || n == "string" || n == "string_view") && !self.path_is_function_call())
-                    || (self.std_ns && (TEMPLATES.contains(&name.as_str()) || name == "string" || name == "string_view") && name != "numeric_limits")
-                    || self.structs.iter().any(|s| *s == name)
+                let is_ctor_type = (name == "std"
+                    && matches!(self.peek_at(2), Tok::Id(n) if TEMPLATES.contains(&n.as_str()) || n == "string" || n == "string_view")
+                    && !self.path_is_function_call())
+                    || (self.std_ns
+                        && (TEMPLATES.contains(&name.as_str())
+                            || name == "string"
+                            || name == "string_view")
+                        && name != "numeric_limits")
+                    || self.structs.contains(&name)
                     || self.types.contains_key(&name);
                 if is_ctor_type && !matches!(self.peek_at(1), Tok::P("=")) {
                     let save = self.i;
-                    if let Ok(ty) = self.type_spec() {
-                        if self.is_p("(") || self.is_p("{") {
-                            let brace = self.is_p("{");
-                            let args = if brace { self.brace_args()? } else { self.call_args()? };
-                            return Ok(self.expr(from, ExprKind::Construct { ty, args, brace }));
-                        }
+                    if let Ok(ty) = self.type_spec()
+                        && (self.is_p("(") || self.is_p("{"))
+                    {
+                        let brace = self.is_p("{");
+                        let args = if brace {
+                            self.brace_args()?
+                        } else {
+                            self.call_args()?
+                        };
+                        return Ok(self.expr(from, ExprKind::Construct { ty, args, brace }));
                     }
                     self.i = save;
                 }
                 // a (qualified) name
-                let mut segs = vec![PathSeg { name: self.ident()?, targs: None }];
+                let mut segs = vec![PathSeg {
+                    name: self.ident()?,
+                    targs: None,
+                }];
                 let mut qualified = false;
                 loop {
                     if self.is_p("::") {
                         self.bump();
                         qualified = true;
                         let n = self.ident()?;
-                        segs.push(PathSeg { name: n, targs: None });
+                        segs.push(PathSeg {
+                            name: n,
+                            targs: None,
+                        });
                     } else if self.is_p("<") && self.targs_follow(&segs) {
                         let a = self.targs()?;
                         if let Some(s) = segs.last_mut() {
@@ -815,7 +967,10 @@ impl P {
                     Ok(self.expr(from, ExprKind::Var(segs.remove(0).name)))
                 }
             }
-            t => Err(format!("unexpected {t:?} in an expression at byte {}", self.pos())),
+            t => Err(format!(
+                "unexpected {t:?} in an expression at byte {}",
+                self.pos()
+            )),
         }
     }
 
@@ -831,7 +986,12 @@ impl P {
         }
         match self.peek_at(1) {
             Tok::Num(..) => true,
-            Tok::Id(s) => matches!(s.as_str(), "int" | "long" | "unsigned" | "char" | "bool" | "size_t" | "std") || self.types.contains_key(s),
+            Tok::Id(s) => {
+                matches!(
+                    s.as_str(),
+                    "int" | "long" | "unsigned" | "char" | "bool" | "size_t" | "std"
+                ) || self.types.contains_key(s)
+            }
             _ => false,
         }
     }
@@ -847,7 +1007,10 @@ impl P {
             stmts.push(self.stmt()?);
         }
         self.bump();
-        Ok(Block { stmts, tail_comments: vec![] })
+        Ok(Block {
+            stmts,
+            tail_comments: vec![],
+        })
     }
 
     fn mk(&mut self, from: u32, kind: StmtKind) -> Stmt {
@@ -861,7 +1024,9 @@ impl P {
         let save = self.i;
         let ok = (|| -> R<bool> {
             let _ = self.type_spec()?;
-            Ok(matches!(self.peek(), Tok::Id(_)) || self.is_p("[") && matches!(self.peek_at(1), Tok::Id(_)) || (self.is_p("&") && matches!(self.peek_at(1), Tok::P("[") | Tok::Id(_))))
+            Ok(matches!(self.peek(), Tok::Id(_))
+                || self.is_p("[") && matches!(self.peek_at(1), Tok::Id(_))
+                || (self.is_p("&") && matches!(self.peek_at(1), Tok::P("[") | Tok::Id(_))))
         })()
         .unwrap_or(false);
         self.i = save;
@@ -883,18 +1048,29 @@ impl P {
             let init = if self.eat_p("=") {
                 if self.is_p("{") {
                     let a = self.brace_args()?;
-                    Init::Brace { elems: a, with_eq: true }
+                    Init::Brace {
+                        elems: a,
+                        with_eq: true,
+                    }
                 } else {
                     Init::Copy(self.assign()?)
                 }
             } else if self.is_p("(") {
                 Init::Direct(self.call_args()?)
             } else if self.is_p("{") {
-                Init::Brace { elems: self.brace_args()?, with_eq: false }
+                Init::Brace {
+                    elems: self.brace_args()?,
+                    with_eq: false,
+                }
             } else {
                 Init::None
             };
-            vars.push(Declarator { id: self.id(from), name, array, init });
+            vars.push(Declarator {
+                id: self.id(from),
+                name,
+                array,
+                init,
+            });
             if !self.eat_p(",") {
                 break;
             }
@@ -962,20 +1138,42 @@ impl P {
                     let cond = self.parse_expr()?;
                     self.expect_p(")")?;
                     let then = self.body()?;
-                    let els = if self.eat_id("else") { Some(self.body()?) } else { None };
-                    return Ok(self.mk(from, StmtKind::If { init, cond, then, els }));
+                    let els = if self.eat_id("else") {
+                        Some(self.body()?)
+                    } else {
+                        None
+                    };
+                    return Ok(self.mk(
+                        from,
+                        StmtKind::If {
+                            init,
+                            cond,
+                            then,
+                            els,
+                        },
+                    ));
                 }
                 "switch" => {
                     self.bump();
                     self.expect_p("(")?;
-                    let init = if self.looks_like_decl() { Some(self.decl_stmt()?) } else { None };
+                    let init = if self.looks_like_decl() {
+                        Some(self.decl_stmt()?)
+                    } else {
+                        None
+                    };
                     let cond = self.parse_expr()?;
                     self.expect_p(")")?;
                     let body = self.block()?;
                     let sw = self.mk(from, StmtKind::Switch { cond, body });
                     return Ok(match init {
                         None => sw,
-                        Some(i) => self.mk(from, StmtKind::Block(Block { stmts: vec![i, sw], tail_comments: vec![] })),
+                        Some(i) => self.mk(
+                            from,
+                            StmtKind::Block(Block {
+                                stmts: vec![i, sw],
+                                tail_comments: vec![],
+                            }),
+                        ),
                     });
                 }
                 "case" => {
@@ -1012,7 +1210,15 @@ impl P {
                 "for" => return self.for_stmt(from),
                 "return" => {
                     self.bump();
-                    let e = if self.is_p(";") { None } else { Some(if self.is_p("{") { self.init_list()? } else { self.parse_expr()? }) };
+                    let e = if self.is_p(";") {
+                        None
+                    } else {
+                        Some(if self.is_p("{") {
+                            self.init_list()?
+                        } else {
+                            self.parse_expr()?
+                        })
+                    };
                     self.expect_p(";")?;
                     return Ok(self.mk(from, StmtKind::Return(e)));
                 }
@@ -1058,10 +1264,23 @@ impl P {
                 names.push(self.ident()?);
             }
             if self.eat_p(":") {
-                let range = if self.is_p("{") { self.init_list()? } else { self.parse_expr()? };
+                let range = if self.is_p("{") {
+                    self.init_list()?
+                } else {
+                    self.parse_expr()?
+                };
                 self.expect_p(")")?;
                 let body = self.body()?;
-                return Ok(self.mk(from, StmtKind::RangeFor { spec, names, structured, range, body }));
+                return Ok(self.mk(
+                    from,
+                    StmtKind::RangeFor {
+                        spec,
+                        names,
+                        structured,
+                        range,
+                        body,
+                    },
+                ));
             }
             self.i = save;
         }
@@ -1075,12 +1294,28 @@ impl P {
             self.expect_p(";")?;
             Some(Box::new(self.mk(f, StmtKind::Expr(e))))
         };
-        let cond = if self.is_p(";") { None } else { Some(self.parse_expr()?) };
+        let cond = if self.is_p(";") {
+            None
+        } else {
+            Some(self.parse_expr()?)
+        };
         self.expect_p(";")?;
-        let incr = if self.is_p(")") { None } else { Some(self.parse_expr()?) };
+        let incr = if self.is_p(")") {
+            None
+        } else {
+            Some(self.parse_expr()?)
+        };
         self.expect_p(")")?;
         let body = self.body()?;
-        Ok(self.mk(from, StmtKind::For { init, cond, incr, body }))
+        Ok(self.mk(
+            from,
+            StmtKind::For {
+                init,
+                cond,
+                incr,
+                body,
+            },
+        ))
     }
 
     // ---- items ----
@@ -1090,8 +1325,16 @@ impl P {
         while !self.is_p(")") {
             let pf = self.pos();
             let spec = self.type_spec()?;
-            let name = if let Tok::Id(_) = self.peek() { self.ident()? } else { String::new() };
-            v.push(Param { id: self.id(pf), name, spec });
+            let name = if let Tok::Id(_) = self.peek() {
+                self.ident()?
+            } else {
+                String::new()
+            };
+            v.push(Param {
+                id: self.id(pf),
+                name,
+                spec,
+            });
             if !self.eat_p(",") {
                 break;
             }
@@ -1105,7 +1348,11 @@ impl P {
         if let Tok::Inc(path, angle) = self.peek().clone() {
             self.bump();
             let id = self.id(from);
-            items.push(Item { id, kind: ItemKind::Include { path, angle }, comments: vec![] });
+            items.push(Item {
+                id,
+                kind: ItemKind::Include { path, angle },
+                comments: vec![],
+            });
             return Ok(());
         }
         if self.is_id("using") {
@@ -1115,7 +1362,11 @@ impl P {
                 self.expect_p(";")?;
                 self.std_ns = true;
                 let id = self.id(from);
-                items.push(Item { id, kind: ItemKind::UsingNamespaceStd, comments: vec![] });
+                items.push(Item {
+                    id,
+                    kind: ItemKind::UsingNamespaceStd,
+                    comments: vec![],
+                });
                 return Ok(());
             }
             let name = self.ident()?;
@@ -1124,7 +1375,15 @@ impl P {
             self.expect_p(";")?;
             self.types.insert(name.clone(), ty.clone());
             let id = self.id(from);
-            items.push(Item { id, kind: ItemKind::Alias { name, ty, typedef: false }, comments: vec![] });
+            items.push(Item {
+                id,
+                kind: ItemKind::Alias {
+                    name,
+                    ty,
+                    typedef: false,
+                },
+                comments: vec![],
+            });
             return Ok(());
         }
         if self.is_id("typedef") {
@@ -1134,7 +1393,15 @@ impl P {
             self.expect_p(";")?;
             self.types.insert(name.clone(), ty.clone());
             let id = self.id(from);
-            items.push(Item { id, kind: ItemKind::Alias { name, ty, typedef: true }, comments: vec![] });
+            items.push(Item {
+                id,
+                kind: ItemKind::Alias {
+                    name,
+                    ty,
+                    typedef: true,
+                },
+                comments: vec![],
+            });
             return Ok(());
         }
         if self.is_id("struct") {
@@ -1154,7 +1421,11 @@ impl P {
                     if self.eat_p(":") {
                         loop {
                             let f = self.ident()?;
-                            let args = if self.is_p("{") { self.brace_args()? } else { self.call_args()? };
+                            let args = if self.is_p("{") {
+                                self.brace_args()?
+                            } else {
+                                self.call_args()?
+                            };
                             inits.push((f, args));
                             if !self.eat_p(",") {
                                 break;
@@ -1162,20 +1433,33 @@ impl P {
                         }
                     }
                     let body = self.block()?;
-                    ctors.push(Ctor { id: self.id(cf), params, inits, body });
+                    ctors.push(Ctor {
+                        id: self.id(cf),
+                        params,
+                        inits,
+                        body,
+                    });
                     continue;
                 }
                 let spec = self.type_spec()?;
                 loop {
                     let n = self.ident()?;
                     let default = if self.eat_p("=") {
-                        Some(if self.is_p("{") { self.init_list()? } else { self.assign()? })
+                        Some(if self.is_p("{") {
+                            self.init_list()?
+                        } else {
+                            self.assign()?
+                        })
                     } else if self.is_p("{") {
                         Some(self.init_list()?)
                     } else {
                         None
                     };
-                    fields.push(Field { spec: spec.clone(), name: n, default });
+                    fields.push(Field {
+                        spec: spec.clone(),
+                        name: n,
+                        default,
+                    });
                     if !self.eat_p(",") {
                         break;
                     }
@@ -1186,7 +1470,16 @@ impl P {
             self.expect_p(";")?;
             let id = self.id(from);
             let sid = self.id(from);
-            items.push(Item { id, kind: ItemKind::Struct(StructDecl { id: sid, name, fields, ctors }), comments: vec![] });
+            items.push(Item {
+                id,
+                kind: ItemKind::Struct(StructDecl {
+                    id: sid,
+                    name,
+                    fields,
+                    ctors,
+                }),
+                comments: vec![],
+            });
             return Ok(());
         }
         // function, forward declaration or global
@@ -1197,10 +1490,26 @@ impl P {
         let name = self.ident()?;
         if self.is_p("(") {
             let params = self.params()?;
-            let body = if self.eat_p(";") { None } else { Some(self.block()?) };
+            let body = if self.eat_p(";") {
+                None
+            } else {
+                Some(self.block()?)
+            };
             let fid = self.id(from);
             let id = self.id(from);
-            items.push(Item { id, kind: ItemKind::Func(FnDecl { id: fid, name, params, ret: spec, is_static, body, comments: vec![] }), comments: vec![] });
+            items.push(Item {
+                id,
+                kind: ItemKind::Func(FnDecl {
+                    id: fid,
+                    name,
+                    params,
+                    ret: spec,
+                    is_static,
+                    body,
+                    comments: vec![],
+                }),
+                comments: vec![],
+            });
             return Ok(());
         }
         if !is_const {
@@ -1211,7 +1520,15 @@ impl P {
         let vars = self.declarators()?;
         self.expect_p(";")?;
         let id = self.id(from);
-        items.push(Item { id, kind: ItemKind::Global { spec, constexpr_, vars }, comments: vec![] });
+        items.push(Item {
+            id,
+            kind: ItemKind::Global {
+                spec,
+                constexpr_,
+                vars,
+            },
+            comments: vec![],
+        });
         Ok(())
     }
 }

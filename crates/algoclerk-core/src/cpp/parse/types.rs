@@ -349,10 +349,9 @@ impl Parser<'_> {
                     "`long` (write `long long`, which is the same size everywhere)",
                 ))
             }
-            "short" => Err(self.unsupported(
-                span,
-                "`short` (16 bit integers are not stocked: use `int`)",
-            )),
+            "short" => {
+                Err(self.unsupported(span, "`short` (16 bit integers are not stocked: use `int`)"))
+            }
             "float" | "double" => {
                 Err(self.unsupported(span, "decimal numbers (`float` and `double`) at all"))
             }

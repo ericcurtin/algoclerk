@@ -146,10 +146,10 @@ fn sample_arg(t: &Ty) -> Option<String> {
         Ty::Bool => "true".into(),
         Ty::Char => "'a'".into(),
         Ty::Str => "\"abc\"".into(),
-        Ty::Vector(e) => match sample_arg(e) {
-            Some(x) => format!("{{{x}, {x}, {x}}}"),
-            None => return None,
-        },
+        Ty::Vector(e) => {
+            let x = sample_arg(e)?;
+            format!("{{{x}, {x}, {x}}}")
+        }
         _ => return None,
     })
 }

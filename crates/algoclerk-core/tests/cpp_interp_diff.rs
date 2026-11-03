@@ -335,7 +335,7 @@ fn run_file(file: &str) {
                                     "g++ and clang++ disagree:\n g++: {a}\n clang: {b}"
                                 ));
                             }
-                        } else if let Ok(_) = &r {
+                        } else if r.is_ok() {
                             r = Err("clang++ failed on a program g++ accepts".into());
                         }
                     }

@@ -291,7 +291,9 @@ fn constant_space_solutions_are_measured_constant_whatever_the_loop_style() {
         let src = format!("int missingNumber(const std::vector<int>& nums) {{\n    {body}\n}}\n");
         let v = j.judge(&src);
         assert!(v.passed, "{name}: {:?} {:?}", v.failure, v.diags);
-        let cx = v.complexity.unwrap_or_else(|| panic!("{name}: no estimate"));
+        let cx = v
+            .complexity
+            .unwrap_or_else(|| panic!("{name}: no estimate"));
         assert_eq!(cx.space.to_string(), "O(1)", "{name}: {:?}", cx.samples);
     }
 }
@@ -307,7 +309,12 @@ fn linear_space_is_linear_at_every_sweep_start_size() {
             let j = Judge::new(&l).expect("level compiles");
             let v = j.reference_verdict();
             let cx = v.complexity.unwrap_or_else(|| panic!("{id}: no estimate"));
-            assert_eq!(cx.space.to_string(), "O(n)", "{id} at n0 = {n0}: {:?}", cx.samples);
+            assert_eq!(
+                cx.space.to_string(),
+                "O(n)",
+                "{id} at n0 = {n0}: {:?}",
+                cx.samples
+            );
         }
     }
 }
@@ -333,5 +340,9 @@ fn a_locked_header_shows_the_reason_of_its_lock() {
         "int binarySearch(const std::vector<int>& nums, int target) { auto it = std::lower_bound(nums.begin(), nums.end(), target); return static_cast<int>(it - nums.begin()); }\n",
     );
     assert!(!v.passed);
-    assert!(v.diags[0].msg.contains("Same family of tools"), "{:?}", v.diags);
+    assert!(
+        v.diags[0].msg.contains("Same family of tools"),
+        "{:?}",
+        v.diags
+    );
 }

@@ -77,10 +77,10 @@ fn every_expression_is_typed() {
             });
         };
         for it in &prog.items {
-            if let ItemKind::Func(f) = &it.kind {
-                if let Some(b) = &f.body {
-                    walk_stmts(b, &mut visit);
-                }
+            if let ItemKind::Func(f) = &it.kind
+                && let Some(b) = &f.body
+            {
+                walk_stmts(b, &mut visit);
             }
         }
     }

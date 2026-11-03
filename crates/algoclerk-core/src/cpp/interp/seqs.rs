@@ -151,7 +151,9 @@ impl<'p> Machine<'p> {
                 }
                 Ok(Rv::Val(Value::Void))
             }
-            "insert" | "emplace" if growable && kind != VKind::Stack => self.vec_insert(&rp, &ety, ver, len, name, args),
+            "insert" | "emplace" if growable && kind != VKind::Stack => {
+                self.vec_insert(&rp, &ety, ver, len, name, args)
+            }
             "erase" if growable => {
                 self.nargs(name, args, 1, 2)?;
                 let a = self.arg_iter(&args[0])?;
@@ -224,33 +226,33 @@ impl<'p> Machine<'p> {
     pub(super) fn assign_items(&mut self, ety: &TyRc, args: &'p [Expr]) -> R<Vec<Value>> {
         self.nargs("assign", args, 1, 2)?;
         let new: Vec<Value> = if args.len() == 2 {
-                    let first = self.eval(&args[0])?;
-                    if let Some(n) = first.as_i128() {
-                        let x = self.eval_conv(&args[1], ety)?;
-                        let n = self.count_arg(n)?;
-                        let per = leaves(&x).max(1);
-                        self.reserve(n.saturating_mul(per))?;
-                        self.charge(n.saturating_mul(per))?;
-                        (0..n).map(|_| x.clone()).collect()
-                    } else {
-                        let second = self.eval(&args[1])?;
-                        let vals = self.range_values(&first, &second)?;
-                        let mut out = Vec::with_capacity(vals.len());
-                        for v in vals {
-                            out.push(self.convert(v, ety)?);
-                        }
-                        out
-                    }
-                } else if let ExprKind::InitList(elems) = &args[0].kind {
-                    let mut out = Vec::new();
-                    for e in elems {
-                        out.push(self.eval_conv(e, ety)?);
-                    }
-                    self.charge(out.len() as u64)?;
-                    out
-                } else {
-                    return Err(self.err(RtKind::BadArg, "unsupported assign overload"));
-                };
+            let first = self.eval(&args[0])?;
+            if let Some(n) = first.as_i128() {
+                let x = self.eval_conv(&args[1], ety)?;
+                let n = self.count_arg(n)?;
+                let per = leaves(&x).max(1);
+                self.reserve(n.saturating_mul(per))?;
+                self.charge(n.saturating_mul(per))?;
+                (0..n).map(|_| x.clone()).collect()
+            } else {
+                let second = self.eval(&args[1])?;
+                let vals = self.range_values(&first, &second)?;
+                let mut out = Vec::with_capacity(vals.len());
+                for v in vals {
+                    out.push(self.convert(v, ety)?);
+                }
+                out
+            }
+        } else if let ExprKind::InitList(elems) = &args[0].kind {
+            let mut out = Vec::new();
+            for e in elems {
+                out.push(self.eval_conv(e, ety)?);
+            }
+            self.charge(out.len() as u64)?;
+            out
+        } else {
+            return Err(self.err(RtKind::BadArg, "unsupported assign overload"));
+        };
         Ok(new)
     }
 

@@ -102,13 +102,9 @@ impl Rs<'_> {
     pub fn default_val(&mut self, t: &Ty) -> R<String> {
         Ok(match t {
             Ty::Bool => "false".into(),
-            Ty::Char
-            | Ty::UChar
-            | Ty::Int
-            | Ty::UInt
-            | Ty::LongLong
-            | Ty::ULongLong
-            | Ty::Size => "0".into(),
+            Ty::Char | Ty::UChar | Ty::Int | Ty::UInt | Ty::LongLong | Ty::ULongLong | Ty::Size => {
+                "0".into()
+            }
             Ty::Str => "String::new()".into(),
             Ty::StrView => "\"\"".into(),
             Ty::Vector(_) | Ty::Stack(_) => "Vec::new()".into(),
