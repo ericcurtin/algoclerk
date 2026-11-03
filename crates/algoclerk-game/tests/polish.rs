@@ -124,7 +124,13 @@ fn an_empty_body_offers_an_obvious_first_card() {
     assert!(p.panel.palette.is_none());
     let rows = p.session.rows();
     assert!(!cards::is_empty_body(&rows), "{}", p.session.text());
+    assert_eq!(p.panel.sel, Some(1), "the new card is selected");
     assert!(!p.session.nudge());
+    // the first card leaves the missing return as a yellow heads-up, not a red error
+    let tr = algoclerk_core::i18n::english();
+    assert!(p.session.soft_problem(), "pressed: {}", p.session.pressed);
+    let status = p.status_line(tr);
+    assert!(!status.1, "{status:?}");
 }
 
 #[test]
@@ -257,4 +263,29 @@ fn a_missing_return_is_a_yellow_heads_up_until_run_is_pressed() {
     p.session.start_run().unwrap_err();
     assert!(!p.session.soft_problem());
     assert!(p.panel.note_of(&p.session).unwrap().1);
+}
+
+#[test]
+fn the_status_stays_calm_after_the_first_card_when_coming_from_the_brief() {
+    use algoclerk_game::Nav;
+    let mut g = build(&Spec::new("title")).unwrap();
+    g.goto(Nav::Brief("sum-the-bills".into()));
+    for _ in 0..5 {
+        tick(&mut g, Input::default());
+    }
+    click(&mut g, (388, 247));
+    for _ in 0..40 {
+        tick(&mut g, Input::default());
+    }
+    let list = editor_body(&mut g);
+    let rows = g.play_mut().unwrap().session.rows();
+    let geo = cards::geometry(&rows, list, 14);
+    let slot = cards::empty_slot(&rows, &geo, list, 0, 22).expect("the add button");
+    click(&mut g, (slot.x + slot.w / 2, slot.y + slot.h / 2));
+    click(&mut g, (list.x + 9, list.y + 19));
+    let tr = algoclerk_core::i18n::english();
+    let p = g.play_mut().unwrap();
+    assert!(!p.session.nudge(), "{}", p.session.text());
+    assert!(p.session.soft_problem(), "pressed {}", p.session.pressed);
+    assert!(!p.status_line(tr).1, "{:?}", p.status_line(tr));
 }

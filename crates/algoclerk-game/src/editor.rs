@@ -614,6 +614,13 @@ impl EditorPanel {
                             Ok(t) => {
                                 s.set_text(&t);
                                 changed = true;
+                                // the new card is the first row that differs from the old list
+                                let now = s.rows();
+                                self.sel = (0..now.len()).find(|i| {
+                                    rows.get(*i).is_none_or(|r| {
+                                        r.text != now[*i].text || r.kind != now[*i].kind
+                                    })
+                                });
                                 cx.sfx("pick");
                                 self.note = Some(cx.tr.t("editor.new_card"));
                             }
