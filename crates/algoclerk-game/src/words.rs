@@ -39,3 +39,7 @@ pub const TAB_CPP: &str = "Your own program, formatted, with the level's include
 pub const NO_SUGGESTION: &str = "no suggestions";
 /// Card editor: statement that cards cannot express.
 pub const RAW_CARD: &str = "raw C++ (read only card)";
+/// Card editor: a dragged card cannot go where it was dropped.
+pub const CANT_DROP: &str = "A card cannot go there.";
+/// Card editor: tab with the member functions of the value left of the cursor.
+pub const MEMBERS: &str = ".fn";

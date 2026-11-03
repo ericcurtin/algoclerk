@@ -35,6 +35,7 @@
 pub mod about;
 pub mod blocks;
 pub mod brief;
+pub mod cards;
 pub mod clerk;
 pub mod complete;
 pub mod editor;
