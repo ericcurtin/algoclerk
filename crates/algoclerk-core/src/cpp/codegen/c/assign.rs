@@ -171,6 +171,12 @@ impl Cx<'_> {
             },
             Ty::Struct(s) => {
                 self.use_struct(s)?;
+                if args.iter().any(|a| matches!(self.ty_of(a), Ty::Struct(_))) {
+                    return no(
+                        "C",
+                        "copying a struct value (nodes are shared through pointers)",
+                    );
+                }
                 let Some(tys) = self.struct_params(s) else {
                     return no("C", format!("the type {s}"));
                 };
@@ -245,6 +251,9 @@ impl Cx<'_> {
     /// Lift a non-capturing lambda to a static function; returns its name. All parameters are pointers
     /// (`const T *a`), which is what `sort_by` calls.
     pub(super) fn lift_lambda(&mut self, id: NodeId, l: &Lambda, hint: &str) -> R<String> {
+        if !self.allow_generic && l.params.iter().any(|p| p.spec.ty == Ty::Auto) {
+            return no("C", "a generic lambda (C has no templates)");
+        }
         let bound: std::collections::HashSet<String> =
             l.params.iter().map(|p| p.name.clone()).collect();
         let mut free = std::collections::HashSet::new();

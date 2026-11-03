@@ -334,3 +334,23 @@ pub fn iter_pos(e: &Expr) -> Option<Pos<'_>> {
         _ => None,
     }
 }
+
+/// The types of a function's parameters and its return type.
+pub fn sig_types(f: &FnDecl) -> Vec<Ty> {
+    let mut v: Vec<Ty> = f.params.iter().map(|p| p.spec.ty.clone()).collect();
+    v.push(f.ret.ty.clone());
+    v
+}
+
+/// Does any of these types mention a pointer to the struct `name`?
+pub fn uses_struct(tys: &[Ty], name: &str) -> bool {
+    let mut found = false;
+    for t in tys {
+        t.walk(&mut |x| {
+            if matches!(x, Ty::Ptr(inner) if matches!(&**inner, Ty::Struct(n) if n == name)) {
+                found = true;
+            }
+        });
+    }
+    found
+}

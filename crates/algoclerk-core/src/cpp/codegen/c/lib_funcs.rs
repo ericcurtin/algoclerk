@@ -432,7 +432,12 @@ impl Cx<'_> {
     /// The comparison function passed to `sort_by`.
     fn comparator(&mut self, cmp: &Expr, vec: &str) -> R<String> {
         match &cmp.kind {
-            ExprKind::Lambda(l) => self.lift_lambda(cmp.id, l, "lambda"),
+            ExprKind::Lambda(l) => {
+                self.allow_generic = true;
+                let f = self.lift_lambda(cmp.id, l, "lambda");
+                self.allow_generic = false;
+                f
+            }
             ExprKind::Var(v) => match self.lookup(v).map(|x| x.rk.clone()) {
                 Some(Rk::Lambda(f)) => Ok(f),
                 _ => no("C", "this comparator"),

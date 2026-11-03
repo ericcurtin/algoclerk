@@ -128,10 +128,16 @@ impl Rs<'_> {
 
     /// An integer literal of type `t` (negative values wrap for unsigned types like C++ does).
     pub fn int_lit(&self, v: i128, t: &Ty) -> Ex {
+        let signed = |bits: u32, v: i128| {
+            let m = 1i128 << bits;
+            (v + (m >> 1)).rem_euclid(m) - (m >> 1)
+        };
         let (suffix, v) = match t {
-            Ty::Int | Ty::Char | Ty::Bool => ("", v),
+            Ty::Int => ("", signed(32, v)),
+            Ty::Char => ("u8", v.rem_euclid(256)),
+            Ty::Bool => ("", v),
             Ty::UInt => ("u32", v.rem_euclid(1 << 32)),
-            Ty::LongLong => ("i64", v),
+            Ty::LongLong => ("i64", signed(64, v)),
             Ty::ULongLong => ("u64", v.rem_euclid(1 << 64)),
             Ty::Size => ("usize", v.rem_euclid(1 << 64)),
             _ => ("", v),
@@ -189,6 +195,12 @@ impl Rs<'_> {
     /// Convert `x` (of C++ type `from`) to the type `to` the context needs: integral casts, `Some(..)` for
     /// optionals, owned values.
     pub fn convert(&mut self, x: Ex, from: &Ty, to: &Ty) -> R<Ex> {
+        if matches!(from, Ty::Struct(_)) && x.kind != Kind::Val {
+            return no(
+                "Rust",
+                "copying a struct value (nodes are shared through pointers)",
+            );
+        }
         if from == to {
             return Ok(self.own(x, from));
         }

@@ -109,3 +109,75 @@ fn cpp(c: &Compiled) -> Generated {
         code: super::print::print_program(&c.program, true),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cpp::check::CheckOpts;
+    use crate::cpp::run::compile;
+
+    fn gen_lang(src: &str, lang: Lang, entry: &str) -> Result<Generated, String> {
+        let c = compile("", src, &CheckOpts::all()).map_err(|d| d[0].msg.clone())?;
+        generate(&c, lang, entry)
+    }
+
+    #[test]
+    fn cpp_tab_is_the_formatted_player_code() {
+        let g = gen_lang(
+            "#include <vector>\nint f(int x){return x+1;}\n",
+            Lang::Cpp,
+            "f",
+        )
+        .unwrap();
+        assert!(g.full().contains("#include <vector>"));
+        assert!(g.code.contains("int f(int x) {"));
+    }
+
+    #[test]
+    fn simple_function_translates_to_both_languages() {
+        let src = "int twice(int x) { return x * 2; }\n";
+        let r = gen_lang(src, Lang::Rust, "twice").unwrap();
+        assert!(r.code.contains("fn twice(x: i32) -> i32 {"), "{}", r.code);
+        let c = gen_lang(src, Lang::C, "twice").unwrap();
+        assert!(c.code.contains("int twice(int x) {"), "{}", c.code);
+    }
+
+    #[test]
+    fn untranslatable_programs_give_friendly_errors() {
+        let src = "#include <functional>\nint f(int x) { std::function<int(int)> g = [](int a) { return a; }; return g(x); }\n";
+        for lang in [Lang::Rust, Lang::C] {
+            let e = gen_lang(src, lang, "f").unwrap_err();
+            assert!(e.starts_with("this clerk cannot translate"), "{e}");
+            assert!(e.ends_with("yet"), "{e}");
+        }
+    }
+
+    #[test]
+    fn missing_entry_is_an_error_not_a_panic() {
+        assert!(gen_lang("int f() { return 1; }\n", Lang::Rust, "nope").is_err());
+        assert!(gen_lang("int f() { return 1; }\n", Lang::C, "nope").is_err());
+    }
+
+    #[test]
+    fn generation_never_panics_on_the_corpus() {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/data/cpp_corpus");
+        for e in std::fs::read_dir(dir).unwrap().flatten() {
+            let text = std::fs::read_to_string(e.path()).unwrap();
+            let Ok(c) = compile("", &text, &CheckOpts::all()) else {
+                continue;
+            };
+            let entry = c
+                .program
+                .fns()
+                .last()
+                .map(|f| f.name.clone())
+                .unwrap_or_default();
+            for lang in Lang::ALL {
+                let r = generate(&c, lang, &entry);
+                if let Err(m) = r {
+                    assert!(!m.is_empty());
+                }
+            }
+        }
+    }
+}

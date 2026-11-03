@@ -195,8 +195,11 @@ impl Cx<'_> {
             self.declare(&v.name, ty, Rk::Lambda(f));
             return Ok(String::new());
         }
-        if spec.is_ref && !(spec.konst && self.is_plain(&ty)) {
-            return self.ref_decl(v, &ty);
+        if spec.is_ref {
+            let temp = matches!(&v.init, Init::Copy(e) if matches!(e.kind, ExprKind::Call { .. } | ExprKind::Construct { .. } | ExprKind::Binary(..) | ExprKind::InitList(_)));
+            if !(spec.konst && temp) {
+                return self.ref_decl(v, &ty);
+            }
         }
         let sp = |t: &str| if t.ends_with('*') { "" } else { " " };
         if let Some(n) = &v.array {

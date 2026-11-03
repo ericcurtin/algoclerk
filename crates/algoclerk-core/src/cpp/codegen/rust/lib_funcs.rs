@@ -141,7 +141,10 @@ impl Rs<'_> {
         let Some(l) = lam else {
             return no("Rust", "this comparator");
         };
-        let f = self.ex(cmp, false)?.s;
+        self.allow_generic = true;
+        let f = self.ex(cmp, false);
+        self.allow_generic = false;
+        let f = f?.s;
         let f = if matches!(cmp.kind, ExprKind::Lambda(_)) {
             format!("({f})")
         } else {
@@ -359,9 +362,18 @@ impl Rs<'_> {
         if r.rev || matches!(r.ty, Ty::Str | Ty::StrView) && name != "std::count" {
             return no("Rust", format!("`{name}` on this range"));
         }
+        let mutating = matches!(
+            name,
+            "std::sort" | "std::stable_sort" | "std::reverse" | "std::fill" | "std::iota"
+        );
+        let (r, pre) = if mutating {
+            self.hoist_len(r)
+        } else {
+            (r, None)
+        };
         let s = self.range_slice(&r);
         let el = self.elem_of(&r.ty);
-        match (name, args.len()) {
+        let out: R<Ex> = match (name, args.len()) {
             ("std::sort" | "std::stable_sort", 2) => Ok(val(format!("{s}.sort()"))),
             ("std::sort" | "std::stable_sort", 3) => Ok(val(self.sort_by(&s, &args[2])?)),
             ("std::reverse", 2) => Ok(val(format!("{s}.reverse()"))),
@@ -407,6 +419,27 @@ impl Rs<'_> {
                 let _ = e;
                 no("Rust", format!("`{name}` with these arguments"))
             }
+        };
+        match (out, pre) {
+            (Ok(x), Some(p)) => Ok(Ex::val(format!("{{ {p} {} }}", x.s))),
+            (out, _) => out,
         }
+    }
+
+    /// A mutable slice `v[a..v.len() - 1]` cannot name `v` twice: read the length into a variable first.
+    fn hoist_len(&mut self, r: super::lib_free::Rg) -> (super::lib_free::Rg, Option<String>) {
+        let pat = format!("{}.len()", r.obj);
+        if !r.lo.iter().chain(r.hi.iter()).any(|t| t.contains(&pat)) {
+            return (r, None);
+        }
+        let n = self.fresh("n");
+        let fix = |t: &Option<String>| t.as_ref().map(|s| s.replace(&pat, &n));
+        let pre = format!("let {n} = {pat};");
+        let r2 = super::lib_free::Rg {
+            lo: fix(&r.lo),
+            hi: fix(&r.hi),
+            ..r
+        };
+        (r2, Some(pre))
     }
 }

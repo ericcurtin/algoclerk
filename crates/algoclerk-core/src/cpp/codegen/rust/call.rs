@@ -64,6 +64,32 @@ impl Rs<'_> {
             ExprKind::Var(n) => self.name(n),
             _ => self.name(&f.name),
         };
+        // `f(&mut v, v.len())`: the other arguments are read first, the borrow checker insists
+        let mut_roots: Vec<&str> = parts
+            .iter()
+            .zip(args)
+            .filter(|(p, _)| p.starts_with("&mut "))
+            .filter_map(|(_, a)| root(a))
+            .collect();
+        let mut lets = String::new();
+        if !mut_roots.is_empty() {
+            for (i, (p, a)) in parts.iter_mut().zip(args).enumerate() {
+                let (names, _) = names_and_calls(a);
+                if !p.starts_with("&mut ") && names.iter().any(|n| mut_roots.contains(&n.as_str()))
+                {
+                    let v = format!("arg{i}");
+                    lets.push_str(&format!("let {v} = {p}; "));
+                    *p = v;
+                }
+            }
+        }
+        if !lets.is_empty() {
+            return Ok(Ex::new(
+                format!("{{ {lets}{name}({}) }}", parts.join(", ")),
+                20,
+                Kind::Val,
+            ));
+        }
         Ok(Ex::new(
             format!("{name}({})", parts.join(", ")),
             19,

@@ -21,32 +21,32 @@ impl Cx<'_> {
             Ty::ULongLong => "ull".into(),
             Ty::Size => "size_t".into(),
             Ty::Str | Ty::StrView => "Str".into(),
-            Ty::Vector(e) | Ty::Stack(e) | Ty::Array(e, _) => format!("Vec_{}", self.name_of(e)?),
-            Ty::Deque(e) | Ty::Queue(e) | Ty::List(e) => format!("Deq_{}", self.name_of(e)?),
+            Ty::Vector(e) | Ty::Stack(e) | Ty::Array(e, _) => format!("Vec_{}", self.nested(e)?),
+            Ty::Deque(e) | Ty::Queue(e) | Ty::List(e) => format!("Deq_{}", self.nested(e)?),
             Ty::PriorityQueue(e, cmp) => {
                 let dir = match &**cmp {
                     Ty::Functor(Functor::Less, _) => "max",
                     Ty::Functor(Functor::Greater, _) => "min",
                     _ => return no("C", "a priority_queue ordered by a lambda"),
                 };
-                format!("Heap_{}_{dir}", self.name_of(e)?)
+                format!("Heap_{}_{dir}", self.nested(e)?)
             }
-            Ty::UnorderedMap(k, v) => format!("Hmap_{}_{}", self.name_of(k)?, self.name_of(v)?),
-            Ty::Map(k, v) => format!("Smap_{}_{}", self.name_of(k)?, self.name_of(v)?),
+            Ty::UnorderedMap(k, v) => format!("Hmap_{}_{}", self.nested(k)?, self.nested(v)?),
+            Ty::Map(k, v) => format!("Smap_{}_{}", self.nested(k)?, self.nested(v)?),
             Ty::UnorderedSet(e) => {
-                self.name_of(&Ty::Char)?;
-                format!("Hset_{}", self.name_of(e)?)
+                self.nested(&Ty::Char)?;
+                format!("Hset_{}", self.nested(e)?)
             }
             Ty::Set(e) => {
-                self.name_of(&Ty::Char)?;
-                format!("Sset_{}", self.name_of(e)?)
+                self.nested(&Ty::Char)?;
+                format!("Sset_{}", self.nested(e)?)
             }
-            Ty::Pair(a, b) => format!("Pair_{}_{}", self.name_of(a)?, self.name_of(b)?),
+            Ty::Pair(a, b) => format!("Pair_{}_{}", self.nested(a)?, self.nested(b)?),
             Ty::Tuple(ts) => {
-                let parts: R<Vec<String>> = ts.iter().map(|t| self.name_of(t)).collect();
+                let parts: R<Vec<String>> = ts.iter().map(|t| self.nested(t)).collect();
                 format!("Tup_{}", parts?.join("_"))
             }
-            Ty::Optional(e) => format!("Opt_{}", self.name_of(e)?),
+            Ty::Optional(e) => format!("Opt_{}", self.nested(e)?),
             Ty::Ptr(inner) => match &**inner {
                 Ty::Struct(s) => {
                     self.use_struct(s)?;
@@ -64,6 +64,17 @@ impl Cx<'_> {
             self.types.push((t.clone(), n.clone()));
         }
         Ok(n)
+    }
+
+    /// The name of a type stored inside another (a struct by value cannot be: it has no helper functions).
+    fn nested(&mut self, t: &Ty) -> R<String> {
+        if matches!(t, Ty::Struct(_)) {
+            return no(
+                "C",
+                "a struct stored by value in a container, pair or optional",
+            );
+        }
+        self.name_of(t)
     }
 
     /// The C spelling of a type in declarations.
@@ -129,7 +140,7 @@ impl Cx<'_> {
 
     /// The instantiation text of one registered type and the template macro it needs.
     fn instantiate(&mut self, t: &Ty, n: &str) -> R<(String, Option<&'static str>)> {
-        let nm = |this: &mut Self, t: &Ty| this.name_of(t);
+        let nm = |this: &mut Self, t: &Ty| this.nested(t);
         Ok(match t {
             Ty::Bool | Ty::Char | Ty::Int | Ty::UInt | Ty::LongLong | Ty::ULongLong | Ty::Size => {
                 (format!("SCALAR({n})\n"), None)

@@ -77,6 +77,7 @@ pub struct Rs<'a> {
     pub(super) cont: Vec<Option<String>>,
     pub(super) tmp: usize,
     pub(super) lams: HashMap<NodeId, &'a Lambda>,
+    pub(super) allow_generic: bool,
 }
 
 /// Translate to Rust.
@@ -94,6 +95,7 @@ pub fn generate(comp: &Compiled, entry: &str) -> R<Generated> {
         cont: Vec::new(),
         tmp: 0,
         lams: HashMap::new(),
+        allow_generic: false,
     };
     rs.collect_lambdas();
     let mut code = String::new();

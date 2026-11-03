@@ -387,6 +387,9 @@ impl Rs<'_> {
             if stmts.iter().any(|s| has_break(s)) {
                 return no("Rust", "a `break` inside a switch case");
             }
+            if labels.iter().any(Option::is_none) && gi + 1 != n {
+                return no("Rust", "a switch whose default label is not last");
+            }
             let mut pats = Vec::new();
             for l in labels {
                 match l {

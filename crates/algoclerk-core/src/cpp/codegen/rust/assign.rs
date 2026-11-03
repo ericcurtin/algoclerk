@@ -92,6 +92,9 @@ impl Rs<'_> {
                     }
                     _ => {
                         let y = self.str_ref(rhs)?;
+                        if root(lhs).is_some() && root(lhs) == root(rhs) {
+                            return Ok(format!("{place}.push_str(&{}.to_string())", y.at(19)));
+                        }
                         Ok(format!("{place}.push_str({})", y.s))
                     }
                 }
@@ -133,7 +136,11 @@ impl Rs<'_> {
         let plain = |y: &Ex| y.lit.map_or_else(|| y.s.clone(), |v| v.to_string());
         let shift = matches!(bo, BinOp::Shl | BinOp::Shr);
         let wrap = matches!(bo, BinOp::Add | BinOp::Sub | BinOp::Mul) && lt.is_unsigned();
-        let direct = (lt == *rt || y.lit.is_some() || shift)
+        let fits = y.lit.is_some_and(|v| {
+            let (lo, hi) = crate::cpp::value::int_range(&lt);
+            (lo..=hi).contains(&v)
+        });
+        let direct = (lt == *rt || fits || shift)
             && !matches!(lt, Ty::Char | Ty::Bool)
             && (!wrap || (lt == Ty::Size && bo == BinOp::Add && y.lit.is_some()));
         if direct {
@@ -143,7 +150,7 @@ impl Rs<'_> {
         if !is_pure(lhs) {
             return no("Rust", "this compound assignment");
         }
-        if wrap && (lt == *rt || y.lit.is_some()) {
+        if wrap && (lt == *rt || fits) {
             let m = match bo {
                 BinOp::Add => "wrapping_add",
                 BinOp::Sub => "wrapping_sub",
@@ -249,6 +256,12 @@ impl Rs<'_> {
             },
             Ty::Struct(n) => {
                 self.use_struct(n)?;
+                if args.iter().any(|a| matches!(self.ty_of(a), Ty::Struct(_))) {
+                    return no(
+                        "Rust",
+                        "copying a struct value (nodes are shared through pointers)",
+                    );
+                }
                 let Some(s) = self.prog.find_struct(n) else {
                     return no("Rust", format!("the type {n}"));
                 };
@@ -349,7 +362,77 @@ impl Rs<'_> {
         }
     }
 
+    /// Can the lambda become a Rust closure with the same behaviour? Returns whether it must `move`.
+    fn closure_captures(&self, l: &Lambda) -> R<bool> {
+        let mut own: std::collections::HashSet<&str> =
+            l.params.iter().map(|p| p.name.as_str()).collect();
+        let mut free: std::collections::HashSet<String> = std::collections::HashSet::new();
+        walk_stmts(&l.body, &mut |s| {
+            match &s.kind {
+                StmtKind::Decl { vars, .. } => own.extend(vars.iter().map(|v| v.name.as_str())),
+                StmtKind::Structured { names, .. } | StmtKind::RangeFor { names, .. } => {
+                    own.extend(names.iter().map(String::as_str))
+                }
+                _ => {}
+            }
+            stmt_exprs(s, &mut |e| {
+                walk_expr(e, &mut |x| {
+                    if let ExprKind::Var(n) = &x.kind {
+                        free.insert(n.clone());
+                    }
+                });
+            });
+        });
+        let in_lam = mutated_names(self.prog, self.info, &l.body);
+        let (mut by_val, mut by_ref) = (false, false);
+        for n in free.iter().filter(|n| !own.contains(n.as_str())) {
+            let global = self.scopes.first().is_some_and(|s| s.contains_key(n));
+            let Some(v) = self.lookup(n) else { continue };
+            if global || matches!(v.ty, Ty::Lambda(_)) {
+                continue;
+            }
+            let explicit = l
+                .captures
+                .items
+                .iter()
+                .find(|(i, _)| i == n)
+                .map(|(_, r)| *r);
+            let val = match explicit {
+                Some(r) => !r,
+                None => l.captures.default == CaptureDefault::Copy,
+            };
+            if val {
+                by_val = true;
+                if !self.is_copy(&v.ty) {
+                    return no("Rust", "a lambda that copies a container into its closure");
+                }
+            } else {
+                by_ref = true;
+                if self.mutated.contains(n) && !in_lam.contains(n) {
+                    return no(
+                        "Rust",
+                        "a lambda that captures a variable which is also changed outside it",
+                    );
+                }
+            }
+        }
+        if by_val && by_ref {
+            return no(
+                "Rust",
+                "a lambda that captures some variables by copy and others by reference",
+            );
+        }
+        Ok(by_val)
+    }
+
     pub(super) fn lambda_ex(&mut self, e: &Expr, l: &Lambda) -> R<Ex> {
+        if !self.allow_generic && l.params.iter().any(|p| p.spec.ty == Ty::Auto) {
+            return no(
+                "Rust",
+                "a generic lambda (Rust closures have one set of types)",
+            );
+        }
+        let by_copy = self.closure_captures(l)?;
         let mut ps = Vec::new();
         self.push_scope();
         for p in &l.params {
@@ -404,11 +487,7 @@ impl Rs<'_> {
         self.ret = saved;
         self.pop_scope();
         let text = text?;
-        let mv = if l.captures.default == CaptureDefault::Copy {
-            "move "
-        } else {
-            ""
-        };
+        let mv = if by_copy { "move " } else { "" };
         let sep = if single.is_some() { " " } else { "" };
         let _ = e;
         Ok(Ex::new(

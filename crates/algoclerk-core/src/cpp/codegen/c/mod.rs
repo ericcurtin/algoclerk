@@ -77,6 +77,7 @@ pub struct Cx<'a> {
     pub(super) ret: Ty,
     pub(super) tmp: usize,
     pub(super) lifted: Vec<String>,
+    pub(super) allow_generic: bool,
 }
 
 impl<'a> Cx<'a> {
@@ -90,6 +91,7 @@ impl<'a> Cx<'a> {
             ret: Ty::Void,
             tmp: 0,
             lifted: Vec::new(),
+            allow_generic: false,
         }
     }
 }

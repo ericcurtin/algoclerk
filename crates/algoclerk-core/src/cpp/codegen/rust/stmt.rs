@@ -254,7 +254,16 @@ impl Rs<'_> {
         if spec.is_ref {
             return self.ref_decl(spec, v, &ty);
         }
-        let mutable = !spec.konst && self.mutated.contains(&v.name);
+        let mut mutable = !spec.konst && self.mutated.contains(&v.name);
+        if let (Ty::Lambda(_), Init::Copy(e)) = (&ty, &v.init)
+            && let ExprKind::Lambda(l) = &e.kind
+        {
+            let own: std::collections::HashSet<&str> =
+                l.params.iter().map(|p| p.name.as_str()).collect();
+            mutable = mutated_names(self.prog, self.info, &l.body)
+                .iter()
+                .any(|n| !own.contains(n.as_str()));
+        }
         let m = if mutable { "mut " } else { "" };
         let init = match (&v.array, &v.init) {
             (Some(n), init) => self.array_init(&ty, n, init)?,

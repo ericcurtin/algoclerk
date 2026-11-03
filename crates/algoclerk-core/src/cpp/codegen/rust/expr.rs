@@ -6,6 +6,12 @@ use crate::cpp::ast::*;
 use crate::cpp::check::Resolved;
 use crate::cpp::codegen::common::*;
 
+/// Does the expression text end in an `as <primitive>` cast (a following `<` would start generics)?
+fn ends_with_cast(s: &str) -> bool {
+    s.rsplit_once(" as ")
+        .is_some_and(|(_, ty)| !ty.contains([' ', '(', ')', ',']) && !ty.is_empty())
+}
+
 fn is_strty(t: &Ty) -> bool {
     matches!(t, Ty::Str | Ty::StrView)
 }
@@ -235,6 +241,9 @@ impl Rs<'_> {
             UnOp::Neg | UnOp::BitNot | UnOp::Plus => {
                 let x = self.ex(a, false)?;
                 let x = self.conv_int(x, &at, &t)?;
+                if let (UnOp::Neg, Some(v)) = (op, x.lit) {
+                    return Ok(self.int_lit(-v, &t));
+                }
                 Ok(match op {
                     UnOp::Plus => x,
                     UnOp::Neg if t.is_unsigned() => {
@@ -381,7 +390,7 @@ impl Rs<'_> {
             let y = self.ex(b, false)?;
             (r(x), r(y))
         };
-        let xs = if x.cast && matches!(op, BinOp::Lt | BinOp::Shl) {
+        let xs = if (x.cast || ends_with_cast(&x.s)) && matches!(op, BinOp::Lt | BinOp::Shl) {
             format!("({})", x.s)
         } else {
             x.at(8)

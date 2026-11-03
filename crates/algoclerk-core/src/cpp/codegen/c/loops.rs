@@ -60,7 +60,7 @@ impl Cx<'_> {
             None => String::new(),
         };
         let inc = match incr {
-            Some(e) => self.ex(e, true)?.s,
+            Some(e) => self.comma_list(e)?,
             None => String::new(),
         };
         let b = self.body(body, ind + if pre { 2 } else { 1 })?;
@@ -70,6 +70,16 @@ impl Cx<'_> {
         }
         self.pop_scope();
         Ok(())
+    }
+
+    /// An expression whose top-level commas are written without parentheses (a `for` increment).
+    fn comma_list(&mut self, e: &Expr) -> R<String> {
+        match &e.kind {
+            ExprKind::Binary(BinOp::Comma, a, b) => {
+                Ok(format!("{}, {}", self.comma_list(a)?, self.comma_list(b)?))
+            }
+            _ => Ok(self.ex(e, true)?.s),
+        }
     }
 
     /// The declaration binding `name` to an element reachable as `place` (an lvalue text).
@@ -131,11 +141,16 @@ impl Cx<'_> {
             | Ty::Queue(el)
             | Ty::List(el) => {
                 let deq = matches!(cty, Ty::Deque(_) | Ty::Queue(_) | Ty::List(_));
-                head = format!(
-                    "for (size_t {i} = 0; {i} < {}; ++{i}) {{",
-                    self.dot(&x, "len")
-                );
-                let place = if deq {
+                let native = matches!(&range.kind, ExprKind::Var(v) if self.lookup(v).is_some_and(|v| v.rk == Rk::Native));
+                let count = match (&cty, native) {
+                    (Ty::Array(_, n), true) => n.to_string(),
+                    (_, true) => return no("C", "a loop over this array"),
+                    _ => self.dot(&x, "len"),
+                };
+                head = format!("for (size_t {i} = 0; {i} < {count}; ++{i}) {{");
+                let place = if native {
+                    format!("{}[{i}]", x.at(16))
+                } else if deq {
                     let n = self.name_of(&cty)?;
                     let ptr = self.addr(x.clone(), &cty)?;
                     format!("(*{n}_at({ptr}, {i}))")

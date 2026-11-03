@@ -47,6 +47,12 @@ impl Cx<'_> {
 
     /// The value of an expression as owned: scalars are read, aggregates copied unless they are temporaries.
     pub(super) fn own(&mut self, x: Ex, ty: &Ty) -> R<Ex> {
+        if matches!(ty, Ty::Struct(_)) && x.kind != Kind::Val {
+            return no(
+                "C",
+                "copying a struct value (nodes are shared through pointers)",
+            );
+        }
         if self.is_plain(ty) {
             return Ok(match x.kind {
                 Kind::Ref => Ex::new(format!("*{}", x.at(15)), 15, Kind::Val),
@@ -80,6 +86,9 @@ impl Cx<'_> {
 
     /// A pointer to the aggregate `x` of type `ty`.
     pub(super) fn addr(&mut self, x: Ex, ty: &Ty) -> R<String> {
+        if x.slice {
+            return Ok(format!("(Str[]){{ Str_from({}) }}", x.s));
+        }
         Ok(match x.kind {
             Kind::Ref => x.s,
             Kind::Place => format!("&{}", x.at(15)),
@@ -248,7 +257,12 @@ impl Cx<'_> {
                     UnOp::Plus => "+",
                     _ => "~",
                 };
-                Ok(Ex::new(format!("{c}{}", x.at(15)), 15, Kind::Val))
+                let inner = if x.s.starts_with(c) {
+                    format!("({})", x.s)
+                } else {
+                    x.at(15)
+                };
+                Ok(Ex::new(format!("{c}{inner}"), 15, Kind::Val))
             }
             UnOp::Deref => match &at {
                 Ty::Optional(_) => {
@@ -281,6 +295,10 @@ impl Cx<'_> {
 
     pub(super) fn binary(&mut self, e: &Expr, op: BinOp, a: &Expr, b: &Expr) -> R<Ex> {
         let (at, bt, rt) = (self.ty_of(a), self.ty_of(b), self.ty_of(e));
+        if op == BinOp::Comma {
+            let (x, y) = (self.ex(a, true)?, self.ex(b, true)?);
+            return Ok(Ex::val(format!("({}, {})", x.at(3), y.at(3))));
+        }
         if matches!(
             op,
             BinOp::Eq | BinOp::Ne | BinOp::Lt | BinOp::Le | BinOp::Gt | BinOp::Ge
