@@ -1,5 +1,5 @@
 # AlgoClerk English strings for the pixel front end. Keys are grouped by tables; placeholders look like {name}.
-# (Compiler and runtime messages come from the ClerkScript core in English; their codes are stable for translation tools.)
+# (Compiler and runtime messages come from the C++ core in English; their codes are stable for translation tools.)
 # To translate: copy this file to <code>.toml (for example de.toml), translate the values and
 # keep the keys and {placeholders} unchanged. Missing keys fall back to English.
 
