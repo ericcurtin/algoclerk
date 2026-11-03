@@ -91,7 +91,11 @@ impl Checker<'_> {
             return Val::unknown();
         };
         let key = format!("{}::{name}", base_name(first.recv));
-        if !self.check_locked(node, &[key]) {
+        let mut keys = vec![key];
+        if !first.header.is_empty() {
+            keys.push(first.header.to_string());
+        }
+        if !self.check_locked(node, &keys) {
             return Val::unknown();
         }
         match self.lib_pick(&cands, Some(recv), args, &[]) {
@@ -150,6 +154,10 @@ impl Checker<'_> {
         if cands.is_empty() {
             return None;
         }
+        // a lock on the name or on its header wins over a missing include or a wrong argument
+        if !self.check_locked(node, &[cands[0].header.to_string(), key.to_string()]) {
+            return Some(Val::unknown());
+        }
         Some(match self.lib_pick(&cands, None, args, explicit) {
             Err((m, f)) => {
                 self.need_header(node, m.header, key);
@@ -164,9 +172,7 @@ impl Checker<'_> {
                 Val::unknown()
             }
             Ok((m, ret, bind)) => {
-                if self.need_header(node, m.header, key) {
-                    self.check_locked(node, &[m.header.to_string(), key.to_string()]);
-                }
+                self.need_header(node, m.header, key);
                 self.info.refs.insert(node, Resolved::Lib(m));
                 self.check_callables(node, m, &bind, args);
                 ret

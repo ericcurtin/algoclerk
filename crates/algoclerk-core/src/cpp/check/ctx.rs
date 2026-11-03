@@ -92,6 +92,8 @@ pub(super) struct Checker<'a> {
     pub lams: HashMap<NodeId, LamInfo<'a>>,
     pub fctx: Vec<FnCtx>,
     pub headers: BTreeSet<String>,
+    /// Headers the level prelude includes (the player may repeat them).
+    pub prelude_headers: BTreeSet<String>,
     pub using_std: bool,
     pub depth: u32,
     /// Functions with a body seen so far (name and parameter types).
@@ -105,12 +107,16 @@ impl<'a> Checker<'a> {
     /// A fresh checker: reads includes and `using namespace std` from every item.
     pub fn new(p: &'a Program, o: &'a CheckOpts) -> Checker<'a> {
         let mut headers = BTreeSet::new();
+        let mut prelude_headers = BTreeSet::new();
         let mut using_std = false;
         let mut fn_names = HashSet::new();
-        for it in &p.items {
+        for (idx, it) in p.items.iter().enumerate() {
             match &it.kind {
                 ItemKind::Include { path, angle: true } => {
                     headers.insert(format!("<{path}>"));
+                    if idx < p.prelude_items {
+                        prelude_headers.insert(format!("<{path}>"));
+                    }
                 }
                 ItemKind::UsingNamespaceStd => using_std = true,
                 ItemKind::Func(f) => {
@@ -132,6 +138,7 @@ impl<'a> Checker<'a> {
             lams: HashMap::new(),
             fctx: Vec::new(),
             headers,
+            prelude_headers,
             using_std,
             depth: 0,
             defs: Vec::new(),
