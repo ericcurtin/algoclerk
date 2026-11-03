@@ -6,7 +6,7 @@
 
 use crate::gfx::Gfx;
 use algoclerk_core::cpp::ast::Ty;
-use algoclerk_core::cpp::value::{Heap, Plain, render};
+use algoclerk_core::cpp::value::{Heap, Plain, iter_elem_ty, render};
 use algoclerk_media::Rect;
 use std::collections::VecDeque;
 
@@ -162,7 +162,18 @@ fn is_grid_elem(t: &Ty) -> bool {
 pub fn build(v: &Plain, t: &Ty, heap: &Heap, max_w: i32) -> W {
     match (v, t) {
         (Plain::Uninit, _) => tag("uninit"),
-        (_, Ty::Iter { .. }) | (Plain::Void, Ty::Unknown) => tag("iterator"),
+        (Plain::Void, Ty::Iter { .. }) => tag("end()"),
+        (x, Ty::Iter { container, .. }) => {
+            let inner = build(x, &iter_elem_ty(container), heap, max_w - 24);
+            W {
+                w: inner.w + 6,
+                h: inner.h + 8,
+                k: K::Tag {
+                    label: "it",
+                    inner: Some(Box::new(inner)),
+                },
+            }
+        }
         (Plain::Void, _) => tag("..."),
         (Plain::Int(i), Ty::Bool) => W {
             w: 14,

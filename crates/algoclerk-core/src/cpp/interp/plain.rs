@@ -450,6 +450,32 @@ impl<'p> Machine<'p> {
         }
     }
 
+    /// Type and plain value of a variable for a trace. An iterator reports `Container::iterator` and the
+    /// element it points at (a map entry as a `{key, value}` sequence); `Plain::Void` means `end()` and
+    /// `Plain::Uninit` an iterator that was invalidated.
+    fn snap_value(&self, v: &Value, ho: &mut HeapOut, budget: &mut i64) -> (Ty, Plain) {
+        let Value::Iter(it) = v else {
+            return (v.ty(), self.to_plain(v, ho, budget, 0));
+        };
+        let container = self.get(&it.cont).map_or(Ty::Unknown, |c| c.ty());
+        let ty = Ty::Iter {
+            container: Box::new(container),
+            reverse: it.rev,
+        };
+        let plain = match self.iter_deref(it) {
+            Ok(p) => match self.get(&p) {
+                Ok(e) => self.to_plain(e, ho, budget, 0),
+                Err(_) => Plain::Uninit,
+            },
+            Err(_) if matches!(it.pos, Pos::End) => Plain::Void,
+            Err(_) => match self.check_ver(it) {
+                Ok(_) => Plain::Void,
+                Err(_) => Plain::Uninit,
+            },
+        };
+        (ty, plain)
+    }
+
     pub(super) fn snapshot(&self, node: NodeId, returned: Option<&Value>) -> Event {
         let mut ho = HeapOut::new();
         let mut budget = 4000i64;
@@ -467,10 +493,11 @@ impl<'p> Machine<'p> {
                 v => Some(v),
             };
             let Some(v) = v else { continue };
+            let (ty, value) = self.snap_value(v, &mut ho, &mut budget);
             vars.push(VarSnap {
                 name: (*name).to_string(),
-                ty: v.ty(),
-                value: self.to_plain(v, &mut ho, &mut budget, 0),
+                ty,
+                value,
             });
         }
         let ret = returned.map(|v| self.to_plain(v, &mut ho, &mut budget, 0));

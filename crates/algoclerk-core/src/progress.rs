@@ -91,7 +91,7 @@ impl Default for Settings {
             language: "en".into(),
             text_scale: 1.0,
             unlock_all: false,
-            code_lang: "rust".into(),
+            code_lang: "cpp".into(),
             palette: "warm".into(),
             outfit: String::new(),
             reduce_motion: false,
@@ -244,6 +244,13 @@ impl Progress {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn code_reveal_defaults_to_cpp_and_saved_values_are_kept() {
+        assert_eq!(Settings::default().code_lang, "cpp");
+        let p = Progress::from_json("{\"settings\": {\"code_lang\": \"rust\"}}");
+        assert_eq!(p.settings.code_lang, "rust");
+    }
 
     #[test]
     fn corrupt_json_gives_defaults() {

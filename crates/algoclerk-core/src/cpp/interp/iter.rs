@@ -134,7 +134,7 @@ impl<'p> Machine<'p> {
         })
     }
 
-    fn check_ver(&self, it: &IterV) -> R<(CKind, usize)> {
+    pub(super) fn check_ver(&self, it: &IterV) -> R<(CKind, usize)> {
         let (k, len, ver) = self.ckind(&it.cont)?;
         if matches!(k, CKind::Seq | CKind::Un) && ver != it.ver {
             return Err(self.fail(invalid_msg()));

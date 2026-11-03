@@ -1397,11 +1397,17 @@ impl<'p> Machine<'p> {
             && let VarRef::Local(s) = self.rs.var(e.id)
         {
             let abs = self.base + s as usize;
+            let tracing = self.trace.is_some();
             if let Some(sl) = self.stack.get_mut(abs)
                 && sl.gn != 0
                 && !matches!(sl.v, Value::Ref(_) | Value::Uninit(_) | Value::Void)
             {
-                let v = std::mem::replace(&mut sl.v, Value::Void);
+                // a traced run copies so the `return` snapshot still shows the live local
+                let v = if tracing {
+                    sl.v.clone()
+                } else {
+                    std::mem::replace(&mut sl.v, Value::Void)
+                };
                 return match ty {
                     Some(t) => self.convert(v, t),
                     None => Ok(v),

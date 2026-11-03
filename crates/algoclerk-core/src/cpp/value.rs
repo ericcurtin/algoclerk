@@ -131,8 +131,23 @@ fn elem_ty(ty: &Ty) -> Option<&Ty> {
     }
 }
 
+/// Type of the element an iterator into `container` points at.
+pub fn iter_elem_ty(container: &Ty) -> Ty {
+    match container {
+        Ty::Map(k, v) | Ty::UnorderedMap(k, v) => Ty::Pair(k.clone(), v.clone()),
+        Ty::Str | Ty::StrView => Ty::Char,
+        c => elem_ty(c).cloned().unwrap_or(Ty::Unknown),
+    }
+}
+
 fn render_into(v: &Plain, ty: &Ty, heap: &Heap, out: &mut String) {
     match (v, ty) {
+        (Plain::Void, Ty::Iter { .. }) => out.push_str("end()"),
+        (Plain::Uninit, Ty::Iter { .. }) => out.push_str("<invalidated>"),
+        (x, Ty::Iter { container, .. }) => {
+            out.push_str("-> ");
+            render_into(x, &iter_elem_ty(container), heap, out);
+        }
         (Plain::Void, _) => out.push_str("void"),
         (Plain::Uninit, _) => out.push_str("<uninitialised>"),
         (Plain::Int(i), Ty::Bool) => out.push_str(if *i != 0 { "true" } else { "false" }),

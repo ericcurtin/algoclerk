@@ -33,23 +33,9 @@ struct Spark {
     ttl: u32,
 }
 
-/// A value that the trace cannot show (an iterator, whose type the trace reports as unknown) reads
-/// `<iterator>` on the watch board instead of `void`.
-fn watch_value(v: &Plain, ty: &Ty, heap: &Heap) -> String {
-    if *ty == Ty::Unknown && *v == Plain::Void {
-        "<iterator>".to_string()
-    } else {
-        render(v, ty, heap)
-    }
-}
-
-/// The C++ type shown on the watch board: `auto` for a type the trace does not know.
+/// The C++ type shown on the watch board and trays: the spelling without the `std::` prefix.
 fn watch_type(ty: &Ty) -> String {
-    if *ty == Ty::Unknown {
-        "auto".to_string()
-    } else {
-        ty.to_string().replace("std::", "")
-    }
+    ty.to_string().replace("std::", "")
 }
 
 /// The scene state.
@@ -133,7 +119,7 @@ impl Office {
         let texts: Vec<String> = f
             .vars
             .iter()
-            .map(|(_, ty, v)| watch_value(v, ty, &f.heap))
+            .map(|(_, ty, v)| render(v, ty, &f.heap))
             .collect();
         for (i, (name, ty, v)) in f.vars.iter().enumerate() {
             let changed = self
@@ -587,14 +573,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn an_iterator_reads_as_auto_iterator_on_the_watch_board() {
+    fn iterators_read_with_their_deduced_type_on_the_watch_board() {
         let heap = Heap::default();
-        assert_eq!(watch_value(&Plain::Void, &Ty::Unknown, &heap), "<iterator>");
-        assert_eq!(watch_type(&Ty::Unknown), "auto");
-        assert_eq!(watch_value(&Plain::Int(3), &Ty::Int, &heap), "3");
-        assert_eq!(
-            watch_type(&Ty::Vector(Box::new(Ty::Int))),
-            "vector<int>".to_string()
-        );
+        let it = Ty::Iter {
+            container: Box::new(Ty::UnorderedMap(Box::new(Ty::Int), Box::new(Ty::Int))),
+            reverse: false,
+        };
+        assert_eq!(watch_type(&it), "unordered_map<int, int>::iterator");
+        let entry = Plain::Seq(vec![Plain::Int(4), Plain::Int(2)]);
+        assert_eq!(render(&entry, &it, &heap), "-> {4, 2}");
+        assert_eq!(render(&Plain::Void, &it, &heap), "end()");
+        assert_eq!(render(&Plain::Int(3), &Ty::Int, &heap), "3");
+        assert_eq!(watch_type(&Ty::vector(Ty::Int)), "vector<int>");
     }
 }
