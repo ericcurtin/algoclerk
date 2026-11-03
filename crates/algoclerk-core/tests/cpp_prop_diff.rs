@@ -12,9 +12,9 @@
 
 mod prop_common;
 
+use prop_common::{bytes_strategy, case_count, evaluate, generate, have, interpret};
 use proptest::strategy::{Strategy, ValueTree};
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use prop_common::{bytes_strategy, case_count, evaluate, generate, have, interpret};
 
 const BATCH: usize = 10;
 
@@ -104,7 +104,11 @@ fn random_programs_agree_with_the_compilers() {
         let body = std::fs::read_to_string(path).expect("file");
         let args = std::env::var("ALGOCLERK_PROP_ARGS").unwrap_or_default();
         let args: Vec<String> = args.lines().map(str::to_string).collect();
-        let p = prop_common::prog::Prog { body, args, ret: "?" };
+        let p = prop_common::prog::Prog {
+            body,
+            args,
+            ret: "?",
+        };
         println!("interp: {:?}", interpret(&p));
         let r = evaluate(&[p], 0).remove(0);
         assert!(r.is_ok(), "{}", r.unwrap_err());
@@ -131,11 +135,8 @@ fn random_programs_agree_with_the_compilers() {
         trees.push(strat.new_tree(&mut runner).expect("tree"));
     }
     let progs: Vec<_> = trees.iter().map(|t| generate(t.current())).collect();
-    let chunks: Vec<(usize, &[prop_common::prog::Prog])> = progs
-        .chunks(BATCH)
-        .enumerate()
-        .map(|(i, c)| (i, c))
-        .collect();
+    let chunks: Vec<(usize, &[prop_common::prog::Prog])> =
+        progs.chunks(BATCH).enumerate().collect();
     let next = std::sync::atomic::AtomicUsize::new(0);
     let results = std::sync::Mutex::new(Vec::<(usize, Vec<Result<(), String>>)>::new());
     let workers = std::env::var("ALGOCLERK_PROP_THREADS")
@@ -166,7 +167,11 @@ fn random_programs_agree_with_the_compilers() {
     }
     eprintln!("cpp_prop_diff: {} of {n} programs differ", failing.len());
     for (i, e) in &failing {
-        let errs: Vec<&str> = e.lines().filter(|l| l.contains("error") || l.starts_with('[')).take(4).collect();
+        let errs: Vec<&str> = e
+            .lines()
+            .filter(|l| l.contains("error") || l.starts_with('['))
+            .take(4)
+            .collect();
         eprintln!("  program {i}: {}", errs.join(" / "));
     }
     let mut report = Vec::new();
@@ -174,7 +179,11 @@ fn random_programs_agree_with_the_compilers() {
     let mut trees: Vec<Option<_>> = trees.into_iter().map(Some).collect();
     for (i, e) in failing.into_iter().take(3) {
         let tree = trees[i].take().expect("tree");
-        let (bytes, msg) = if shrinking { shrink(tree.current(), e) } else { (tree.current(), e) };
+        let (bytes, msg) = if shrinking {
+            shrink(tree.current(), e)
+        } else {
+            (tree.current(), e)
+        };
         let p = generate(bytes.clone());
         report.push(format!(
             "---- {msg}\nreplay: ALGOCLERK_PROP_REPLAY={}\nargs: {:?}\n{}",

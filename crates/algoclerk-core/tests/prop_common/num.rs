@@ -23,9 +23,19 @@ impl Gen {
         if self.src.chance(1, 24) {
             return match t {
                 N::Int => E::new("2147483647".into(), t, i32::MAX as i128, i32::MAX as i128),
-                N::Ll => E::new("9223372036854775807LL".into(), t, i64::MAX as i128, i64::MAX as i128),
+                N::Ll => E::new(
+                    "9223372036854775807LL".into(),
+                    t,
+                    i64::MAX as i128,
+                    i64::MAX as i128,
+                ),
                 N::U => E::new("4294967295u".into(), t, u32::MAX as i128, u32::MAX as i128),
-                N::Ull => E::new("18446744073709551615ull".into(), t, u64::MAX as i128, u64::MAX as i128),
+                N::Ull => E::new(
+                    "18446744073709551615ull".into(),
+                    t,
+                    u64::MAX as i128,
+                    u64::MAX as i128,
+                ),
             };
         }
         let mut v = *self.src.pick(table);
@@ -38,7 +48,11 @@ impl Gen {
             N::Ll => "LL",
             N::Ull => "ull",
         };
-        let s = if v < 0 { format!("(-{}{suffix})", -v) } else { format!("{v}{suffix}") };
+        let s = if v < 0 {
+            format!("(-{}{suffix})", -v)
+        } else {
+            format!("{v}{suffix}")
+        };
         E::new(s, t, v as i128, v as i128)
     }
 
@@ -90,8 +104,16 @@ impl Gen {
 
     /// An operand whose type has rank at most that of `t`.
     fn operand(&mut self, t: N, d: u32) -> E {
-        let ts: Vec<N> = ALL_N.iter().copied().filter(|x| (*x as usize) <= (t as usize)).collect();
-        let pick = if self.src.chance(1, 3) { *self.src.pick(&ts) } else { t };
+        let ts: Vec<N> = ALL_N
+            .iter()
+            .copied()
+            .filter(|x| (*x as usize) <= (t as usize))
+            .collect();
+        let pick = if self.src.chance(1, 3) {
+            *self.src.pick(&ts)
+        } else {
+            t
+        };
         self.num(pick, d.saturating_sub(1))
     }
 
@@ -154,11 +176,20 @@ impl Gen {
         let a = self.num(t, d - 1);
         let dv = self.divisor(t, d);
         let is_div = self.src.chance(1, 2);
-        let s = paren(&format!("{} {} {}", a.s, if is_div { '/' } else { '%' }, dv.s));
+        let s = paren(&format!(
+            "{} {} {}",
+            a.s,
+            if is_div { '/' } else { '%' },
+            dv.s
+        ));
         let (alo, ahi) = a.conv_iv(t);
         let m = ahi.abs().max(alo.abs());
         if is_div {
-            if alo >= 0 && dv.lo > 0 { E::new(s, t, 0, ahi) } else { E::new(s, t, -m, m) }
+            if alo >= 0 && dv.lo > 0 {
+                E::new(s, t, 0, ahi)
+            } else {
+                E::new(s, t, -m, m)
+            }
         } else {
             let dm = dv.lo.abs().max(dv.hi.abs());
             let top = (dm - 1).min(m);
@@ -199,7 +230,12 @@ impl Gen {
         let a = self.num(t, d - 1);
         let b = self.num(N::Int, d - 1);
         let left = self.src.chance(1, 2) && !t.signed();
-        let s = paren(&format!("{} {} ({} & {mask})", a.s, if left { "<<" } else { ">>" }, b.s));
+        let s = paren(&format!(
+            "{} {} ({} & {mask})",
+            a.s,
+            if left { "<<" } else { ">>" },
+            b.s
+        ));
         let (alo, ahi) = a.conv_iv(t);
         if left {
             E::full(s, t)
@@ -228,7 +264,12 @@ impl Gen {
         let c = self.boolean(d - 1);
         let a = self.num(t, d - 1);
         let b = self.num(t, d - 1);
-        E::new(paren(&format!("{c} ? {} : {}", a.s, b.s)), t, a.lo.min(b.lo), a.hi.max(b.hi))
+        E::new(
+            paren(&format!("{c} ? {} : {}", a.s, b.s)),
+            t,
+            a.lo.min(b.lo),
+            a.hi.max(b.hi),
+        )
     }
 
     fn cast_from_other(&mut self, t: N, d: u32) -> E {
@@ -241,7 +282,11 @@ impl Gen {
             _ if t == N::Int || t == N::U => format!("{}({})", t.name(), a.s),
             _ => format!("static_cast<{}>({})", t.name(), a.s),
         };
-        if from == t { E::new(s, t, a.lo, a.hi) } else { E::new(s, t, lo, hi) }
+        if from == t {
+            E::new(s, t, a.lo, a.hi)
+        } else {
+            E::new(s, t, lo, hi)
+        }
     }
 
     fn minmax(&mut self, t: N, d: u32) -> E {
@@ -249,12 +294,21 @@ impl Gen {
         if t.signed() && self.src.chance(1, 4) && a.lo > t.min() {
             let (lo, hi) = (a.lo, a.hi);
             let m = lo.abs().max(hi.abs());
-            let low = if lo <= 0 && hi >= 0 { 0 } else { lo.abs().min(hi.abs()) };
+            let low = if lo <= 0 && hi >= 0 {
+                0
+            } else {
+                lo.abs().min(hi.abs())
+            };
             return E::new(format!("std::abs({})", a.s), t, low, m);
         }
         let b = self.num(t, d - 1);
         let is_min = self.src.chance(1, 2);
-        let s = format!("std::{}({}, {})", if is_min { "min" } else { "max" }, a.s, b.s);
+        let s = format!(
+            "std::{}({}, {})",
+            if is_min { "min" } else { "max" },
+            a.s,
+            b.s
+        );
         E::new(s, t, a.lo.min(b.lo), a.hi.max(b.hi))
     }
 }

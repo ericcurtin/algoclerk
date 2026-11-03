@@ -34,7 +34,11 @@ impl Gen {
         let x = self.fresh("e");
         match v.k {
             K::Vec | K::Deque | K::Set => {
-                let mut form = if v.k == K::Set { self.src.below(2) } else { self.src.below(5) };
+                let mut form = if v.k == K::Set {
+                    self.src.below(2)
+                } else {
+                    self.src.below(5)
+                };
                 if form == 3 && !v.rw {
                     form = 2;
                 }
@@ -62,12 +66,22 @@ impl Gen {
                         let big = self.src.chance(1, 2);
                         if big && v.k != K::Set {
                             self.line(&format!("for (size_t {i} = 0; {i} < {n}.size(); ++{i}) {{"));
-                            self.ro(format!("static_cast<unsigned long long>({i})"), K::Ull, 0, v.len as i128, false);
+                            self.ro(
+                                format!("static_cast<unsigned long long>({i})"),
+                                K::Ull,
+                                0,
+                                v.len as i128,
+                                false,
+                            );
                         } else if v.k != K::Set {
-                            self.line(&format!("for (int {i} = 0; {i} < static_cast<int>({n}.size()); ++{i}) {{"));
+                            self.line(&format!(
+                                "for (int {i} = 0; {i} < static_cast<int>({n}.size()); ++{i}) {{"
+                            ));
                             self.ro(i.clone(), K::Int, 0, v.len as i128, true);
                         } else {
-                            self.line(&format!("for (auto it = {n}.begin(); it != {n}.end(); ++it) {{"));
+                            self.line(&format!(
+                                "for (auto it = {n}.begin(); it != {n}.end(); ++it) {{"
+                            ));
                             self.ro("*it".into(), K::Int, -KI, KI, false);
                         }
                         if v.k != K::Set {
@@ -89,7 +103,11 @@ impl Gen {
                 let (kk, vv) = (self.fresh("k"), self.fresh("val"));
                 match self.src.below(3) {
                     0 | 1 => {
-                        let c = if self.src.chance(1, 2) { "const auto&" } else { "auto&" };
+                        let c = if self.src.chance(1, 2) {
+                            "const auto&"
+                        } else {
+                            "auto&"
+                        };
                         self.line(&format!("for ({c} [{kk}, {vv}] : {n}) {{"));
                         self.ro(kk, K::Int, -KI, KI, false);
                         self.ro(vv, K::Int, -KI, KI, false);
@@ -144,16 +162,27 @@ impl Gen {
                 let tb = *self.src.pick(&ALL_N);
                 let ea = self.num(ta, 2);
                 let eb = self.num(tb, 2);
-                self.line(&format!("auto [{a}, {b}] = std::make_pair({}, {});", ea.s, eb.s));
+                self.line(&format!(
+                    "auto [{a}, {b}] = std::make_pair({}, {});",
+                    ea.s, eb.s
+                ));
                 self.ro(a, K::of(ta), ea.lo, ea.hi, false);
                 self.ro(b, K::of(tb), eb.lo, eb.hi, false);
             }
             1 => {
                 let names = [self.fresh("ta"), self.fresh("tb"), self.fresh("tc")];
-                let ts = [*self.src.pick(&ALL_N), *self.src.pick(&ALL_N), *self.src.pick(&ALL_N)];
+                let ts = [
+                    *self.src.pick(&ALL_N),
+                    *self.src.pick(&ALL_N),
+                    *self.src.pick(&ALL_N),
+                ];
                 let es: Vec<E> = ts.iter().map(|t| self.num(*t, 2)).collect();
                 let txt: Vec<&str> = es.iter().map(|e| e.s.as_str()).collect();
-                self.line(&format!("auto [{}] = std::make_tuple({});", names.join(", "), txt.join(", ")));
+                self.line(&format!(
+                    "auto [{}] = std::make_tuple({});",
+                    names.join(", "),
+                    txt.join(", ")
+                ));
                 for i in 0..3 {
                     self.ro(names[i].clone(), K::of(ts[i]), es[i].lo, es[i].hi, false);
                 }
@@ -176,7 +205,13 @@ impl Gen {
     /// A local vector of pairs: fill, sort, fold with a structured binding.
     fn pair_block(&mut self) {
         let k = self.src.range(1, 5);
-        let (pv, i, acc, a, b) = (self.fresh("pv"), self.fresh("i"), self.fresh("acc"), self.fresh("a"), self.fresh("b"));
+        let (pv, i, acc, a, b) = (
+            self.fresh("pv"),
+            self.fresh("i"),
+            self.fresh("acc"),
+            self.fresh("a"),
+            self.fresh("b"),
+        );
         self.line("{");
         self.indent += 1;
         self.push_scope();
@@ -196,7 +231,9 @@ impl Gen {
             _ => self.line(&format!("std::sort({pv}.begin(), {pv}.end(), std::greater<std::pair<int, int>>());")),
         }
         self.line(&format!("long long {acc} = 0;"));
-        self.line(&format!("for (const auto& [{a}, {b}] : {pv}) {acc} = ({acc} * 31 + {a} * 7 + {b}) % 1000003;"));
+        self.line(&format!(
+            "for (const auto& [{a}, {b}] : {pv}) {acc} = ({acc} * 31 + {a} * 7 + {b}) % 1000003;"
+        ));
         let target = format!("static_cast<int>({acc} % {})", KI + 1);
         self.assign_or_decl(&target, N::Int);
         self.pop_scope_keep_outer_effects();

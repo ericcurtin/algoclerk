@@ -20,7 +20,20 @@ impl Gen {
             let e = self.fit_int_text(1);
             format!("static_cast<size_t>({e}) % ({n}.size() + 1)")
         };
-        let w = [3 * can as usize, 2 * can as usize, 2 * can as usize, 2, 2, 2 * can as usize, 2, 1, 1, can as usize, 1, 2];
+        let w = [
+            3 * can as usize,
+            2 * can as usize,
+            2 * can as usize,
+            2,
+            2,
+            2 * can as usize,
+            2,
+            1,
+            1,
+            can as usize,
+            1,
+            2,
+        ];
         match self.src.weighted(&w) {
             0 => {
                 self.line(&format!("{n} += {c};"));
@@ -113,8 +126,12 @@ impl Gen {
         match self.src.below(17) {
             0 => self.line(&format!("std::sort({b}, {e});")),
             1 => self.line(&format!("std::sort({b}, {e}, std::greater<int>());")),
-            2 => self.line(&format!("std::sort({b}, {e}, [](int a, int b) {{ return {cmp}; }});")),
-            3 => self.line(&format!("std::stable_sort({b}, {e}, [](int a, int b) {{ return a % 7 < b % 7; }});")),
+            2 => self.line(&format!(
+                "std::sort({b}, {e}, [](int a, int b) {{ return {cmp}; }});"
+            )),
+            3 => self.line(&format!(
+                "std::stable_sort({b}, {e}, [](int a, int b) {{ return a % 7 < b % 7; }});"
+            )),
             4 => self.line(&format!("std::reverse({b}, {e});")),
             5 => {
                 self.line(&format!("std::sort({b}, {e});"));
@@ -125,20 +142,30 @@ impl Gen {
                 self.line(&format!("std::iota({b}, {e}, {s});"));
             }
             7 => self.line(&format!("std::fill({b}, {e}, {k});")),
-            8 => self.line(&format!("std::rotate({b}, {b} + static_cast<int>({off}), {e});")),
+            8 => self.line(&format!(
+                "std::rotate({b}, {b} + static_cast<int>({off}), {e});"
+            )),
             9 => {
-                let f = if self.src.chance(1, 2) { "next_permutation" } else { "prev_permutation" };
+                let f = if self.src.chance(1, 2) {
+                    "next_permutation"
+                } else {
+                    "prev_permutation"
+                };
                 self.line(&format!("std::{f}({b}, {e});"));
             }
             10 => self.line(&format!("{n}.erase(std::remove({b}, {e}, {k}), {e});")),
-            11 => self.line(&format!("{n}.erase(std::remove_if({b}, {e}, [](int a) {{ return a % 3 == 0; }}), {e});")),
+            11 => self.line(&format!(
+                "{n}.erase(std::remove_if({b}, {e}, [](int a) {{ return a % 3 == 0; }}), {e});"
+            )),
             12 if super::known("partial_sum") => self.line(&format!("std::reverse({b}, {e});")),
             12 => {
                 self.line(&format!("std::partial_sum({b}, {e}, {b});"));
                 self.line(&format!("for (int& q : {n}) q %= {};", KI + 1));
             }
             13 if super::known("for_each") => self.line(&format!("std::reverse({b}, {e});")),
-            13 => self.line(&format!("std::for_each({b}, {e}, [](int& a) {{ a = a % 100; }});")),
+            13 => self.line(&format!(
+                "std::for_each({b}, {e}, [](int& a) {{ a = a % 100; }});"
+            )),
             14 => {
                 // searches on a sorted copy
                 let t = self.fresh("t");
@@ -155,14 +182,20 @@ impl Gen {
                 nv.hi = LEN_CAP as i128;
                 self.add(nv);
                 let q2 = self.fresh("b");
-                self.line(&format!("bool {q2} = std::binary_search({t}.begin(), {t}.end(), {kk});"));
+                self.line(&format!(
+                    "bool {q2} = std::binary_search({t}.begin(), {t}.end(), {kk});"
+                ));
                 self.add(Var::new(q2, K::Bool));
             }
             15 => {
                 let q = self.fresh("x");
                 let f = *self.src.pick(&["count_if", "all_of", "any_of", "none_of"]);
                 let ty = if f == "count_if" { "int" } else { "bool" };
-                let cast = if f == "count_if" { "static_cast<int>" } else { "" };
+                let cast = if f == "count_if" {
+                    "static_cast<int>"
+                } else {
+                    ""
+                };
                 self.line(&format!(
                     "{ty} {q} = {cast}(std::{f}({b}, {e}, [](int a) {{ return a % 2 == 0; }}));"
                 ));
@@ -171,7 +204,9 @@ impl Gen {
                 nv.hi = LEN_CAP as i128;
                 self.add(nv);
             }
-            _ => self.line(&format!("if (!{n}.empty()) std::sort({b}, {b} + static_cast<int>({off}));")),
+            _ => self.line(&format!(
+                "if (!{n}.empty()) std::sort({b}, {b} + static_cast<int>({off}));"
+            )),
         }
     }
 }

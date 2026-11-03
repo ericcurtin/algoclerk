@@ -5,7 +5,20 @@ use super::expr::*;
 use super::reads::LEN_CAP;
 
 const CONTAINERS: [K; 14] = [
-    K::Vec, K::Vec, K::Vec, K::Str, K::Str, K::Grid, K::Map, K::UMap, K::Set, K::USet, K::Stack, K::Queue, K::Deque, K::Pq,
+    K::Vec,
+    K::Vec,
+    K::Vec,
+    K::Str,
+    K::Str,
+    K::Grid,
+    K::Map,
+    K::UMap,
+    K::Set,
+    K::USet,
+    K::Stack,
+    K::Queue,
+    K::Deque,
+    K::Pq,
 ];
 
 impl Gen {
@@ -84,7 +97,11 @@ impl Gen {
                 ));
             }
             K::Map | K::UMap => {
-                let (ty, p) = if k == K::Map { ("std::map", "m") } else { ("std::unordered_map", "um") };
+                let (ty, p) = if k == K::Map {
+                    ("std::map", "m")
+                } else {
+                    ("std::unordered_map", "um")
+                };
                 let name = self.fresh(p);
                 v = Var::new(name.clone(), k);
                 if self.src.chance(1, 2) {
@@ -92,14 +109,20 @@ impl Gen {
                 } else {
                     let n = self.src.range(1, 3);
                     let es: Vec<String> = (0..n)
-                        .map(|_| format!("{{{}, {}}}", self.src.range(-9, 9), self.src.range(-99, 99)))
+                        .map(|_| {
+                            format!("{{{}, {}}}", self.src.range(-9, 9), self.src.range(-99, 99))
+                        })
                         .collect();
                     v.len = n;
                     self.line(&format!("{ty}<int, int> {name} = {{{}}};", es.join(", ")));
                 }
             }
             K::Set | K::USet => {
-                let (ty, p) = if k == K::Set { ("std::set", "st") } else { ("std::unordered_set", "us") };
+                let (ty, p) = if k == K::Set {
+                    ("std::set", "st")
+                } else {
+                    ("std::unordered_set", "us")
+                };
                 let name = self.fresh(p);
                 v = Var::new(name.clone(), k);
                 if self.src.chance(1, 2) {
@@ -143,7 +166,9 @@ impl Gen {
                     )),
                     2 => {
                         let cmp = self.fresh("cmp");
-                        self.line(&format!("auto {cmp} = [](int a, int b) {{ return a > b; }};"));
+                        self.line(&format!(
+                            "auto {cmp} = [](int a, int b) {{ return a > b; }};"
+                        ));
                         self.line(&format!(
                             "std::priority_queue<int, std::vector<int>, decltype({cmp})> {name}({cmp});"
                         ));
@@ -171,8 +196,20 @@ impl Gen {
 
     pub fn container_op(&mut self) {
         let all = [
-            K::Vec, K::Vec, K::Vec, K::Str, K::Str, K::Grid, K::Map, K::UMap, K::Set, K::USet, K::Stack, K::Queue,
-            K::Deque, K::Pq,
+            K::Vec,
+            K::Vec,
+            K::Vec,
+            K::Str,
+            K::Str,
+            K::Grid,
+            K::Map,
+            K::UMap,
+            K::Set,
+            K::USet,
+            K::Stack,
+            K::Queue,
+            K::Deque,
+            K::Pq,
         ];
         let Some(v) = self.pick_var(&all) else {
             return self.decl_container();
@@ -191,7 +228,9 @@ impl Gen {
                     let x = self.num(N::Int, 1);
                     format!("static_cast<size_t>({}) % {n}.size()", self.fit_int(x).s)
                 };
-                let other = self.pick_var(&[K::Vec]).filter(|o| o.name != n && o.len * m + v.len <= LEN_CAP);
+                let other = self
+                    .pick_var(&[K::Vec])
+                    .filter(|o| o.name != n && o.len * m + v.len <= LEN_CAP);
                 let w = [3 * can, can, 2, 3, 2 * can, 2, 1, 1, 1, 3, 2, 2 * can, can];
                 match self.src.weighted(&w) {
                     0 => {
@@ -204,14 +243,20 @@ impl Gen {
                     }
                     2 => self.line(&format!("if (!{n}.empty()) {n}.pop_back();")),
                     3 => {
-                        let at = if self.src.chance(1, 2) { format!("{n}[{i}]") } else { format!("{n}.at({i})") };
+                        let at = if self.src.chance(1, 2) {
+                            format!("{n}[{i}]")
+                        } else {
+                            format!("{n}.at({i})")
+                        };
                         self.line(&format!("if (!{n}.empty()) {at} = {e};"));
                     }
                     4 => {
                         self.line(&format!("{n}.insert({n}.begin() + static_cast<int>(static_cast<size_t>({e}) % ({n}.size() + 1)), {e});"));
                         self.grow(&n, m);
                     }
-                    5 => self.line(&format!("if (!{n}.empty()) {n}.erase({n}.begin() + static_cast<int>({i}));")),
+                    5 => self.line(&format!(
+                        "if (!{n}.empty()) {n}.erase({n}.begin() + static_cast<int>({i}));"
+                    )),
                     6 => {
                         if self.src.chance(1, 3) {
                             self.line(&format!("{n}.clear();"));
@@ -236,15 +281,22 @@ impl Gen {
                     9 => {
                         let r = self.num(N::Int, 1);
                         let r = self.reduce(r, 17).s;
-                        self.line(&format!("if (!{n}.empty()) {n}[{i}] = ({n}[{i}] + {r}) % {};", KI + 1));
+                        self.line(&format!(
+                            "if (!{n}.empty()) {n}[{i}] = ({n}[{i}] + {r}) % {};",
+                            KI + 1
+                        ));
                     }
                     10 => {
-                        let j = format!("static_cast<size_t>({}) % {n}.size()", self.fit_int_text(2));
+                        let j =
+                            format!("static_cast<size_t>({}) % {n}.size()", self.fit_int_text(2));
                         self.line(&format!("if (!{n}.empty()) std::swap({n}[{i}], {n}[{j}]);"));
                     }
                     11 => {
                         if let Some(o) = other {
-                            self.line(&format!("{n}.insert({n}.end(), {0}.begin(), {0}.end());", o.name));
+                            self.line(&format!(
+                                "{n}.insert({n}.end(), {0}.begin(), {0}.end());",
+                                o.name
+                            ));
                             self.grow(&n, o.len * m);
                         } else {
                             self.line(&format!("if (!{n}.empty()) {n}.push_back({n}.back());"));
@@ -302,7 +354,9 @@ impl Gen {
                     }
                     1 => self.line(&format!("{n}.erase({k});")),
                     2 => self.line(&format!("{n}.clear();")),
-                    3 => self.line(&format!("if (auto it = {n}.find({k}); it != {n}.end()) {n}.erase(it);")),
+                    3 => self.line(&format!(
+                        "if (auto it = {n}.find({k}); it != {n}.end()) {n}.erase(it);"
+                    )),
                     _ => {
                         self.line(&format!("{n}.emplace({e});"));
                         self.grow(&n, m);
@@ -339,7 +393,9 @@ impl Gen {
                     2 => self.line(&format!("if (!{n}.empty()) {n}.pop_back();")),
                     3 => self.line(&format!("if (!{n}.empty()) {n}.pop_front();")),
                     4 => self.line(&format!("if (!{n}.empty()) {n}[{i}] = {e};")),
-                    5 => self.line(&format!("if (!{n}.empty()) {n}.erase({n}.begin() + static_cast<int>({i}));")),
+                    5 => self.line(&format!(
+                        "if (!{n}.empty()) {n}.erase({n}.begin() + static_cast<int>({i}));"
+                    )),
                     _ => self.line(&format!("if (!{n}.empty()) {n}.front() = {e};")),
                 }
             }

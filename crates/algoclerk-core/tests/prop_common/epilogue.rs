@@ -18,7 +18,9 @@ impl Gen {
             let mut lines: Vec<String> = Vec::new();
             match v.k {
                 K::Int => lines.push(format!("int {d} = (({n} % {M}) + {M}) % {M};")),
-                K::Ll => lines.push(format!("int {d} = static_cast<int>((({n} % {M}) + {M}) % {M});")),
+                K::Ll => lines.push(format!(
+                    "int {d} = static_cast<int>((({n} % {M}) + {M}) % {M});"
+                )),
                 K::U | K::Ull => lines.push(format!("int {d} = static_cast<int>({n} % {M});")),
                 K::Char => lines.push(format!("int {d} = static_cast<int>({n});")),
                 K::Bool => lines.push(format!("int {d} = {n} ? 1 : 0;")),
@@ -32,7 +34,10 @@ impl Gen {
                 }
                 K::Grid => {
                     lines.push(format!("int {d} = 7;"));
-                    lines.push(format!("for (const auto& row : {n}) for (int e : row) {}", fold("(e % 1000 + 1000)")));
+                    lines.push(format!(
+                        "for (const auto& row : {n}) for (int e : row) {}",
+                        fold("(e % 1000 + 1000)")
+                    ));
                 }
                 K::Map => {
                     lines.push(format!("int {d} = 7;"));
@@ -47,13 +52,19 @@ impl Gen {
                 }
                 K::UMap => {
                     lines.push(format!("long long {d}a = 0;"));
-                    lines.push(format!("for (const auto& [k, x] : {n}) {d}a += static_cast<long long>(k) * 7 + x;"));
-                    lines.push(format!("int {d} = static_cast<int>((({d}a % {M}) + {M}) % {M});"));
+                    lines.push(format!(
+                        "for (const auto& [k, x] : {n}) {d}a += static_cast<long long>(k) * 7 + x;"
+                    ));
+                    lines.push(format!(
+                        "int {d} = static_cast<int>((({d}a % {M}) + {M}) % {M});"
+                    ));
                 }
                 K::USet => {
                     lines.push(format!("long long {d}a = 0;"));
                     lines.push(format!("for (int e : {n}) {d}a += e;"));
-                    lines.push(format!("int {d} = static_cast<int>((({d}a % {M}) + {M}) % {M});"));
+                    lines.push(format!(
+                        "int {d} = static_cast<int>((({d}a % {M}) + {M}) % {M});"
+                    ));
                 }
                 K::Stack | K::Queue | K::Deque | K::Pq => {
                     let t = format!("{d}t");
@@ -66,7 +77,10 @@ impl Gen {
                             K::Queue => format!("{t}.front()"),
                             _ => format!("{t}.top()"),
                         };
-                        lines.push(format!("while (!{t}.empty()) {{ {} {t}.pop(); }}", fold(&format!("({get} % 1000 + 1000)"))));
+                        lines.push(format!(
+                            "while (!{t}.empty()) {{ {} {t}.pop(); }}",
+                            fold(&format!("({get} % 1000 + 1000)"))
+                        ));
                     }
                 }
             }
@@ -104,7 +118,9 @@ impl Gen {
             4 => {
                 self.line("unsigned long long h = 17;");
                 for d in ds {
-                    self.line(&format!("h = h * 1000003ull + static_cast<unsigned long long>({d});"));
+                    self.line(&format!(
+                        "h = h * 1000003ull + static_cast<unsigned long long>({d});"
+                    ));
                 }
                 self.line("return h;");
                 "unsigned long long"

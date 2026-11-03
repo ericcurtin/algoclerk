@@ -33,11 +33,20 @@ fn interpreter_and_checker_report_every_class_at_the_right_line() {
     for c in all() {
         match (run_case(&c), prop_common::ub::ub_known(c.name)) {
             (Err(e), false) => bad.push(format!("[{}] {e}", c.name)),
-            (Ok(()), true) => eprintln!("UB_KNOWN entry `{}` now passes: remove it from the list", c.name),
+            (Ok(()), true) => eprintln!(
+                "UB_KNOWN entry `{}` now passes: remove it from the list",
+                c.name
+            ),
             _ => {}
         }
     }
-    assert!(bad.is_empty(), "{} of {} cases wrong:\n{}", bad.len(), all().len(), bad.join("\n"));
+    assert!(
+        bad.is_empty(),
+        "{} of {} cases wrong:\n{}",
+        bad.len(),
+        all().len(),
+        bad.join("\n")
+    );
 }
 
 #[test]
@@ -51,7 +60,10 @@ fn well_defined_sequencing_is_not_flagged() {
             Err(ds) => bad.push(format!("[{name}] rejected: {}", ds[0].msg)),
             Ok(c) => match c.call("f", &[], &Limits::default()) {
                 Ok(r) if r.report.result.is_ok() => {}
-                Ok(r) => bad.push(format!("[{name}] runtime error {:?}", r.report.result.err())),
+                Ok(r) => bad.push(format!(
+                    "[{name}] runtime error {:?}",
+                    r.report.result.err()
+                )),
                 Err(e) => bad.push(format!("[{name}] {e}")),
             },
         }
@@ -88,7 +100,11 @@ fn real_compilers_with_sanitizers_reject_the_flagged_cases() {
                         Ok(Some(false)) => out.lock().expect("out").push(format!(
                             "[{}] the sanitizer build ran without complaint:\n{}",
                             c.name,
-                            full_source(c).lines().skip(15).collect::<Vec<_>>().join("\n")
+                            full_source(c)
+                                .lines()
+                                .skip(15)
+                                .collect::<Vec<_>>()
+                                .join("\n")
                         )),
                         Ok(None) => skipped.store(true, std::sync::atomic::Ordering::SeqCst),
                         Err(e) => out.lock().expect("out").push(format!("[{}] {e}", c.name)),

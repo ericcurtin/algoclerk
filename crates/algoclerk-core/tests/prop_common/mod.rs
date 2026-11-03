@@ -22,7 +22,9 @@ pub mod ubc3;
 
 use algoclerk_core::cpp::check::CheckOpts;
 use algoclerk_core::cpp::diag::line_col;
-use algoclerk_core::cpp::harness::{Compiler, available_compilers, compile as cxx_compile, run_binary};
+use algoclerk_core::cpp::harness::{
+    Compiler, available_compilers, compile as cxx_compile, run_binary,
+};
 use algoclerk_core::cpp::interp::Limits;
 use algoclerk_core::cpp::run::compile;
 use prog::Prog;
@@ -33,10 +35,22 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// real compilers on them (each is described in `lvl-bugs/prop.md`). The list shrinks as bugs get fixed.
 /// Format: (feature name used by the generator, one line description).
 pub const KNOWN: &[(&str, &str)] = &[
-    ("ull_mul", "unsigned long long `*` overflows the i128 product in interpreter/ops.rs (panic in debug builds)"),
-    ("append_n", "std::string::append(count, char) is valid C++17 but the checker rejects it (type.arity)"),
-    ("partial_sum", "std::partial_sum is accepted by the checker but the interpreter reports BadArg"),
-    ("for_each", "std::for_each is accepted by the checker but the interpreter reports BadArg (does not stock it)"),
+    (
+        "ull_mul",
+        "unsigned long long `*` overflows the i128 product in interpreter/ops.rs (panic in debug builds)",
+    ),
+    (
+        "append_n",
+        "std::string::append(count, char) is valid C++17 but the checker rejects it (type.arity)",
+    ),
+    (
+        "partial_sum",
+        "std::partial_sum is accepted by the checker but the interpreter reports BadArg",
+    ),
+    (
+        "for_each",
+        "std::for_each is accepted by the checker but the interpreter reports BadArg (does not stock it)",
+    ),
 ];
 
 pub fn known(feature: &str) -> bool {
@@ -108,7 +122,15 @@ pub fn translation_unit(progs: &[&Prog]) -> String {
 
 /// Warnings that mean the program has (or may have) undefined behaviour or a bug of the generator.
 fn bad_warning(diag: &str) -> Option<String> {
-    let keys = ["overflow in expression", "division by zero", "shift", "uninitialized", "return-type", "array-bounds", "dangling"];
+    let keys = [
+        "overflow in expression",
+        "division by zero",
+        "shift",
+        "uninitialized",
+        "return-type",
+        "array-bounds",
+        "dangling",
+    ];
     diag.lines()
         .find(|l| l.contains("warning:") && keys.iter().any(|k| l.contains(k)))
         .map(str::to_string)
@@ -117,7 +139,12 @@ fn bad_warning(diag: &str) -> Option<String> {
 /// Compile and run the programs with `cc`; on any failure the batch is split to find the culprit(s).
 pub fn run_batch(cc: &Compiler, progs: &[&Prog], sanitize: bool) -> Vec<Result<String, String>> {
     let dir = work_dir("prop_diff");
-    let tag = format!("b{}_{}_{}", std::process::id(), COUNTER.fetch_add(1, Ordering::SeqCst), cc.exe.replace('+', "p"));
+    let tag = format!(
+        "b{}_{}_{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::SeqCst),
+        cc.exe.replace('+', "p")
+    );
     let tu = translation_unit(progs);
     let built = cxx_compile(cc, &tu, &dir, &tag, sanitize, 180);
     let outcome = built.and_then(|b| {
@@ -131,7 +158,15 @@ pub fn run_batch(cc: &Compiler, progs: &[&Prog], sanitize: bool) -> Vec<Result<S
     let _ = std::fs::remove_file(dir.join(format!("{tag}.cpp")));
     match outcome {
         Ok(lines) if lines.len() == progs.len() => lines.into_iter().map(Ok).collect(),
-        Ok(lines) => vec![Err(format!("{} printed {} lines for {} programs", cc.exe, lines.len(), progs.len())); progs.len()],
+        Ok(lines) => vec![
+            Err(format!(
+                "{} printed {} lines for {} programs",
+                cc.exe,
+                lines.len(),
+                progs.len()
+            ));
+            progs.len()
+        ],
         Err(e) if progs.len() == 1 => vec![Err(e)],
         Err(_) => {
             let (a, b) = progs.split_at(progs.len() / 2);
@@ -154,7 +189,9 @@ pub fn interpret(p: &Prog) -> Result<String, String> {
         steps: 400_000_000,
         ..Limits::default()
     };
-    let called = c.call("f", &p.args, &limits).map_err(|e| format!("[call] {e}"))?;
+    let called = c
+        .call("f", &p.args, &limits)
+        .map_err(|e| format!("[call] {e}"))?;
     match called.report.result {
         Ok(_) => Ok(called.output.unwrap_or_default()),
         Err(e) => {
@@ -170,7 +207,7 @@ pub fn interpret(p: &Prog) -> Result<String, String> {
 /// The compilers to use for batch number `b`: g++ always; a sampled second pass (all of them when
 /// `ALGOCLERK_DIFF_CLANG` is set) with clang++ and with sanitizers where the runtime exists.
 pub fn passes(b: usize) -> Vec<(Compiler, bool)> {
-    let sampled = std::env::var("ALGOCLERK_DIFF_CLANG").is_ok() || b % 4 == 0;
+    let sampled = std::env::var("ALGOCLERK_DIFF_CLANG").is_ok() || b.is_multiple_of(4);
     let mut out = Vec::new();
     for c in available_compilers() {
         if c.exe == "g++" {
@@ -213,7 +250,9 @@ pub fn evaluate(progs: &[Prog], b: usize) -> Vec<Result<(), String>> {
                 (Ok(t), Ok(m)) => {
                     if let Some(prev) = &first[i] {
                         if *prev != t && verdict[i].is_ok() {
-                            verdict[i] = Err(format!("[compilers disagree] first: {prev}\n  {label}: {t}"));
+                            verdict[i] = Err(format!(
+                                "[compilers disagree] first: {prev}\n  {label}: {t}"
+                            ));
                         }
                     } else {
                         first[i] = Some(t.clone());

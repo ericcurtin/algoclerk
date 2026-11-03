@@ -42,7 +42,19 @@ impl Gen {
 
     /// An `int` read from a container, a string, or a helper.
     pub fn int_read(&mut self) -> E {
-        let all = [K::Vec, K::Str, K::Grid, K::Map, K::UMap, K::Set, K::USet, K::Stack, K::Queue, K::Deque, K::Pq];
+        let all = [
+            K::Vec,
+            K::Str,
+            K::Grid,
+            K::Map,
+            K::UMap,
+            K::Set,
+            K::USet,
+            K::Stack,
+            K::Queue,
+            K::Deque,
+            K::Pq,
+        ];
         let Some(v) = self.pick_var(&all) else {
             return self.lit(N::Int);
         };
@@ -61,7 +73,11 @@ impl Gen {
                 }
                 2 => ik(format!("static_cast<int>({n}.size())"), 0, v.len as i128),
                 3 => {
-                    let b = if self.src.chance(1, 2) { "front" } else { "back" };
+                    let b = if self.src.chance(1, 2) {
+                        "front"
+                    } else {
+                        "back"
+                    };
                     ik(format!("({n}.empty() ? 0 : {n}.{b}())"), -KI, KI)
                 }
                 4 => ik(
@@ -71,16 +87,35 @@ impl Gen {
                 ),
                 5 => {
                     let k = self.num(N::Int, 1);
-                    ik(format!("static_cast<int>(std::count({n}.begin(), {n}.end(), {}))", k.s), 0, v.len as i128)
+                    ik(
+                        format!(
+                            "static_cast<int>(std::count({n}.begin(), {n}.end(), {}))",
+                            k.s
+                        ),
+                        0,
+                        v.len as i128,
+                    )
                 }
                 6 => {
                     let k = self.num(N::Int, 1);
                     let f = format!("std::find({n}.begin(), {n}.end(), {})", k.s);
-                    ik(format!("static_cast<int>(std::distance({n}.begin(), {f}))"), 0, v.len as i128)
+                    ik(
+                        format!("static_cast<int>(std::distance({n}.begin(), {f}))"),
+                        0,
+                        v.len as i128,
+                    )
                 }
                 _ => {
-                    let f = if self.src.chance(1, 2) { "min_element" } else { "max_element" };
-                    ik(format!("({n}.empty() ? 0 : *std::{f}({n}.begin(), {n}.end()))"), -KI, KI)
+                    let f = if self.src.chance(1, 2) {
+                        "min_element"
+                    } else {
+                        "max_element"
+                    };
+                    ik(
+                        format!("({n}.empty() ? 0 : *std::{f}({n}.begin(), {n}.end()))"),
+                        -KI,
+                        KI,
+                    )
                 }
             },
             K::Str => match self.src.weighted(&[3, 2, 2, 1]) {
@@ -91,11 +126,19 @@ impl Gen {
                 1 => ik(format!("static_cast<int>({n}.size())"), 0, v.len as i128),
                 2 => {
                     let c = self.char_expr(1);
-                    ik(format!("static_cast<int>({n}.find({c}))"), -1, v.len as i128)
+                    ik(
+                        format!("static_cast<int>({n}.find({c}))"),
+                        -1,
+                        v.len as i128,
+                    )
                 }
                 _ => {
                     let c = self.char_expr(1);
-                    ik(format!("static_cast<int>(std::count({n}.begin(), {n}.end(), {c}))"), 0, v.len as i128)
+                    ik(
+                        format!("static_cast<int>(std::count({n}.begin(), {n}.end(), {c}))"),
+                        0,
+                        v.len as i128,
+                    )
                 }
             },
             K::Grid => {
@@ -110,10 +153,10 @@ impl Gen {
                 } else if self.src.chance(1, 4) {
                     ik(format!("static_cast<int>({n}.size())"), 0, v.len as i128)
                 } else {
+                    // `m[k]` would insert and make a read of the same map elsewhere in the expression depend
+                    // on the (unspecified) order of evaluation, so reads never insert
                     let k = self.num(N::Int, 1);
-                    let m = self.mult;
-                    self.grow(&n, m);
-                    ik(format!("{n}[{}]", k.s), -KI, KI)
+                    ik(format!("({n}.count({0}) ? {n}.at({0}) : 0)", k.s), -KI, KI)
                 }
             }
             K::Set | K::USet => match self.src.below(4) {
@@ -123,13 +166,20 @@ impl Gen {
                 }
                 1 => ik(format!("static_cast<int>({n}.size())"), 0, v.len as i128),
                 2 if v.k == K::Set => {
-                    let e = if self.src.chance(1, 2) { format!("*{n}.begin()") } else { format!("*{n}.rbegin()") };
+                    let e = if self.src.chance(1, 2) {
+                        format!("*{n}.begin()")
+                    } else {
+                        format!("*{n}.rbegin()")
+                    };
                     ik(format!("({n}.empty() ? 0 : {e})"), -KI, KI)
                 }
                 _ if v.k == K::Set => {
                     let k = self.num(N::Int, 1);
                     ik(
-                        format!("({n}.lower_bound({0}) == {n}.end() ? -1 : *{n}.lower_bound({0}))", k.s),
+                        format!(
+                            "({n}.lower_bound({0}) == {n}.end() ? -1 : *{n}.lower_bound({0}))",
+                            k.s
+                        ),
                         -KI,
                         KI,
                     )

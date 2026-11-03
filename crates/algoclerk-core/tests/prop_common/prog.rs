@@ -81,13 +81,21 @@ impl Gen {
             }
             K::Str => {
                 let n = self.src.range(0, 8) as usize;
-                let s: String = (0..n).map(|_| (b'a' + self.src.range(0, 5) as u8) as char).collect();
+                let s: String = (0..n)
+                    .map(|_| (b'a' + self.src.range(0, 5) as u8) as char)
+                    .collect();
                 format!("\"{s}\"")
             }
             _ => {
                 let n = self.src.range(0, 8);
                 let v: Vec<String> = (0..n)
-                    .map(|_| if self.src.chance(1, 10) { "30000".into() } else { self.src.range(-20, 20).to_string() })
+                    .map(|_| {
+                        if self.src.chance(1, 10) {
+                            "30000".into()
+                        } else {
+                            self.src.range(-20, 20).to_string()
+                        }
+                    })
                     .collect();
                 format!("{{{}}}", v.join(", "))
             }
@@ -109,12 +117,10 @@ impl Gen {
         self.early_return = Some(ret);
         let rt = ret.num().expect("numeric");
         let rv = Var::new("r".into(), ret);
-        let helper;
-        let head;
-        if recursive {
+        let (head, helper) = if recursive {
             let double = self.src.chance(1, 2);
             let mask = if double { 7 } else { 31 };
-            head = format!("{} {name}(int n, int a)", rt.name());
+            let head = format!("{} {name}(int n, int a)", rt.name());
             let mut n = Var::new("n".into(), K::Int);
             n.lo = 0;
             n.hi = mask;
@@ -142,7 +148,13 @@ impl Gen {
             let e = self.num(rt, 3);
             let e = self.fit_var(e, &rv);
             self.line(&format!("return {};", e.s));
-            helper = Helper { name: name.clone(), params: vec![K::Int, K::Int], ret: Some(ret), rec_mask: Some(mask as i64) };
+            let helper = Helper {
+                name: name.clone(),
+                params: vec![K::Int, K::Int],
+                ret: Some(ret),
+                rec_mask: Some(mask as i64),
+            };
+            (head, helper)
         } else {
             let np = 1 + self.src.below(3);
             let mut params = Vec::new();
@@ -169,7 +181,7 @@ impl Gen {
                 params.push(k);
                 self.add(v);
             }
-            head = format!("{} {name}({})", rt.name(), decl.join(", "));
+            let head = format!("{} {name}({})", rt.name(), decl.join(", "));
             let n = 1 + self.src.below(4);
             for _ in 0..n {
                 self.stmt(2);
@@ -177,8 +189,14 @@ impl Gen {
             let e = self.num(rt, 3);
             let e = self.fit_var(e, &rv);
             self.line(&format!("return {};", e.s));
-            helper = Helper { name: name.clone(), params, ret: Some(ret), rec_mask: None };
-        }
+            let helper = Helper {
+                name: name.clone(),
+                params,
+                ret: Some(ret),
+                rec_mask: None,
+            };
+            (head, helper)
+        };
         let body = std::mem::replace(&mut self.out, saved_out);
         self.scopes = saved_scopes;
         self.lambdas = saved_lam;
@@ -213,11 +231,19 @@ impl Gen {
                 K::Int | K::Ll => decl.push(format!("{} {pn}", kind_name(k))),
                 K::Str => {
                     v.len = 8;
-                    decl.push(if by_ref { format!("const std::string& {pn}") } else { format!("std::string {pn}") });
+                    decl.push(if by_ref {
+                        format!("const std::string& {pn}")
+                    } else {
+                        format!("std::string {pn}")
+                    });
                 }
                 _ => {
                     v.len = 8;
-                    decl.push(if by_ref { format!("const std::vector<int>& {pn}") } else { format!("std::vector<int> {pn}") });
+                    decl.push(if by_ref {
+                        format!("const std::vector<int>& {pn}")
+                    } else {
+                        format!("std::vector<int> {pn}")
+                    });
                 }
             }
             if by_ref {
@@ -234,8 +260,16 @@ impl Gen {
             self.stmt(3);
         }
         let ret = self.epilogue();
-        text.push_str(&format!("{ret} f({}) {{\n{}}}\n", decl.join(", "), self.out));
-        Prog { body: text, args, ret }
+        text.push_str(&format!(
+            "{ret} f({}) {{\n{}}}\n",
+            decl.join(", "),
+            self.out
+        ));
+        Prog {
+            body: text,
+            args,
+            ret,
+        }
     }
 }
 

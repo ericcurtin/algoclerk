@@ -9,13 +9,23 @@ impl Gen {
         if d == 0 {
             return match self.pick_var(&[K::Bool]) {
                 Some(v) if self.src.chance(2, 3) => v.name,
-                _ => if self.src.chance(1, 2) { "true".into() } else { "false".into() },
+                _ => {
+                    if self.src.chance(1, 2) {
+                        "true".into()
+                    } else {
+                        "false".into()
+                    }
+                }
             };
         }
         match self.src.weighted(&[8, 2, 3, 2, 3, 2, 2, 2]) {
             0 => {
                 let ta = *self.src.pick(&ALL_N);
-                let tb = if self.src.chance(1, 2) { ta } else { *self.src.pick(&ALL_N) };
+                let tb = if self.src.chance(1, 2) {
+                    ta
+                } else {
+                    *self.src.pick(&ALL_N)
+                };
                 let a = self.num(ta, d - 1);
                 let b = self.num(tb, d - 1);
                 let op = *self.src.pick(&["<", "<=", ">", ">=", "==", "!="]);
@@ -28,7 +38,8 @@ impl Gen {
             }
             3 => {
                 // a guard that is only safe because && short-circuits
-                let Some(v) = self.pick_var(&[K::Vec, K::Str, K::Stack, K::Queue, K::Deque, K::Pq]) else {
+                let Some(v) = self.pick_var(&[K::Vec, K::Str, K::Stack, K::Queue, K::Deque, K::Pq])
+                else {
                     return self.boolean(0);
                 };
                 let n = v.name;
@@ -46,7 +57,8 @@ impl Gen {
                 }
             }
             4 => {
-                let Some(v) = self.pick_var(&[K::Map, K::UMap, K::Set, K::USet, K::Vec, K::Str]) else {
+                let Some(v) = self.pick_var(&[K::Map, K::UMap, K::Set, K::USet, K::Vec, K::Str])
+                else {
                     return self.boolean(0);
                 };
                 let n = v.name;
@@ -92,7 +104,7 @@ impl Gen {
                 None => "'a'".into(),
             },
             1 => {
-                let c = *self.src.pick(&[b'a', b'b', b'c', b'z', b'0', b'7', b'A', b'Z', b' ']);
+                let c = *self.src.pick(b"abcz07AZ ");
                 format!("'{}'", c as char)
             }
             2 => {
@@ -105,7 +117,10 @@ impl Gen {
                     let n = v.name;
                     let e = self.num(N::Int, d.saturating_sub(1));
                     let e = self.fit_int(e);
-                    format!("({n}.empty() ? 'a' : {n}[static_cast<size_t>({}) % {n}.size()])", e.s)
+                    format!(
+                        "({n}.empty() ? 'a' : {n}[static_cast<size_t>({}) % {n}.size()])",
+                        e.s
+                    )
                 }
                 None => "'q'".into(),
             },
@@ -122,14 +137,20 @@ impl Gen {
 
     /// A `std::string` expression and an upper bound of its length.
     pub fn str_expr(&mut self, d: u32) -> (String, i64) {
-        let w = if d == 0 { self.src.weighted(&[3, 2, 0, 0, 0, 0, 0]) } else { self.src.weighted(&[3, 2, 2, 2, 1, 2, 1]) };
+        let w = if d == 0 {
+            self.src.weighted(&[3, 2, 0, 0, 0, 0, 0])
+        } else {
+            self.src.weighted(&[3, 2, 2, 2, 1, 2, 1])
+        };
         match w {
             0 => match self.pick_var(&[K::Str]) {
                 Some(v) => (v.name, v.len),
                 None => ("std::string(\"ab\")".into(), 2),
             },
             1 => {
-                let w = *self.src.pick(&["", "a", "abc", "hello", "xyz", "banana", "level", "cab"]);
+                let w = *self
+                    .src
+                    .pick(&["", "a", "abc", "hello", "xyz", "banana", "level", "cab"]);
                 (format!("std::string(\"{w}\")"), w.len() as i64)
             }
             2 => {
@@ -186,7 +207,10 @@ impl Gen {
                         self.fit_int(e).s
                     })
                     .collect();
-                (format!("std::vector<int>{{{}}}", items.join(", ")), n as i64)
+                (
+                    format!("std::vector<int>{{{}}}", items.join(", ")),
+                    n as i64,
+                )
             }
             2 => {
                 let n = self.src.range(0, 5);
@@ -221,7 +245,12 @@ impl Gen {
 
     /// A call of a helper returning a number, or a call of a lambda (`None` when there is none).
     pub fn call_expr(&mut self, d: u32) -> Option<E> {
-        let cands: Vec<Helper> = self.helpers.iter().filter(|h| h.ret.is_some()).cloned().collect();
+        let cands: Vec<Helper> = self
+            .helpers
+            .iter()
+            .filter(|h| h.ret.is_some())
+            .cloned()
+            .collect();
         let nl = self.lambdas.len();
         if cands.is_empty() && nl == 0 {
             return None;
@@ -233,14 +262,19 @@ impl Gen {
                 let e = self.num(N::Int, d);
                 args.push(self.fit_int(e).s);
             }
-            return Some(E::new(format!("{name}({})", args.join(", ")), N::Int, -KI, KI));
+            return Some(E::new(
+                format!("{name}({})", args.join(", ")),
+                N::Int,
+                -KI,
+                KI,
+            ));
         }
         let h = cands[self.src.below(cands.len())].clone();
         let mut args = Vec::new();
         for (i, k) in h.params.iter().enumerate() {
-            if i == 0 && h.rec_mask.is_some() {
+            if let (0, Some(mask)) = (i, h.rec_mask) {
                 let e = self.num(N::Int, d);
-                args.push(format!("({} & {})", e.s, h.rec_mask.expect("mask")));
+                args.push(format!("({} & {mask})", e.s));
             } else {
                 args.push(self.arg_for(*k, d)?);
             }
@@ -248,6 +282,11 @@ impl Gen {
         let r = h.ret.expect("returns");
         let n = r.num().expect("numeric");
         let (lo, hi) = if n == N::Int { (-KI, KI) } else { (-KL, KL) };
-        Some(E::new(format!("{}({})", h.name, args.join(", ")), n, lo, hi))
+        Some(E::new(
+            format!("{}({})", h.name, args.join(", ")),
+            n,
+            lo,
+            hi,
+        ))
     }
 }

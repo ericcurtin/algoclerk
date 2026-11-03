@@ -21,10 +21,18 @@ impl N {
         matches!(self, N::Int | N::Ll)
     }
     pub fn bits(self) -> u32 {
-        if matches!(self, N::Int | N::U) { 32 } else { 64 }
+        if matches!(self, N::Int | N::U) {
+            32
+        } else {
+            64
+        }
     }
     pub fn min(self) -> i128 {
-        if self.signed() { -(1i128 << (self.bits() - 1)) } else { 0 }
+        if self.signed() {
+            -(1i128 << (self.bits() - 1))
+        } else {
+            0
+        }
     }
     pub fn max(self) -> i128 {
         if self.signed() {
@@ -57,7 +65,12 @@ impl E {
         E { s, t, lo, hi }
     }
     pub fn full(s: String, t: N) -> E {
-        E { s, t, lo: t.min(), hi: t.max() }
+        E {
+            s,
+            t,
+            lo: t.min(),
+            hi: t.max(),
+        }
     }
     /// Interval of the value after conversion to `to`.
     pub fn conv_iv(&self, to: N) -> (i128, i128) {
@@ -268,7 +281,11 @@ impl Gen {
 
     pub fn lit_int(&mut self, lo: i64, hi: i64) -> E {
         let v = self.src.range(lo, hi);
-        let s = if v < 0 { format!("(-{})", -v) } else { v.to_string() };
+        let s = if v < 0 {
+            format!("(-{})", -v)
+        } else {
+            v.to_string()
+        };
         E::new(s, N::Int, v as i128, v as i128)
     }
 }

@@ -32,8 +32,20 @@ pub struct Case {
     pub src: &'static str,
 }
 
-pub fn c(name: &'static str, expect: Expect, args: &'static [&'static str], san: bool, src: &'static str) -> Case {
-    Case { name, expect, args, san, src }
+pub fn c(
+    name: &'static str,
+    expect: Expect,
+    args: &'static [&'static str],
+    san: bool,
+    src: &'static str,
+) -> Case {
+    Case {
+        name,
+        expect,
+        args,
+        san,
+        src,
+    }
 }
 
 pub const PRELUDE_INCLUDES: &str = "#include <algorithm>
@@ -70,45 +82,74 @@ pub fn full_source(case: &Case) -> String {
 }
 
 fn marker_line(src: &str) -> usize {
-    src.lines().position(|l| l.contains("// @UB")).map(|i| i + 1).expect("case has a // @UB marker")
+    src.lines()
+        .position(|l| l.contains("// @UB"))
+        .map(|i| i + 1)
+        .expect("case has a // @UB marker")
 }
 
 /// Run the interpreter or checker on a case and compare with its expectation. `Err` describes the problem.
 pub fn run_case(case: &Case) -> Result<(), String> {
     let src = full_source(case);
     let want_line = marker_line(&src);
-    let limits = Limits { steps: 3_000_000, ..Limits::default() };
+    let limits = Limits {
+        steps: 3_000_000,
+        ..Limits::default()
+    };
     let compiled = compile("", &src, &CheckOpts::all());
     match (compiled, case.expect) {
         (Ok(c), Expect::Rt(k) | Expect::Either(k, _)) => {
             let args: Vec<String> = case.args.iter().map(|s| (*s).to_string()).collect();
             let called = c.call("f", &args, &limits)?;
             match called.report.result {
-                Ok(v) => Err(format!("expected {k:?}, the program ran and returned {v:?}")),
+                Ok(v) => Err(format!(
+                    "expected {k:?}, the program ran and returned {v:?}"
+                )),
                 Err(e) => {
-                    let line = c.program.span(e.node).map_or(0, |s| line_col(&src, s.start).0);
+                    let line = c
+                        .program
+                        .span(e.node)
+                        .map_or(0, |s| line_col(&src, s.start).0);
                     if e.kind != k {
-                        Err(format!("expected {k:?}, got {:?} at line {line}: {}", e.kind, e.msg))
+                        Err(format!(
+                            "expected {k:?}, got {:?} at line {line}: {}",
+                            e.kind, e.msg
+                        ))
                     } else if line != want_line {
-                        Err(format!("{k:?} reported at line {line}, expected line {want_line}: {}", e.msg))
+                        Err(format!(
+                            "{k:?} reported at line {line}, expected line {want_line}: {}",
+                            e.msg
+                        ))
                     } else {
                         Ok(())
                     }
                 }
             }
         }
-        (Ok(_), Expect::Diag(code)) => Err(format!("expected the checker to report {code}, but it accepted the program")),
+        (Ok(_), Expect::Diag(code)) => Err(format!(
+            "expected the checker to report {code}, but it accepted the program"
+        )),
         (Err(ds), Expect::Diag(code) | Expect::Either(_, code)) => {
             let prog = parse(&src, &ParseOpts::default()).ok();
             let Some(d) = ds.iter().find(|d| d.code == code) else {
-                let codes: Vec<String> = ds.iter().map(|d| format!("{}: {}", d.code, d.msg)).collect();
+                let codes: Vec<String> = ds
+                    .iter()
+                    .map(|d| format!("{}: {}", d.code, d.msg))
+                    .collect();
                 return Err(format!("expected diagnostic {code}, got {codes:?}"));
             };
             let at = d
                 .span
                 .or_else(|| d.node.and_then(|n| prog.as_ref().and_then(|p| p.span(n))))
                 .map_or(0, |s| line_col(&src, s.start).0);
-            if at == want_line { Ok(()) } else { Err(format!("{code} reported at line {at}, expected line {want_line}: {}", d.msg)) }
+            if at == want_line {
+                Ok(())
+            } else {
+                Err(format!(
+                    "{code} reported at line {at}, expected line {want_line}: {}",
+                    d.msg
+                ))
+            }
         }
         (Err(ds), Expect::Rt(k)) => Err(format!(
             "expected the interpreter to report {k:?}, but the checker rejected the program: {}: {}",
@@ -120,7 +161,10 @@ pub fn run_case(case: &Case) -> Result<(), String> {
 /// A `main` that calls `f` with the case's arguments.
 fn driver(case: &Case) -> String {
     let args = case.args.join(", ");
-    format!("{}\nint main() {{\n    auto r = f({args});\n    (void)r;\n    return 0;\n}}\n", full_source(case))
+    format!(
+        "{}\nint main() {{\n    auto r = f({args});\n    (void)r;\n    return 0;\n}}\n",
+        full_source(case)
+    )
 }
 
 /// Compile with a sanitizer-capable compiler and run: the program must fail (sanitizer report, assertion,
@@ -135,19 +179,41 @@ pub fn sanitizer_rejects(case: &Case, dir: &std::path::Path) -> Result<Option<bo
         let exe = dir.join(&name);
         std::fs::write(&cpp, driver(case)).map_err(|e| e.to_string())?;
         let out = Command::new("timeout")
-            .args(["-s", "KILL", "120", &cc.exe, "-std=c++17", "-O0", "-g0", "-fsanitize=undefined,address"])
-            .args(["-fno-sanitize-recover=all", "-D_GLIBCXX_ASSERTIONS", "-w", "-o"])
+            .args([
+                "-s",
+                "KILL",
+                "120",
+                &cc.exe,
+                "-std=c++17",
+                "-O0",
+                "-g0",
+                "-fsanitize=undefined,address",
+            ])
+            .args([
+                "-fno-sanitize-recover=all",
+                "-D_GLIBCXX_ASSERTIONS",
+                "-w",
+                "-o",
+            ])
             .arg(&exe)
             .arg(&cpp)
             .output()
             .map_err(|e| e.to_string())?;
         if !out.status.success() {
-            return Err(format!("{} cannot compile {}:\n{}", cc.exe, case.name, String::from_utf8_lossy(&out.stderr)));
+            return Err(format!(
+                "{} cannot compile {}:\n{}",
+                cc.exe,
+                case.name,
+                String::from_utf8_lossy(&out.stderr)
+            ));
         }
         let run = Command::new("timeout")
             .args(["-s", "KILL", "20"])
             .arg(&exe)
-            .env("ASAN_OPTIONS", "detect_leaks=0:detect_stack_use_after_return=1")
+            .env(
+                "ASAN_OPTIONS",
+                "detect_leaks=0:detect_stack_use_after_return=1",
+            )
             .env("UBSAN_OPTIONS", "halt_on_error=1")
             .output()
             .map_err(|e| e.to_string())?;

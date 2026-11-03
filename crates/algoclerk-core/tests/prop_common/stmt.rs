@@ -47,26 +47,26 @@ impl Gen {
         self.budget -= 1;
         let nest = if d > 0 && self.loops < 3 { 1 } else { 0 };
         let w = [
-            3,          // 0 declare scalar
-            5,          // 1 declare container
-            5,          // 2 assign scalar
-            3,          // 3 compound assign
-            1,          // 4 inc/dec
-            8,          // 5 container operation
-            4,          // 6 algorithm
-            3 * nest,   // 7 if
-            3 * nest,   // 8 counting for
-            3 * nest,   // 9 range for
-            nest,       // 10 while / do-while
-            nest,       // 11 switch
-            if self.in_loop { 2 } else { 0 }, // 12 break / continue
-            2,          // 13 lambda
-            2,          // 14 structured binding / pairs
+            3,                                               // 0 declare scalar
+            5,                                               // 1 declare container
+            5,                                               // 2 assign scalar
+            3,                                               // 3 compound assign
+            1,                                               // 4 inc/dec
+            8,                                               // 5 container operation
+            4,                                               // 6 algorithm
+            3 * nest,                                        // 7 if
+            3 * nest,                                        // 8 counting for
+            3 * nest,                                        // 9 range for
+            nest,                                            // 10 while / do-while
+            nest,                                            // 11 switch
+            if self.in_loop { 2 } else { 0 },                // 12 break / continue
+            2,                                               // 13 lambda
+            2,                                               // 14 structured binding / pairs
             if self.early_return.is_some() { 1 } else { 0 }, // 15
-            2,          // 16 swap
-            2,          // 17 unordered iteration
-            3 * nest,   // 18 drain loop
-            if self.void_helpers { 2 } else { 0 }, // 19 void helper call
+            2,                                               // 16 swap
+            2,                                               // 17 unordered iteration
+            3 * nest,                                        // 18 drain loop
+            if self.void_helpers { 2 } else { 0 },           // 19 void helper call
         ];
         match self.src.weighted(&w) {
             0 => self.decl_scalar(),
@@ -83,7 +83,11 @@ impl Gen {
             11 => self.switch_stmt(d),
             12 => {
                 let c = self.boolean(1);
-                let kw = if self.src.chance(1, 2) { "break" } else { "continue" };
+                let kw = if self.src.chance(1, 2) {
+                    "break"
+                } else {
+                    "continue"
+                };
                 self.line(&format!("if ({c}) {kw};"));
             }
             13 => self.lambda_decl(),
@@ -106,11 +110,25 @@ impl Gen {
     /// An assignable scalar variable that is not read-only.
     fn rw_var(&mut self, ks: &[K]) -> Option<Var> {
         let vs: Vec<Var> = self.find_vars(ks).into_iter().filter(|v| v.rw).collect();
-        if vs.is_empty() { None } else { Some(vs[self.src.below(vs.len())].clone()) }
+        if vs.is_empty() {
+            None
+        } else {
+            Some(vs[self.src.below(vs.len())].clone())
+        }
     }
 
     pub fn decl_scalar(&mut self) {
-        let k = *self.src.pick(&[K::Int, K::Int, K::Int, K::Ll, K::Ll, K::U, K::Ull, K::Char, K::Bool]);
+        let k = *self.src.pick(&[
+            K::Int,
+            K::Int,
+            K::Int,
+            K::Ll,
+            K::Ll,
+            K::U,
+            K::Ull,
+            K::Char,
+            K::Bool,
+        ]);
         let name = self.fresh(prefix(k));
         let mut v = Var::new(name.clone(), k);
         match k {
@@ -124,10 +142,18 @@ impl Gen {
             }
             _ => {
                 let n = k.num().expect("numeric");
-                let from = if self.src.chance(1, 4) { *self.src.pick(&ALL_N) } else { n };
+                let from = if self.src.chance(1, 4) {
+                    *self.src.pick(&ALL_N)
+                } else {
+                    n
+                };
                 let e = self.num(from, 3);
                 let e = self.fit_var(e, &v);
-                let e = if n.signed() && (e.lo < v.lo || e.hi > v.hi) { self.reduce(e, v.hi + 1) } else { e };
+                let e = if n.signed() && (e.lo < v.lo || e.hi > v.hi) {
+                    self.reduce(e, v.hi + 1)
+                } else {
+                    e
+                };
                 if self.src.chance(1, 5) && e.t == n {
                     self.line(&format!("auto {name} = {};", e.s));
                 } else if self.src.chance(1, 8) && n == N::Int {
@@ -150,7 +176,11 @@ impl Gen {
             K::Bool => self.boolean(2),
             k => {
                 let n = k.num().expect("numeric");
-                let from = if self.src.chance(1, 4) { *self.src.pick(&ALL_N) } else { n };
+                let from = if self.src.chance(1, 4) {
+                    *self.src.pick(&ALL_N)
+                } else {
+                    n
+                };
                 let e = self.num(from, 3);
                 self.fit_var(e, &v).s
             }
@@ -177,7 +207,10 @@ impl Gen {
                 5 => ("&=", e.s),
                 6 => ("<<=", format!("({} & {mask})", e.s)),
                 7 => (">>=", format!("({} & {mask})", e.s)),
-                _ => (if self.src.chance(1, 2) { "/=" } else { "%=" }, format!("({} | 1)", e.s)),
+                _ => (
+                    if self.src.chance(1, 2) { "/=" } else { "%=" },
+                    format!("({} | 1)", e.s),
+                ),
             };
             return self.line(&format!("{name} {op} {rhs};"));
         }
@@ -193,6 +226,7 @@ impl Gen {
             2 => {
                 let r = self.reduce(e, 5);
                 self.line(&format!("{name} *= {};", r.s));
+                self.line(&format!("{name} %= {m};"));
             }
             3 => {
                 let r = self.fit_int(e);
@@ -220,7 +254,11 @@ impl Gen {
 
     fn divisor_text(&mut self, n: N) -> String {
         let b = self.num(n, 1);
-        if self.src.chance(1, 3) { format!("({} % 7 - 8)", b.s) } else { format!("({} % 7 + 8)", b.s) }
+        if self.src.chance(1, 3) {
+            format!("({} % 7 - 8)", b.s)
+        } else {
+            format!("({} % 7 + 8)", b.s)
+        }
     }
 
     pub fn incdec(&mut self) {
@@ -279,8 +317,18 @@ impl Gen {
         self.scopes = saved;
         self.lambdas = saved_l;
         self.helpers = saved_h;
-        let cap = if generic { "[]" } else if self.src.chance(1, 2) { "[&]" } else { "[=]" };
-        self.line(&format!("auto {name} = {cap}({}) {{ return {}; }};", params.join(", "), e.s));
+        let cap = if generic {
+            "[]"
+        } else if self.src.chance(1, 2) {
+            "[&]"
+        } else {
+            "[=]"
+        };
+        self.line(&format!(
+            "auto {name} = {cap}({}) {{ return {}; }};",
+            params.join(", "),
+            e.s
+        ));
         self.lambdas.push((name, np));
     }
 

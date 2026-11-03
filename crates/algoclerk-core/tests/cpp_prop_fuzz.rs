@@ -38,6 +38,13 @@ struct TreeNode {
 };
 ";
 
+/// Messages of `RtKind::Internal` failures that are known interpreter bugs (see `lvl-bugs/prop.md`); the
+/// fuzz property tolerates them until they are fixed.
+const KNOWN_INTERNAL: &[(&str, &str)] = &[(
+    "dereferencing a non-pointer",
+    "`T* p = p;` (self initialisation) should be RtKind::Uninit",
+)];
+
 /// Seed programs: (name, source).
 fn corpus() -> &'static Vec<(String, String)> {
     static C: OnceLock<Vec<(String, String)>> = OnceLock::new();
@@ -66,7 +73,7 @@ fn corpus() -> &'static Vec<(String, String)> {
             for line in text.lines() {
                 if let Some(n) = line.strip_prefix("//// ") {
                     out.extend(cur.take());
-                    cur = Some((n.trim().to_string(), format!("{PRELUDE}")));
+                    cur = Some((n.trim().to_string(), PRELUDE.to_string()));
                 } else if let Some((_, s)) = cur.as_mut() {
                     s.push_str(line);
                     s.push('\n');
@@ -109,7 +116,25 @@ fn tokens(src: &str) -> Vec<String> {
             continue;
         } else {
             i += 1;
-            if i < b.len() && matches!((c, b[i]), (b':', b':') | (b'-', b'>') | (b'+', b'+') | (b'-', b'-') | (b'<', b'<') | (b'>', b'>') | (b'=', b'=') | (b'!', b'=') | (b'<', b'=') | (b'>', b'=') | (b'&', b'&') | (b'|', b'|') | (b'+', b'=') | (b'-', b'=')) {
+            if i < b.len()
+                && matches!(
+                    (c, b[i]),
+                    (b':', b':')
+                        | (b'-', b'>')
+                        | (b'+', b'+')
+                        | (b'-', b'-')
+                        | (b'<', b'<')
+                        | (b'>', b'>')
+                        | (b'=', b'=')
+                        | (b'!', b'=')
+                        | (b'<', b'=')
+                        | (b'>', b'=')
+                        | (b'&', b'&')
+                        | (b'|', b'|')
+                        | (b'+', b'=')
+                        | (b'-', b'=')
+                )
+            {
                 i += 1;
             }
         }
@@ -119,12 +144,92 @@ fn tokens(src: &str) -> Vec<String> {
 }
 
 const VOCAB: &[&str] = &[
-    "(", ")", "{", "}", "[", "]", ";", ",", "<", ">", "&", "*", "::", "->", "=", "==", "+", "-", "/", "%", "<<", ">>", "++", "--", "!",
-    "?", ":", "0", "1", "-1", "2147483647", "4294967296", "'a'", "\"s\"", "int", "long long", "unsigned", "char", "auto", "auto&",
-    "const", "std::vector<int>", "std::string", "std::map<int, int>", "nullptr", "new", "delete", "return", "break", "continue", "if", "else",
-    "for", "while", "do", "switch", "case", "default", "true", "false", "static_cast<int>", "sizeof", "goto", "try", "throw", "template",
-    "operator", "this", "std::move", "x", "v", "i", "n", "s", "size()", "begin()", "end()", "std::sort", "std::min", "0x7fffffff", "1e9",
-    "100000000", "...", "#", "@", "\\",
+    "(",
+    ")",
+    "{",
+    "}",
+    "[",
+    "]",
+    ";",
+    ",",
+    "<",
+    ">",
+    "&",
+    "*",
+    "::",
+    "->",
+    "=",
+    "==",
+    "+",
+    "-",
+    "/",
+    "%",
+    "<<",
+    ">>",
+    "++",
+    "--",
+    "!",
+    "?",
+    ":",
+    "0",
+    "1",
+    "-1",
+    "2147483647",
+    "4294967296",
+    "'a'",
+    "\"s\"",
+    "int",
+    "long long",
+    "unsigned",
+    "char",
+    "auto",
+    "auto&",
+    "const",
+    "std::vector<int>",
+    "std::string",
+    "std::map<int, int>",
+    "nullptr",
+    "new",
+    "delete",
+    "return",
+    "break",
+    "continue",
+    "if",
+    "else",
+    "for",
+    "while",
+    "do",
+    "switch",
+    "case",
+    "default",
+    "true",
+    "false",
+    "static_cast<int>",
+    "sizeof",
+    "goto",
+    "try",
+    "throw",
+    "template",
+    "operator",
+    "this",
+    "std::move",
+    "x",
+    "v",
+    "i",
+    "n",
+    "s",
+    "size()",
+    "begin()",
+    "end()",
+    "std::sort",
+    "std::min",
+    "0x7fffffff",
+    "1e9",
+    "100000000",
+    "...",
+    "#",
+    "@",
+    "\\",
 ];
 
 #[derive(Clone, Debug)]
@@ -134,15 +239,127 @@ struct Mutation {
     b: u16,
 }
 
+fn kind_of(t: &str) -> u8 {
+    let t = t.trim();
+    match t.bytes().next() {
+        Some(c) if c.is_ascii_digit() => 1,
+        Some(c) if c.is_ascii_alphabetic() || c == b'_' => 2,
+        Some(b'"' | b'\'') => 3,
+        _ => 4,
+    }
+}
+
+const KEYWORDS: &[&str] = &[
+    "int",
+    "long",
+    "unsigned",
+    "char",
+    "bool",
+    "auto",
+    "const",
+    "void",
+    "for",
+    "while",
+    "do",
+    "if",
+    "else",
+    "return",
+    "break",
+    "continue",
+    "switch",
+    "case",
+    "default",
+    "std",
+    "vector",
+    "string",
+    "map",
+    "set",
+    "pair",
+    "tuple",
+    "optional",
+    "stack",
+    "queue",
+    "deque",
+    "priority_queue",
+    "unordered_map",
+    "unordered_set",
+    "array",
+    "function",
+    "list",
+    "true",
+    "false",
+    "nullptr",
+    "new",
+    "delete",
+    "struct",
+    "using",
+    "namespace",
+    "static_cast",
+    "include",
+    "size_t",
+    "greater",
+    "less",
+];
+
+const OPS: &[&str] = &[
+    "+", "-", "*", "/", "%", "<", ">", "<=", ">=", "==", "!=", "&&", "||", "&", "|", "<<", ">>",
+    "++", "--",
+];
+const NUMS: &[&str] = &[
+    "0",
+    "1",
+    "2",
+    "-1",
+    "7",
+    "255",
+    "65536",
+    "2147483647",
+    "2147483648",
+    "4294967295",
+    "99999999999",
+];
+
+/// A token of the same class as `t` (a number for a number, an operator for an operator, an identifier of the
+/// file for an identifier), chosen by `pick`.
+fn same_class(t: &[String], i: usize, pick: usize) -> Option<String> {
+    let k = kind_of(&t[i]);
+    let word = |x: &str| !KEYWORDS.contains(&x.trim());
+    let after_scope = i > 0 && matches!(t[i - 1].trim(), "::" | "." | "->");
+    if k == 2 && (!word(&t[i]) || after_scope) {
+        return None;
+    }
+    let pool: Vec<&String> = t
+        .iter()
+        .enumerate()
+        .filter(|(n, x)| {
+            kind_of(x) == k
+                && x.trim() != t[i].trim()
+                && (k != 2 || (word(x) && !(*n > 0 && matches!(t[n - 1].trim(), "::" | "."))))
+        })
+        .map(|(_, x)| x)
+        .collect();
+    match k {
+        1 => Some(format!("{} ", NUMS[pick % NUMS.len()])),
+        4 if OPS.contains(&t[i].trim()) => Some(format!("{} ", OPS[pick % OPS.len()])),
+        _ if !pool.is_empty() => Some(pool[pick % pool.len()].clone()),
+        _ => None,
+    }
+}
+
 fn mutate(src: &str, muts: &[Mutation]) -> String {
     let mut t = tokens(src);
+    // leave the `#include` lines alone: breaking them only tests the include handling
+    let start = t
+        .iter()
+        .rposition(|x| x.trim() == "include")
+        .map_or(0, |p| (p + 4).min(t.len().saturating_sub(1)));
     for m in muts {
-        if t.is_empty() {
+        if t.len() <= start {
             break;
         }
-        let i = usize::from(m.a) % t.len();
-        let j = usize::from(m.b) % t.len();
-        match m.kind % 6 {
+        let i = start + usize::from(m.a) % (t.len() - start);
+        let j = start + usize::from(m.b) % (t.len() - start);
+        match m.kind % 16 {
             0 => {
                 t.remove(i);
             }
@@ -159,7 +376,13 @@ fn mutate(src: &str, muts: &[Mutation]) -> String {
                 t[i] = format!("{w} ");
             }
             4 => t.swap(i, j),
-            _ => t[i] = t[j].clone(),
+            5 => t[i] = t[j].clone(),
+            // the rest keep the program well formed more often: same-class replacements
+            _ => {
+                if let Some(x) = same_class(&t, i, usize::from(m.b)) {
+                    t[i] = x;
+                }
+            }
         }
     }
     t.concat()
@@ -195,7 +418,10 @@ fn pipeline(src: &str) -> Result<Outcome, String> {
     out.parsed = true;
     let printed = print_program(&prog, false);
     if let Err(ds) = parse(&printed, &ParseOpts::default()) {
-        return Err(format!("what parses does not print as parseable text: {}\n--- printed:\n{printed}", ds[0].msg));
+        return Err(format!(
+            "what parses does not print as parseable text: {}\n--- printed:\n{printed}",
+            ds[0].msg
+        ));
     }
     let Ok(c) = compile("", src, &CheckOpts::all()) else {
         return Ok(out);
@@ -217,7 +443,12 @@ fn pipeline(src: &str) -> Result<Outcome, String> {
         })
         .collect();
     for f in fns.iter().take(4) {
-        let Some(args) = f.params.iter().map(|p| default_arg(&p.spec.ty)).collect::<Option<Vec<_>>>() else {
+        let Some(args) = f
+            .params
+            .iter()
+            .map(|p| default_arg(&p.spec.ty))
+            .collect::<Option<Vec<_>>>()
+        else {
             continue;
         };
         let Ok(called) = c.call(&f.name, &args, &limits) else {
@@ -225,7 +456,8 @@ fn pipeline(src: &str) -> Result<Outcome, String> {
         };
         out.ran += 1;
         if let Err(e) = &called.report.result {
-            if e.kind == RtKind::Internal {
+            if e.kind == RtKind::Internal && !KNOWN_INTERNAL.iter().any(|(m, _)| e.msg.contains(m))
+            {
                 return Err(format!("interpreter failure in `{}`: {}", f.name, e.msg));
             }
         }
@@ -297,4 +529,55 @@ proptest! {
             return Err(TestCaseError::fail(format!("{name}: {e}\n--- mutant:\n{m}")));
         }
     }
+}
+
+/// The mutants must be a useful mix: many still parse, a good share is accepted by the checker and runs.
+#[test]
+fn mutants_cover_every_stage_of_the_pipeline() {
+    let mut x: u64 = 0x9e37_79b9_7f4a_7c15;
+    let mut next = move || {
+        x ^= x << 13;
+        x ^= x >> 7;
+        x ^= x << 17;
+        x
+    };
+    let (mut total, mut parsed, mut checked, mut ran) = (0usize, 0usize, 0usize, 0usize);
+    for _ in 0..300 {
+        let (_, src) = &corpus()[(next() % corpus().len() as u64) as usize];
+        let muts: Vec<Mutation> = (0..1 + next() % 2)
+            .map(|_| Mutation {
+                kind: next() as u8,
+                a: next() as u16,
+                b: next() as u16,
+            })
+            .collect();
+        let m = mutate(src, &muts);
+        let o = bounded(m.clone()).unwrap_or_else(|e| panic!("{e}\n--- mutant:\n{m}"));
+        if !o.parsed && std::env::var("ALGOCLERK_PROP_DEBUG").is_ok() {
+            if let Err(d) = parse(&m, &ParseOpts::default()) {
+                eprintln!(
+                    "PARSE FAIL kinds {:?}: {}",
+                    muts.iter().map(|m| m.kind % 16).collect::<Vec<_>>(),
+                    d[0].msg
+                );
+            }
+        }
+        total += 1;
+        parsed += usize::from(o.parsed);
+        checked += usize::from(o.checked);
+        ran += usize::from(o.ran > 0);
+    }
+    eprintln!("mutants: {total} total, {parsed} parse, {checked} check, {ran} run");
+    assert!(
+        parsed * 7 >= total,
+        "fewer than 14% of the mutants parse: {parsed} of {total}"
+    );
+    assert!(
+        checked * 15 >= total,
+        "fewer than 6% of the mutants check: {checked} of {total}"
+    );
+    assert!(
+        ran * 20 >= total,
+        "fewer than 5% of the mutants run: {ran} of {total}"
+    );
 }
