@@ -511,7 +511,8 @@ reference = "x"
     /// The worked example of `docs/LEVEL_FORMAT.md` must load.
     #[test]
     fn the_documented_example_loads() {
-        let doc = include_str!("../../../docs/LEVEL_FORMAT.md");
+        // Windows checkouts may use CRLF line endings (git autocrlf); the example is searched for with \n.
+        let doc = include_str!("../../../docs/LEVEL_FORMAT.md").replace("\r\n", "\n");
         let start = doc.find("## A complete example").unwrap();
         let rest = &doc[start..];
         let a = rest.find("```toml\n").unwrap() + "```toml\n".len();

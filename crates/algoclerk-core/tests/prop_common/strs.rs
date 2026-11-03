@@ -109,7 +109,7 @@ impl Gen {
                 format!("'{}'", c as char)
             }
             2 => {
-                let e = self.num(N::Int, d);
+                let e = self.num(N::Int, d.saturating_sub(1));
                 let e = self.fit_int(e);
                 format!("static_cast<char>('a' + ({} % 26 + 26) % 26)", e.s)
             }
@@ -265,7 +265,7 @@ impl Gen {
             let (name, np) = self.lambdas[self.src.below(nl)].clone();
             let mut args = Vec::new();
             for _ in 0..np {
-                let e = self.num(N::Int, d);
+                let e = self.num(N::Int, d.saturating_sub(1));
                 args.push(self.fit_int(e).s);
             }
             return Some(E::new(
@@ -279,10 +279,10 @@ impl Gen {
         let mut args = Vec::new();
         for (i, k) in h.params.iter().enumerate() {
             if let (0, Some(mask)) = (i, h.rec_mask) {
-                let e = self.num(N::Int, d);
+                let e = self.num(N::Int, d.saturating_sub(1));
                 args.push(format!("({} & {mask})", e.s));
             } else {
-                args.push(self.arg_for(*k, d)?);
+                args.push(self.arg_for(*k, d.saturating_sub(1))?);
             }
         }
         let r = h.ret.expect("returns");
