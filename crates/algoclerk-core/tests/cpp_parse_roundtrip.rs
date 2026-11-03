@@ -264,3 +264,15 @@ fn prelude_known_types_are_used_by_the_parser() {
     let printed = print_program(&p, true);
     assert!(printed.contains("Pairs q;"), "{printed}");
 }
+
+/// `T* (x);` is a declaration in C++, never a multiplication, so printing and re-parsing is stable.
+#[test]
+fn parenthesised_pointer_declarator_is_not_a_multiplication() {
+    use algoclerk_core::cpp::parse::{ParseOpts, parse};
+    let src = "struct N { int v; };\nint f(int k) {\n    N* (a[k]);\n    return 0;\n}\n";
+    // either a friendly error or a program that is not an expression statement: never a silent multiplication
+    if let Ok(p) = parse(src, &ParseOpts::default()) {
+        let text = algoclerk_core::cpp::print::print_program(&p, false);
+        assert!(!text.contains("N * a[k]"), "{text}");
+    }
+}

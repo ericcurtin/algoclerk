@@ -664,7 +664,8 @@ impl Parser<'_> {
         let m = self.mark();
         let r = self.parse_type_spec();
         let yes = match r {
-            Ok(_) => self.ident().is_some(),
+            // `T* (x);` declares x in C++ (a declaration wins over the multiplication reading)
+            Ok(ts) => self.ident().is_some() || (matches!(ts.ty, Ty::Ptr(_)) && self.at_punct("(")),
             Err(d) => d.code == "parse.unsupported",
         };
         self.restore(m);
