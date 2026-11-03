@@ -245,6 +245,11 @@ impl EditorPanel {
     pub fn update(&mut self, cx: &mut Ctx<'_>, s: &mut Session, area: Rect) -> Out {
         let mut out = Out::default();
         let vp = cx.vp;
+        // a selection can outlive the card it pointed at (a text edit, an undo)
+        if self.sel.is_some() {
+            let n = s.rows().len();
+            self.sel = self.sel.filter(|i| *i < n);
+        }
         let p = parts(
             &vp,
             area,
@@ -287,6 +292,10 @@ impl EditorPanel {
         match self.tab {
             Tab::Text => out.changed |= self.update_text(cx, s, &p),
             Tab::Blocks => out.changed |= self.update_blocks(cx, s, &p),
+        }
+        if self.sel.is_some() {
+            let n = s.rows().len();
+            self.sel = self.sel.filter(|i| *i < n);
         }
         out
     }
@@ -1541,4 +1550,41 @@ fn weighted_tabs(r: Rect, weights: &[i32]) -> Vec<Rect> {
         x = end + 2;
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_receiver_is_the_expression_left_of_the_cursor() {
+        assert_eq!(receiver_before("seen"), (Some("seen".into()), None));
+        assert_eq!(
+            receiver_before("x = seen."),
+            (Some("seen".into()), Some(false))
+        );
+        assert_eq!(receiver_before("it->"), (Some("it".into()), Some(true)));
+        assert_eq!(
+            receiver_before("return grid[r][c]"),
+            (Some("grid[r][c]".into()), None)
+        );
+        assert_eq!(
+            receiver_before("if (m.find(k)->"),
+            (Some("m.find(k)".into()), Some(true))
+        );
+        assert_eq!(receiver_before("a + "), (None, None));
+        assert_eq!(receiver_before(""), (None, None));
+        // an unbalanced bracket gives up instead of guessing
+        assert_eq!(receiver_before("f(a]").0, None);
+    }
+
+    #[test]
+    fn weighted_tabs_fill_the_row_without_overlap() {
+        let r = Rect::new(10, 5, 180, 16);
+        let t = weighted_tabs(r, &[6, 4, 4, 4, 6, 6]);
+        assert_eq!(t.len(), 6);
+        assert!(t.windows(2).all(|w| w[0].right() < w[1].x));
+        assert!(t.iter().all(|x| x.x >= r.x && x.right() <= r.right() + 1));
+        assert!(t[0].w > t[1].w);
+    }
 }

@@ -671,6 +671,23 @@ fn with_slot(p: &mut Program, slot: Slot, f: &mut dyn FnMut(&mut Block)) -> bool
     found
 }
 
+/// Ask a question of the statement with this id.
+fn find_stmt<R>(p: &Program, id: NodeId, f: impl Fn(&Stmt) -> R) -> Option<R> {
+    let mut out = None;
+    for it in p.player_items() {
+        if let ItemKind::Func(func) = &it.kind
+            && let Some(b) = &func.body
+        {
+            walk_stmts(b, &mut |s| {
+                if s.id == id {
+                    out = Some(f(s));
+                }
+            });
+        }
+    }
+    out
+}
+
 fn contains_id(s: &Stmt, id: NodeId) -> bool {
     let mut hit = false;
     walk_stmts_in(s, &mut |x| hit |= x.id == id);
@@ -715,6 +732,13 @@ pub fn locate(p: &Program, id: NodeId) -> Option<(Slot, usize)> {
 /// block) or would change nothing.
 pub fn move_to(p: &mut Program, id: NodeId, slot: Slot, index: usize) -> Option<String> {
     normalise(p);
+    // `case` and `default` labels only make sense directly inside a switch
+    let is_label = find_stmt(p, id, |s| matches!(s.kind, StmtKind::Case(_)))?;
+    let into_switch =
+        find_stmt(p, slot.owner, |s| matches!(s.kind, StmtKind::Switch { .. })).unwrap_or(false);
+    if is_label && !into_switch {
+        return None;
+    }
     let (from, i) = locate(p, id)?;
     // a card cannot move into itself or into one of its own children
     let mut inside = false;
@@ -779,10 +803,25 @@ pub fn parse_stmt(p: &mut Program, text: &str) -> Result<Stmt, String> {
     } else {
         format!("{t} {{}}")
     };
+    // the card is read in the context of the program: `using namespace std;` makes `stack<char>` a type and
+    // a global `const` makes `std::array<int, N>` a legal size
+    let mut ctx = String::new();
+    for it in &p.items {
+        match &it.kind {
+            ItemKind::UsingNamespaceStd => ctx.push_str("using namespace std;\n"),
+            ItemKind::Global { .. } => {
+                let mut one = Program::default();
+                one.items.push(it.clone());
+                ctx.push_str(&print_program(&one, false));
+            }
+            _ => {}
+        }
+    }
+    let using = ctx;
     let wrapped = if label {
-        format!("void w() {{\nswitch (0) {{\n{body}\n}}\n}}\n")
+        format!("{using}void w() {{\nswitch (0) {{\n{body}\n}}\n}}\n")
     } else {
-        format!("void w() {{\n{body}\n}}\n")
+        format!("{using}void w() {{\n{body}\n}}\n")
     };
     let opts = ParseOpts {
         first_id: p.next_id,
@@ -796,7 +835,10 @@ pub fn parse_stmt(p: &mut Program, text: &str) -> Result<Stmt, String> {
     let Some(Item {
         kind: ItemKind::Func(f),
         ..
-    }) = parsed.items.into_iter().next()
+    }) = parsed
+        .items
+        .into_iter()
+        .find(|i| matches!(i.kind, ItemKind::Func(_)))
     else {
         return Err("I cannot read that card.".into());
     };
