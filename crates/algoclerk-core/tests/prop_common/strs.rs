@@ -160,6 +160,11 @@ impl Gen {
                     (format!("({a} + {b})"), (la + lb).min(LEN_CAP))
                 } else {
                     let c = self.char_expr(d - 1);
+                    let c = if super::known("str_plus_charref") {
+                        format!("static_cast<char>({c})")
+                    } else {
+                        c
+                    };
                     (format!("({a} + {c})"), la + 1)
                 }
             }
