@@ -44,7 +44,7 @@ impl Gen {
 
     /// A leaf of exactly type `t`: variable, literal, or a value read from a container.
     pub fn leaf(&mut self, t: N) -> E {
-        let w = self.src.weighted(&[4, 3, 2, 2, 2]);
+        let w = self.src.weighted(&[10, 2, 3, 2, 2]);
         match w {
             0 => {
                 if let Some(v) = self.pick_var(&[K::of(t)]) {
@@ -98,7 +98,10 @@ impl Gen {
     fn arith(&mut self, t: N, d: u32) -> E {
         let mut a = self.num(t, d - 1);
         let mut b = self.operand(t, d);
-        let op = *self.src.pick(&['+', '-', '*']);
+        let mut op = *self.src.pick(&['+', '-', '*']);
+        if op == '*' && t == N::Ull && super::known("ull_mul") {
+            op = '+';
+        }
         for round in 0..2 {
             let (alo, ahi) = a.conv_iv(t);
             let (blo, bhi) = b.conv_iv(t);

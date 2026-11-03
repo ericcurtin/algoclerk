@@ -15,6 +15,10 @@ pub mod reads;
 pub mod rng;
 pub mod stmt;
 pub mod strs;
+pub mod ub;
+pub mod ubc1;
+pub mod ubc2;
+pub mod ubc3;
 
 use algoclerk_core::cpp::check::CheckOpts;
 use algoclerk_core::cpp::diag::line_col;
@@ -29,6 +33,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// real compilers on them (each is described in `lvl-bugs/prop.md`). The list shrinks as bugs get fixed.
 /// Format: (feature name used by the generator, one line description).
 pub const KNOWN: &[(&str, &str)] = &[
+    ("ull_mul", "unsigned long long `*` overflows the i128 product in interpreter/ops.rs (panic in debug builds)"),
     ("append_n", "std::string::append(count, char) is valid C++17 but the checker rejects it (type.arity)"),
     ("partial_sum", "std::partial_sum is accepted by the checker but the interpreter reports BadArg"),
     ("for_each", "std::for_each is accepted by the checker but the interpreter reports BadArg (does not stock it)"),
@@ -103,7 +108,7 @@ pub fn translation_unit(progs: &[&Prog]) -> String {
 
 /// Warnings that mean the program has (or may have) undefined behaviour or a bug of the generator.
 fn bad_warning(diag: &str) -> Option<String> {
-    let keys = ["overflow", "division by zero", "shift", "uninitialized", "return-type", "array-bounds", "dangling"];
+    let keys = ["overflow in expression", "division by zero", "shift", "uninitialized", "return-type", "array-bounds", "dangling"];
     diag.lines()
         .find(|l| l.contains("warning:") && keys.iter().any(|k| l.contains(k)))
         .map(str::to_string)
@@ -181,7 +186,7 @@ pub fn passes(b: usize) -> Vec<(Compiler, bool)> {
     out
 }
 
-fn cached_sanitizer(cc: &Compiler) -> bool {
+pub fn cached_sanitizer(cc: &Compiler) -> bool {
     static CACHE: std::sync::Mutex<Vec<(String, bool)>> = std::sync::Mutex::new(Vec::new());
     let mut g = CACHE.lock().expect("cache");
     if let Some((_, v)) = g.iter().find(|(e, _)| *e == cc.exe) {

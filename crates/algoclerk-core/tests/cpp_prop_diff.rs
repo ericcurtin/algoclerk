@@ -14,7 +14,7 @@ mod prop_common;
 
 use proptest::strategy::{Strategy, ValueTree};
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
-use prop_common::{bytes_strategy, case_count, evaluate, generate, have};
+use prop_common::{bytes_strategy, case_count, evaluate, generate, have, interpret};
 
 const BATCH: usize = 10;
 
@@ -43,30 +43,52 @@ fn class(e: &str) -> String {
     e.split(']').next().unwrap_or("").to_string()
 }
 
-/// Shrink a failing choice vector; returns the smallest failing vector found and its message.
-fn shrink(mut tree: impl ValueTree<Value = Vec<u8>>, first: String) -> (Vec<u8>, String) {
+/// Does the choice vector still show a failure of the same class? Interpreter failures are tried against the
+/// interpreter alone first, which makes most shrinking steps cheap.
+fn still_fails(bytes: &[u8], cls: &str, batch: usize) -> Option<String> {
+    let p = generate(bytes.to_vec());
+    if cls.starts_with("[interp failed") && interpret(&p).is_ok() {
+        return None;
+    }
+    match evaluate(&[p], batch).remove(0) {
+        Err(e) if class(&e) == cls => Some(e),
+        _ => None,
+    }
+}
+
+/// Shrink a failing choice vector in the style of Hypothesis: first the shortest failing prefix (choices
+/// that run out are all 0), then zero out chunks of decreasing size (this keeps the remaining choices
+/// aligned). Returns the smallest failing vector found and its message.
+fn shrink(bytes: Vec<u8>, first: String) -> (Vec<u8>, String) {
     let cls = class(&first);
     let batch = usize::from(!cls.contains("clang"));
-    let mut best = (tree.current(), first);
     let start = std::time::Instant::now();
-    for _ in 0..80 {
-        if start.elapsed().as_secs() > 90 || !tree.simplify() {
-            break;
+    let mut best = (bytes, first);
+    let (mut lo, mut hi) = (0usize, best.0.len());
+    while lo + 1 < hi && start.elapsed().as_secs() < 60 {
+        let mid = (lo + hi) / 2;
+        if let Some(e) = still_fails(&best.0[..mid], &cls, batch) {
+            best = (best.0[..mid].to_vec(), e);
+            hi = mid;
+        } else {
+            lo = mid;
         }
-        loop {
-            let p = generate(tree.current());
-            match evaluate(&[p], batch).remove(0) {
-                Err(e) if class(&e) == cls => {
-                    best = (tree.current(), e);
-                    break;
-                }
-                _ => {
-                    if !tree.complicate() {
-                        return best;
-                    }
+    }
+    let mut size = 64;
+    while size >= 1 {
+        let mut at = 0;
+        while at < best.0.len() && start.elapsed().as_secs() < 150 {
+            let end = (at + size).min(best.0.len());
+            if best.0[at..end].iter().any(|b| *b != 0) {
+                let mut cand = best.0.clone();
+                cand[at..end].iter_mut().for_each(|b| *b = 0);
+                if let Some(e) = still_fails(&cand, &cls, batch) {
+                    best = (cand, e);
                 }
             }
+            at += size;
         }
+        size /= 2;
     }
     best
 }
@@ -75,6 +97,17 @@ fn shrink(mut tree: impl ValueTree<Value = Vec<u8>>, first: String) -> (Vec<u8>,
 fn random_programs_agree_with_the_compilers() {
     if !have("g++") {
         eprintln!("g++ not found: differential property test skipped");
+        return;
+    }
+    if let Ok(path) = std::env::var("ALGOCLERK_PROP_FILE") {
+        // a hand-written program: `f` is the entry, arguments one per line in ALGOCLERK_PROP_ARGS
+        let body = std::fs::read_to_string(path).expect("file");
+        let args = std::env::var("ALGOCLERK_PROP_ARGS").unwrap_or_default();
+        let args: Vec<String> = args.lines().map(str::to_string).collect();
+        let p = prop_common::prog::Prog { body, args, ret: "?" };
+        println!("interp: {:?}", interpret(&p));
+        let r = evaluate(&[p], 0).remove(0);
+        assert!(r.is_ok(), "{}", r.unwrap_err());
         return;
     }
     if let Ok(h) = std::env::var("ALGOCLERK_PROP_REPLAY") {
@@ -141,7 +174,7 @@ fn random_programs_agree_with_the_compilers() {
     let mut trees: Vec<Option<_>> = trees.into_iter().map(Some).collect();
     for (i, e) in failing.into_iter().take(3) {
         let tree = trees[i].take().expect("tree");
-        let (bytes, msg) = if shrinking { shrink(tree, e) } else { (tree.current(), e) };
+        let (bytes, msg) = if shrinking { shrink(tree.current(), e) } else { (tree.current(), e) };
         let p = generate(bytes.clone());
         report.push(format!(
             "---- {msg}\nreplay: ALGOCLERK_PROP_REPLAY={}\nargs: {:?}\n{}",

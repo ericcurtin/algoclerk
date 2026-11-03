@@ -292,6 +292,7 @@ impl Gen {
     pub fn if_stmt(&mut self, d: u32) {
         let mut head = format!("if ({})", self.boolean(2));
         let mut frozen_map: Option<(String, bool)> = None;
+        let mut then_var: Option<Var> = None;
         self.push_scope();
         if self.src.chance(1, 4) {
             // C++17 init statement
@@ -315,11 +316,17 @@ impl Gen {
             let mut v = Var::new(format!("{name}->second"), K::Int);
             v.rw = false;
             v.capturable = false;
-            self.add(v);
+            then_var = Some(v);
         }
         self.line(&format!("{head} {{"));
         let n = 1 + self.src.below(3);
+        self.push_scope();
+        if let Some(v) = then_var {
+            // the iterator may only be read in the branch where it is known not to be end()
+            self.add(v);
+        }
         self.block(n, d - 1);
+        self.pop_scope();
         if self.src.chance(1, 3) {
             self.line("} else if (false || (true && true)) {");
             let n = 1 + self.src.below(2);
