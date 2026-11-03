@@ -444,9 +444,14 @@ impl Gen {
                     }
                     1 => self.line(&format!("{n}.erase({k});")),
                     2 => self.line(&format!("{n}.clear();")),
-                    3 => self.line(&format!(
-                        "if (auto it = {n}.find({k}); it != {n}.end()) {n}.erase(it);"
-                    )),
+                    3 => {
+                        // A fresh name: `k` may mention an enclosing loop's `it`, and
+                        // `auto it = ...find(*it)` would read the variable being declared.
+                        let fi = self.fresh("fi");
+                        self.line(&format!(
+                            "if (auto {fi} = {n}.find({k}); {fi} != {n}.end()) {n}.erase({fi});"
+                        ));
+                    }
                     _ => {
                         self.line(&format!("{n}.emplace({e});"));
                         self.grow(&n, m);
