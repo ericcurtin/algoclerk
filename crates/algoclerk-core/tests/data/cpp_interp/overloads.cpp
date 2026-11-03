@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0
 //// str_compare_pos_len
 #include <string>
 #include <vector>
