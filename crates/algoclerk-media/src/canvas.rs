@@ -2,6 +2,9 @@
 //! A small RGBA software canvas with an optional clip rectangle.
 //! Adapted from the sibling project Falabichos (Apache-2.0, same owner).
 
+// Newer clippy releases suggest `as_chunks_mut`; the older pinned toolchain does not know that lint.
+#![allow(unknown_lints, clippy::chunks_exact_to_as_chunks)]
+
 use crate::sprite::{Palette, Sprite};
 
 /// One RGBA8 pixel.
