@@ -49,7 +49,6 @@ std::vector<int> commonElements(const std::vector<int>& a, const std::vector<int
 
 [budgets]
 large_steps = 3000000
-sweep_n0 = 256
 
 [medals]
 size = [52, 40, 32]

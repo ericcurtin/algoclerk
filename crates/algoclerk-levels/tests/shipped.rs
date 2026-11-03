@@ -262,3 +262,76 @@ fn complexity_estimates_match_the_declared_classes() {
         assert_eq!(cx.time.to_string(), time, "{id}: {:?}", cx.samples);
     }
 }
+
+#[test]
+fn constant_space_solutions_are_measured_constant_whatever_the_loop_style() {
+    let c = Campaign::shipped();
+    let Some(l) = c.find("missing-number") else {
+        return;
+    };
+    let j = Judge::new(l).expect("level compiles");
+    for (name, body) in [
+        (
+            "range for, total declared first",
+            "const int n = static_cast<int>(nums.size());\n    int total = n * (n + 1) / 2;\n    for (int x : nums) { total -= x; }\n    return total;",
+        ),
+        (
+            "range for, sum then subtract",
+            "int n = static_cast<int>(nums.size()); int total = 0;\n    for (int x : nums) { total += x; }\n    return n * (n + 1) / 2 - total;",
+        ),
+        (
+            "range for, spelled out",
+            "const int n = static_cast<int>(nums.size());\n    int total = n * (n + 1) / 2;\n    for (int x : nums) { total = total - x; }\n    return total;",
+        ),
+        (
+            "index loop",
+            "const int n = static_cast<int>(nums.size());\n    int total = n * (n + 1) / 2;\n    for (int i = 0; i < n; ++i) { total -= nums[i]; }\n    return total;",
+        ),
+    ] {
+        let src = format!("int missingNumber(const std::vector<int>& nums) {{\n    {body}\n}}\n");
+        let v = j.judge(&src);
+        assert!(v.passed, "{name}: {:?} {:?}", v.failure, v.diags);
+        let cx = v.complexity.unwrap_or_else(|| panic!("{name}: no estimate"));
+        assert_eq!(cx.space.to_string(), "O(1)", "{name}: {:?}", cx.samples);
+    }
+}
+
+#[test]
+fn linear_space_is_linear_at_every_sweep_start_size() {
+    let c = Campaign::shipped();
+    for id in ["common-elements", "rotate-shelf"] {
+        let Some(l) = c.find(id) else { continue };
+        let mut l = l.clone();
+        for n0 in [8, 16, 64, 256, 1024] {
+            l.budgets.sweep_n0 = n0;
+            let j = Judge::new(&l).expect("level compiles");
+            let v = j.reference_verdict();
+            let cx = v.complexity.unwrap_or_else(|| panic!("{id}: no estimate"));
+            assert_eq!(cx.space.to_string(), "O(n)", "{id} at n0 = {n0}: {:?}", cx.samples);
+        }
+    }
+}
+
+#[test]
+fn a_locked_header_shows_the_reason_of_its_lock() {
+    let c = Campaign::shipped();
+    let Some(l) = c.find("binary-search") else {
+        return;
+    };
+    let j = Judge::new(l).expect("level compiles");
+    let v = j.judge(
+        "#include <vector>\n#include <algorithm>\nint binarySearch(const std::vector<int>& nums, int target) { return -1; }\n",
+    );
+    assert!(!v.passed);
+    let msg = &v.diags[0].msg;
+    assert!(
+        msg.contains("does not stock `<algorithm>`") && msg.contains("search the shelf for you"),
+        "{msg}"
+    );
+    // naming a locked function without the header shows its lock too
+    let v = j.judge(
+        "int binarySearch(const std::vector<int>& nums, int target) { auto it = std::lower_bound(nums.begin(), nums.end(), target); return static_cast<int>(it - nums.begin()); }\n",
+    );
+    assert!(!v.passed);
+    assert!(v.diags[0].msg.contains("Same family of tools"), "{:?}", v.diags);
+}

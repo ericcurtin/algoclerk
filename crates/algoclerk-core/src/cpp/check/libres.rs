@@ -155,7 +155,7 @@ impl Checker<'_> {
             return None;
         }
         // a lock on the name or on its header wins over a missing include or a wrong argument
-        if !self.check_locked(node, &[cands[0].header.to_string(), key.to_string()]) {
+        if !self.check_locked(node, &[key.to_string(), cands[0].header.to_string()]) {
             return Some(Val::unknown());
         }
         Some(match self.lib_pick(&cands, None, args, explicit) {
