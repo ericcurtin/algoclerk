@@ -123,7 +123,8 @@ impl Gen {
             let mask = if double { 7 } else { 31 };
             let head = format!("{} {name}(int n, int a)", rt.name());
             let mut n = Var::new("n".into(), K::Int);
-            n.lo = 0;
+            // the base case also sees -1 (`n - 2` from n == 1)
+            n.lo = if double { -1 } else { 0 };
             n.hi = mask;
             n.rw = false;
             let mut a = Var::new("a".into(), K::Int);
