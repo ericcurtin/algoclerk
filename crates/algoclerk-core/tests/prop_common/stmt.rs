@@ -201,6 +201,7 @@ impl Gen {
             let (op, rhs) = match self.src.below(9) {
                 0 => ("+=", e.s),
                 1 => ("-=", e.s),
+                2 if n == N::Ull && super::known("ull_mul") => ("+=", e.s),
                 2 => ("*=", e.s),
                 3 => ("^=", e.s),
                 4 => ("|=", e.s),

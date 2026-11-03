@@ -40,6 +40,10 @@ pub const KNOWN: &[(&str, &str)] = &[
         "unsigned long long `*` overflows the i128 product in interpreter/ops.rs (panic in debug builds)",
     ),
     (
+        "str_plus_charref",
+        "`std::string + c` where `c` is a `char&` into a string (`for (auto& c : s)`) gives BadArg",
+    ),
+    (
         "append_n",
         "std::string::append(count, char) is valid C++17 but the checker rejects it (type.arity)",
     ),

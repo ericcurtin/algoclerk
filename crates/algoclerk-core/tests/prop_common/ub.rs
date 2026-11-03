@@ -67,10 +67,20 @@ pub const PRELUDE_INCLUDES: &str = "#include <algorithm>
 
 /// Cases on which the interpreter or checker currently diverges from the expectation (each is described in
 /// `lvl-bugs/prop.md`). They are still run; one that now passes is reported on stderr so the entry can go.
-pub const UB_KNOWN: &[(&str, &str)] = &[(
-    "invalid_map_erase_then_increment",
-    "advancing an erased std::map iterator (++it, it++, std::next) is not reported as Invalidated",
-)];
+pub const UB_KNOWN: &[(&str, &str)] = &[
+    (
+        "uninit_self_init_int",
+        "`int x = x;` gives BadArg instead of Uninit",
+    ),
+    (
+        "uninit_self_init_pointer",
+        "`T* p = p;` gives Internal (dereferencing a non-pointer) instead of Uninit",
+    ),
+    (
+        "invalid_map_erase_then_increment",
+        "advancing an erased std::map iterator (++it, it++, std::next) is not reported as Invalidated",
+    ),
+];
 
 pub fn ub_known(name: &str) -> bool {
     UB_KNOWN.iter().any(|(n, _)| *n == name)

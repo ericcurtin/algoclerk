@@ -313,6 +313,35 @@ int f() {
 }
 "#,
         ),
+        c(
+            "uninit_self_init_int",
+            Rt(R::Uninit),
+            &[],
+            false,
+            r#"
+int f() {
+    int x = x; // @UB
+    return x;
+}
+"#,
+        ),
+        c(
+            "uninit_self_init_pointer",
+            Rt(R::Uninit),
+            &[],
+            false,
+            r#"
+struct ListNode {
+    int val;
+    ListNode* next;
+    ListNode(int x) : val(x), next(nullptr) {}
+};
+int f() {
+    ListNode* slow = slow; // @UB
+    return slow->val;
+}
+"#,
+        ),
         // ---- iterator and reference invalidation ----
         c(
             "invalid_erase_in_loop",
