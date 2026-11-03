@@ -57,6 +57,7 @@ pub mod title;
 pub mod transition;
 pub mod ui;
 pub mod value_view;
+pub mod watch;
 pub mod words;
 
 pub use input::{Input, Key};

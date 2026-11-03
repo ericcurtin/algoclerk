@@ -40,6 +40,7 @@ pub struct Office {
     pub clerk: ClerkState,
     art: ClerkArt,
     trays: Vec<Tray>,
+    watch: Vec<crate::watch::Entry>,
     hidden: usize,
     prev: Vec<(String, String)>,
     target: (f32, f32),
@@ -66,6 +67,7 @@ impl Office {
             clerk: ClerkState::new(60.0, 150.0),
             art: ClerkArt::new(bank, outfit),
             trays: Vec::new(),
+            watch: Vec::new(),
             hidden: 0,
             prev: Vec::new(),
             target: (60.0, 150.0),
@@ -90,6 +92,7 @@ impl Office {
     /// Forget everything shown.
     pub fn clear(&mut self) {
         self.trays.clear();
+        self.watch.clear();
         self.prev.clear();
         self.out_value = None;
         self.expected = None;
@@ -174,6 +177,24 @@ impl Office {
             row_h = row_h.max(th);
         }
         self.hidden = hidden;
+        let mut watch: Vec<(bool, crate::watch::Entry)> = f
+            .vars
+            .iter()
+            .enumerate()
+            .map(|(i, (name, ty, _))| {
+                let on_shelf = trays.iter().any(|t| t.name == *name);
+                let entry = crate::watch::Entry {
+                    name: name.clone(),
+                    ty: ty.to_string().replace("std::", ""),
+                    value: texts[i].clone(),
+                    changed: trays.iter().any(|t| t.name == *name && t.changed),
+                };
+                (on_shelf, entry)
+            })
+            .collect();
+        // variables without room on the shelves first, then the ones that just changed
+        watch.sort_by_key(|(on_shelf, e)| (*on_shelf, !e.changed));
+        self.watch = watch.into_iter().map(|(_, e)| e).collect();
         self.prev = f
             .vars
             .iter()
@@ -303,6 +324,7 @@ impl Office {
         self.draw_room(g, tr);
         self.draw_trays(g, tr);
         self.draw_outbox(g, tr);
+        self.draw_watch(g, tr);
         self.draw_clerk(g);
         self.draw_fx(g);
         g.off = saved_off;
@@ -435,6 +457,29 @@ impl Office {
             g.round_rect(Rect::new(70, 80, 130, 24), 'W', 'K');
             g.text_c(135, 88, &tr.t("office.press_play"), 'K', 1);
         }
+    }
+
+    /// The watch board fills the floor left of the outbox below the trays.
+    fn draw_watch(&self, g: &mut Gfx<'_>, tr: &algoclerk_core::i18n::Strings) {
+        if self.watch.is_empty() {
+            return;
+        }
+        let left_edge = SCENE_W - 126;
+        let top = self
+            .trays
+            .iter()
+            .filter(|t| t.rect.x < left_edge)
+            .map(|t| t.rect.bottom() + 3)
+            .max()
+            .unwrap_or(FLOOR_TOP + 4);
+        let area = Rect::new(4, top, left_edge - 8, SCENE_H - 4 - top);
+        // the board needs room for a header line and at least two lines of text
+        if area.h < 24 {
+            return;
+        }
+        crate::watch::draw(g, &self.watch, area, &|n| {
+            tr.format("office.more", &[("n", n.to_string())])
+        });
     }
 
     fn draw_outbox(&self, g: &mut Gfx<'_>, tr: &algoclerk_core::i18n::Strings) {
