@@ -207,6 +207,15 @@ fn scan_expr(prog: &Program, info: &TypeInfo, e: &Expr, out: &mut HashSet<String
     }
 }
 
+/// Names a simple statement declares in its own scope (an init-statement of `if` / `for`).
+pub fn declared_names(s: &Stmt) -> Vec<&str> {
+    match &s.kind {
+        StmtKind::Decl { vars, .. } => vars.iter().map(|v| v.name.as_str()).collect(),
+        StmtKind::Structured { names, .. } => names.iter().map(String::as_str).collect(),
+        _ => Vec::new(),
+    }
+}
+
 /// Does the body contain a `continue` that belongs to the loop around it (not to an inner loop)?
 pub fn has_continue(s: &Stmt) -> bool {
     match &s.kind {

@@ -8,8 +8,20 @@ use crate::cpp::codegen::common::*;
 
 /// Does the expression text end in an `as <primitive>` cast (a following `<` would start generics)?
 fn ends_with_cast(s: &str) -> bool {
-    s.rsplit_once(" as ")
-        .is_some_and(|(_, ty)| !ty.contains([' ', '(', ')', ',']) && !ty.is_empty())
+    s.rsplit_once(" as ").is_some_and(|(_, ty)| {
+        !ty.is_empty() && ty.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+    })
+}
+
+/// An integer literal without its type suffix.
+fn bare_lit(mut x: Ex) -> Ex {
+    if let Some(v) = x.lit {
+        let t = v.to_string();
+        if x.s.len() > t.len() && x.s.starts_with(&t) && x.s[t.len()..].starts_with(['u', 'i']) {
+            x.s = t;
+        }
+    }
+    x
 }
 
 fn is_strty(t: &Ty) -> bool {
@@ -368,7 +380,11 @@ impl Rs<'_> {
         if let Some(r) = self.special_compare(op, a, b) {
             return r;
         }
-        let (x, y) = if is_strty(at) && is_strty(bt) {
+        let lit = |e: &Expr| matches!(e.kind, ExprKind::Str(_));
+        let (x, y) = if (is_strty(at) && is_strty(bt))
+            || (is_strty(at) && lit(b))
+            || (lit(a) && is_strty(bt))
+        {
             (self.str_ref(a)?, self.str_ref(b)?)
         } else if matches!(at, Ty::Ptr(_) | Ty::NullPtr) || matches!(bt, Ty::Ptr(_) | Ty::NullPtr) {
             let pt = if matches!(at, Ty::Ptr(_)) { at } else { bt };
@@ -395,6 +411,12 @@ impl Rs<'_> {
             let x = self.ex(a, false)?;
             let y = self.ex(b, false)?;
             (r(x), r(y))
+        };
+        // the other operand fixes the type of a literal: `n == 0`, not `n == 0usize`
+        let (x, y) = match (x.lit, y.lit) {
+            (None, Some(_)) => (x, bare_lit(y)),
+            (Some(_), None) => (bare_lit(x), y),
+            _ => (x, y),
         };
         let xs = if (x.cast || ends_with_cast(&x.s)) && matches!(op, BinOp::Lt | BinOp::Shl) {
             format!("({})", x.s)
@@ -436,7 +458,7 @@ impl Rs<'_> {
                     let t = self.ty_of(p);
                     let x = self.ex(p, false)?;
                     if t == Ty::Char {
-                        args.push(format!("{} as char", x.at(17)));
+                        args.push(format!("{} as char", x.at(16)));
                     } else {
                         args.push(x.s);
                     }

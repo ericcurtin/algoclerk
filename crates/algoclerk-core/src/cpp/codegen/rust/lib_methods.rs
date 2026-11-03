@@ -301,7 +301,9 @@ impl Rs<'_> {
                 Self::call_val(format!("{o}.push({})", wrap(v)))
             }
             ("pop", []) => Self::call_val(format!("{o}.pop()")),
-            ("top", []) if greater => Ok(Ex::new(format!("&{o}.peek().unwrap().0"), 17, Kind::Ref)),
+            ("top", []) if greater => {
+                Ok(Ex::new(format!("{o}.peek().unwrap().0"), 19, Kind::Place))
+            }
             ("top", []) => Ok(Ex::new(format!("{o}.peek().unwrap()"), 19, Kind::Ref)),
             _ => no("Rust", format!("the member `{name}` of a priority_queue")),
         }

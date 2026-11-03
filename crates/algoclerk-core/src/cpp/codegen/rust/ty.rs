@@ -171,7 +171,7 @@ impl Rs<'_> {
             return Ok(Ex::new(format!("{} != 0", x.at(8)), 7, Kind::Val));
         }
         let t = self.rty(to)?;
-        let mut r = Ex::new(format!("{} as {t}", x.at(17)), 16, Kind::Val);
+        let mut r = Ex::new(format!("{} as {t}", x.at(16)), 16, Kind::Val);
         r.cast = true;
         Ok(r)
     }

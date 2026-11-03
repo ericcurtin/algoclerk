@@ -7,7 +7,7 @@ use crate::gfx::Gfx;
 use crate::session::Frame;
 use crate::value_view::{self, W};
 use algoclerk_core::cpp::ast::Ty;
-use algoclerk_core::cpp::value::{Heap, Plain, parse_value, render};
+use algoclerk_core::cpp::value::{Heap, parse_value, render};
 use algoclerk_media::{ArtBank, Outfit, Rect};
 
 /// Scene width.
@@ -571,6 +571,7 @@ impl Office {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use algoclerk_core::cpp::value::Plain;
 
     #[test]
     fn iterators_read_with_their_deduced_type_on_the_watch_board() {

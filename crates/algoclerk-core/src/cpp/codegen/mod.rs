@@ -142,6 +142,59 @@ mod tests {
         assert!(c.code.contains("int twice(int x) {"), "{}", c.code);
     }
 
+    fn rust(src: &str, entry: &str) -> String {
+        gen_lang(src, Lang::Rust, entry).unwrap().code
+    }
+
+    const TWO_SUM: &str = "#include <unordered_map>\n#include <vector>\n\
+        std::vector<int> f(const std::vector<int>& a, int t) {\n\
+            std::unordered_map<int, int> seen;\n\
+            for (int i = 0; i < (int)a.size(); i++) {\n\
+                if (auto it = seen.find(t - a[i]); it != seen.end()) { return {it->second, i}; }\n\
+                seen[a[i]] = i;\n\
+            }\n\
+            return {};\n\
+        }\n";
+
+    #[test]
+    fn an_init_statement_without_a_name_clash_leaves_no_lone_block() {
+        let r = rust(TWO_SUM, "f");
+        assert!(!r.lines().any(|l| l.trim() == "{"), "{r}");
+        assert!(r.contains("let it = seen.get_key_value("), "{r}");
+        // a clash with a visible name keeps the scope
+        let src = "#include <unordered_map>\nint f(int it) {\n\
+            std::unordered_map<int, int> m;\n\
+            if (auto it = m.find(1); it != m.end()) { return it->second; }\n\
+            return it;\n}\n";
+        let r = rust(src, "f");
+        assert!(r.lines().any(|l| l.trim() == "{"), "{r}");
+        // a `for` that cannot become a range loop hoists its counter too
+        let src = "int f(int n) {\n int s = 0;\n for (int i = 0; i < n; i += n / 3 + 1) { s += i; }\n \
+            for (int i = 0; i < n; i += n / 3 + 1) { s += i; }\n return s;\n}\n";
+        let r = rust(src, "f");
+        assert!(!r.lines().any(|l| l.trim() == "{"), "{r}");
+    }
+
+    #[test]
+    fn casts_comparisons_and_heap_tops_have_no_redundant_syntax() {
+        let src = "#include <string>\n#include <vector>\n#include <queue>\n#include <functional>\n\
+            bool f(const std::string& s, std::vector<int>& v, std::priority_queue<int, std::vector<int>, std::greater<int>>& q, char c) {\n\
+                int a = q.top();\n\
+                char d = (char)('a' + (c - 'a' + 1) % 26);\n\
+                return s.find(c) != std::string::npos && v[a] < 3 && s == \"x\" && v.size() > 1 && d == 'b';\n\
+            }\n";
+        let r = rust(src, "f");
+        assert!(r.contains("let a: i32 = q.peek().unwrap().0;"), "{r}");
+        assert!(r.contains("s.find(c as char).is_some()"), "{r}");
+        assert!(r.contains("v[a as usize] < 3"), "{r}");
+        assert!(r.contains("s == \"x\""), "{r}");
+        assert!(r.contains("v.len() > 1 "), "{r}");
+        assert!(r.contains("% 26) as u8;"), "{r}");
+        assert!(!r.contains("as usize as usize"), "{r}");
+        assert!(!r.contains("*&"), "{r}");
+        assert!(!r.contains("clone()"), "{r}");
+    }
+
     #[test]
     fn untranslatable_programs_give_friendly_errors() {
         let src = "#include <functional>\nint f(int x) { std::function<int(int)> g = [](int a) { return a; }; return g(x); }\n";

@@ -12,7 +12,7 @@ impl Rs<'_> {
         let a = args.first().ok_or("find needs an argument")?;
         let pat = if self.ty_of(a) == Ty::Char {
             let c = self.ex(a, false)?;
-            format!("({} as char)", c.at(17))
+            format!("{} as char", c.at(16))
         } else {
             self.str_ref(a)?.s
         };
@@ -50,7 +50,7 @@ impl Rs<'_> {
             ("push_back", [c]) => {
                 let o = self.recv(obj, true)?;
                 let c = self.ex(c, false)?;
-                val(format!("{o}.push({} as char)", c.at(17)))
+                val(format!("{o}.push({} as char)", c.at(16)))
             }
             ("pop_back", []) => {
                 let o = self.recv(obj, true)?;

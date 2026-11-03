@@ -153,7 +153,7 @@ impl Rs<'_> {
             ));
             return Ok(());
         }
-        let wrap = init.is_some();
+        let wrap = init.is_some_and(|i| !self.hoistable(i));
         let ip = if wrap { ind + 1 } else { ind };
         let q = pad(ip);
         self.push_scope();

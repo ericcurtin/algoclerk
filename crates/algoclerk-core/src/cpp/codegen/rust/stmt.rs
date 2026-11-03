@@ -97,12 +97,19 @@ impl Rs<'_> {
                 els,
             } => {
                 if let Some(i) = init {
-                    line.push_str(&format!("{p}{{\n"));
+                    // without a name clash the `let` is simply hoisted in front of the `if`
+                    let wrap = !self.hoistable(i);
+                    let ip = if wrap { ind + 1 } else { ind };
+                    if wrap {
+                        line.push_str(&format!("{p}{{\n"));
+                    }
                     self.push_scope();
-                    self.stmt(i, ind + 1, &mut line, false)?;
-                    self.if_chain(cond, then, els.as_deref(), ind + 1, &mut line)?;
+                    self.stmt(i, ip, &mut line, false)?;
+                    self.if_chain(cond, then, els.as_deref(), ip, &mut line)?;
                     self.pop_scope();
-                    line.push_str(&format!("{p}}}\n"));
+                    if wrap {
+                        line.push_str(&format!("{p}}}\n"));
+                    }
                 } else {
                     self.if_chain(cond, then, els.as_deref(), ind, &mut line)?;
                 }
@@ -190,6 +197,15 @@ impl Rs<'_> {
         }
         out.push_str(&line);
         Ok(())
+    }
+
+    /// May the names declared by an init-statement be introduced in the enclosing Rust block? Yes when none
+    /// of them is already visible there: the C++ scope ends with the statement, so no later code can mean
+    /// anything else by the name, and a later declaration of the same name just shadows the hoisted one.
+    pub(super) fn hoistable(&self, init: &Stmt) -> bool {
+        declared_names(init)
+            .iter()
+            .all(|n| self.lookup(n).is_none())
     }
 
     fn if_chain(

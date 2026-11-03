@@ -88,7 +88,7 @@ impl Rs<'_> {
                 match rt {
                     Ty::Char => {
                         let y = self.ex(rhs, false)?;
-                        Ok(format!("{place}.push({} as char)", y.at(17)))
+                        Ok(format!("{place}.push({} as char)", y.at(16)))
                     }
                     _ => {
                         let y = self.str_ref(rhs)?;

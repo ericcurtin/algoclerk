@@ -330,8 +330,16 @@ impl Cx<'_> {
         } else {
             (p, p + 1)
         };
+        // `a || b || c` needs no parentheses, while `&&` inside `||` keeps them (compilers warn otherwise)
+        let side = |v: &Ex, min: u8| {
+            if op == BinOp::Or && v.p == p {
+                v.s.clone()
+            } else {
+                v.at(min)
+            }
+        };
         Ok(Ex::new(
-            format!("{} {} {}", x.at(lp), op.text(), y.at(rp)),
+            format!("{} {} {}", side(&x, lp), op.text(), side(&y, rp)),
             p,
             Kind::Val,
         ))

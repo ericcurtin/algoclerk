@@ -95,7 +95,10 @@ impl Rs<'_> {
                 }
             }));
         }
-        let npos = |this: &Self, e: &Expr| matches!(this.info.resolved(e.id), Some(Resolved::Lib(m)) if m.name == "npos");
+        let npos = |this: &Self, e: &Expr| {
+            matches!(this.info.resolved(e.id), Some(Resolved::Lib(m)) if m.name == "npos")
+                || matches!(&e.kind, ExprKind::Path(segs) if segs.last().is_some_and(|s| s.name == "npos"))
+        };
         if npos(self, b) && matches!(op, BinOp::Eq | BinOp::Ne) {
             let ExprKind::Call { callee, args } = &a.kind else {
                 return None;
