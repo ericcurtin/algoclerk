@@ -54,3 +54,5 @@ pub const ADD_STATEMENT: &str = "+ Add a statement";
 /// Card editor: first-use hint under the button.
 pub const FIRST_CARD_HINT: &str =
     "Tap the button, then pick a card: a variable, an if, a loop, a return.";
+/// Card editor: title of the palette on an empty body.
+pub const ADD_FIRST: &str = "Add your first card";

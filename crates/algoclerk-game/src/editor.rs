@@ -242,7 +242,7 @@ impl EditorPanel {
             Tab::Blocks => s.problem().map(|d| d.msg),
         };
         match m {
-            Some(m) => Some((m, true)),
+            Some(m) => Some((m, !s.soft_problem())),
             None if s.nudge() => Some((crate::words::NUDGE.to_string(), false)),
             None => None,
         }
@@ -1190,7 +1190,7 @@ impl EditorPanel {
                 scroll: self.scroll,
                 sel: self.sel,
                 executing,
-                broken: s.problem().is_some(),
+                broken: s.problem().is_some() && !s.soft_problem(),
                 dragging: self.drag.map(|d| d.0),
                 drop: self.drop,
             },
@@ -1260,7 +1260,7 @@ impl EditorPanel {
                     disabled,
                     ..widget_state(v.ptr, r, false, disabled)
                 };
-                if labels[i].1.len() <= 2 || i == 2 {
+                if i == 2 {
                     g.button(
                         *r,
                         &labels[i].1,
@@ -1291,6 +1291,8 @@ impl EditorPanel {
                 Rect::new(r.x, r.y, r.w, 12),
                 &if inside {
                     v.tr.t("editor.add_inside")
+                } else if cards::is_empty_body(&rows) {
+                    crate::words::ADD_FIRST.to_string()
                 } else {
                     v.tr.t("editor.add_after")
                 },
@@ -1324,7 +1326,12 @@ impl EditorPanel {
         p: &Parts,
         executing: Option<u32>,
     ) {
-        let span = s.problem_span().or_else(|| s.run_error_span());
+        let span = if s.soft_problem() {
+            None
+        } else {
+            s.problem_span()
+        }
+        .or_else(|| s.run_error_span());
         let exec_line = executing.and_then(|n| s.node_line(n));
         if p.strip.h > 0 {
             self.draw_strip(g, s, p.strip);

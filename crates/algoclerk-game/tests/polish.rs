@@ -236,3 +236,25 @@ fn a_pointer_resting_on_a_door_does_not_steal_the_focus_when_level_select_opens(
         _ => panic!("level select"),
     }
 }
+
+#[test]
+fn a_missing_return_is_a_yellow_heads_up_until_run_is_pressed() {
+    let mut g = empty_game(Tab::Blocks);
+    let tr = algoclerk_core::i18n::english();
+    let p = g.play_mut().unwrap();
+    p.session
+        .set_text("int stampDuty(int price, int qty) {\n    int total = price * qty;\n}\n");
+    assert!(!p.session.nudge() && p.session.soft_problem());
+    for tab in [Tab::Blocks, Tab::Text] {
+        p.panel.tab = tab;
+        let note = p.panel.note_of(&p.session).expect("a note");
+        assert!(!note.1, "not red yet: {}", note.0);
+        assert!(note.0.contains("must give back"));
+        assert!(p.panel.shown_error(&p.session).is_none());
+        assert!(!p.status_line(tr).1);
+    }
+    // pressing Run makes it a real error
+    p.session.start_run().unwrap_err();
+    assert!(!p.session.soft_problem());
+    assert!(p.panel.note_of(&p.session).unwrap().1);
+}

@@ -862,7 +862,10 @@ impl Play {
                 )
             }
             (Some((t, b)), _) => (t.clone(), *b),
-            (None, Some(_)) => (crate::words::SEE_NOTE.to_string(), true),
+            (None, Some(_)) if !self.session.soft_problem() => {
+                (crate::words::SEE_NOTE.to_string(), true)
+            }
+            (None, Some(_)) => (self.hint_line(tr), false),
             (None, None) => (self.hint_line(tr), false),
         }
     }

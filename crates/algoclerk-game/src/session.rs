@@ -488,6 +488,16 @@ impl Session {
             .is_some_and(|b| b.stmts.is_empty())
     }
 
+    /// The only problem is the missing `return` and Run was not pressed yet: the player is probably still
+    /// building the answer, so it is shown as a friendly heads-up and not as a red error.
+    pub fn soft_problem(&self) -> bool {
+        !self.pressed
+            && !self.nudge()
+            && self
+                .raw_problem()
+                .is_some_and(|d| d.code == "flow.missing-return")
+    }
+
     /// The first problem with the program, if any (none while the starter is merely untouched).
     pub fn problem(&self) -> Option<Diag> {
         if self.nudge() {
