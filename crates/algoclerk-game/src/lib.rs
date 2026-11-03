@@ -188,9 +188,14 @@ impl Game {
         let bank = ArtBank::load(assets).map_err(|e| e.join("\n"))?;
         let mut campaign = Campaign::shipped();
         extra_levels(&mut campaign);
-        let progress = storage
+        let mut progress = storage
             .read(PROGRESS_FILE)
             .map_or_else(Progress::default, |t| Progress::from_json(&t));
+        // a player who has not solved anything yet starts on the C++ tab of the code reveal (the shared default
+        // is the Rust tab)
+        if progress.solved_count() == 0 && progress.settings.code_lang == "rust" {
+            progress.settings.code_lang = "cpp".into();
+        }
         let tr = i18n::load_language(&progress.settings.language)
             .unwrap_or_else(|| i18n::english().clone());
         let bank = Arc::new(bank);

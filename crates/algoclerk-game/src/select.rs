@@ -164,7 +164,11 @@ impl Select {
         // pointer hover moves focus; taps open doors
         let mut open = None;
         if ptr.pos != self.last_ptr && !ptr.touch {
-            if let Some((pi, li)) = Select::door_at(&floors, self.scroll, &area, ptr.pos) {
+            // the pointer already resting somewhere when the screen opens must not steal the focus from the
+            // level the screen is about to show (that scrolled to whatever door sat under the mouse)
+            if !self.jump_to_focus
+                && let Some((pi, li)) = Select::door_at(&floors, self.scroll, &area, ptr.pos)
+            {
                 self.focus = (pi, li);
             }
             self.last_ptr = ptr.pos;

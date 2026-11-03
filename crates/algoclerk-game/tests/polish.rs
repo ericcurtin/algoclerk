@@ -213,3 +213,26 @@ fn typing_every_reference_solution_gives_the_same_code() {
     bad.truncate(3);
     assert!(n == 0, "{n} mismatches, first:\n{}", bad.join("\n"));
 }
+
+#[test]
+fn a_pointer_resting_on_a_door_does_not_steal_the_focus_when_level_select_opens() {
+    use algoclerk_game::{Nav, Scene};
+    let mut g = build(&Spec::new("title")).unwrap();
+    g.goto(Nav::Select);
+    let want = match &g.scene {
+        Scene::Select(s) => s.focus,
+        _ => panic!("level select"),
+    };
+    // the mouse rests near the bottom right of the window
+    let rest = Input {
+        pointer: Some((408, 245)),
+        ..Input::default()
+    };
+    for _ in 0..3 {
+        tick(&mut g, rest.clone());
+    }
+    match &g.scene {
+        Scene::Select(s) => assert_eq!(s.focus, want, "the screen opened on the wrong level"),
+        _ => panic!("level select"),
+    }
+}
