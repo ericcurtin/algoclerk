@@ -307,8 +307,14 @@ impl Parser<'_> {
                 Ok(Ty::Struct(format!("decltype({name})")))
             }
             "unsigned" => {
-                if self.at_kw("char") || self.at_kw("short") {
-                    return Err(self.unsupported(span, "`unsigned char` and `unsigned short`"));
+                if self.eat_kw("char") {
+                    return Ok(Ty::UChar);
+                }
+                if self.at_kw("short") {
+                    return Err(self.unsupported(
+                        span,
+                        "`unsigned short` (16 bit integers are not stocked: use `int`)",
+                    ));
                 }
                 if self.eat_kw("long") {
                     if !self.eat_kw("long") {
@@ -324,8 +330,11 @@ impl Parser<'_> {
                 Ok(Ty::UInt)
             }
             "signed" => {
-                if self.at_kw("char") || self.at_kw("short") || self.at_kw("long") {
-                    return Err(self.unsupported(span, "`signed char`, `short` and `long`"));
+                if self.eat_kw("char") {
+                    return Ok(Ty::Char);
+                }
+                if self.at_kw("short") || self.at_kw("long") {
+                    return Err(self.unsupported(span, "`signed short` and `signed long`"));
                 }
                 self.eat_kw("int");
                 Ok(Ty::Int)
@@ -340,7 +349,9 @@ impl Parser<'_> {
                     "`long` (write `long long`, which is the same size everywhere)",
                 ))
             }
-            "short" => Err(self.unsupported(span, "`short`")),
+            "short" => {
+                Err(self.unsupported(span, "`short` (16 bit integers are not stocked: use `int`)"))
+            }
             "float" | "double" => {
                 Err(self.unsupported(span, "decimal numbers (`float` and `double`) at all"))
             }

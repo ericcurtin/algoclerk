@@ -31,6 +31,10 @@ const KNOWN: &[(&str, &str)] = &[
         "signed char values of 128 and above",
     ),
     (
+        "smallints/signed_char_alias",
+        "signed char values of 128 and above",
+    ),
+    (
         "misc/const_refs_and_copies",
         "a reference aliasing a variable that is then modified",
     ),

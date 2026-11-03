@@ -77,7 +77,9 @@ impl<'p> Machine<'p> {
         match name {
             "size" => Self::ret_size(len),
             "empty" => Ok(Rv::Val(Value::Bool(len == 0))),
-            "push_back" | "push" | "emplace_back" | "emplace" if growable => {
+            "push_back" | "push" | "emplace_back" | "emplace"
+                if growable && (name != "emplace" || kind == VKind::Stack) =>
+            {
                 let v = if matches!(name, "push_back" | "push") {
                     self.nargs(name, args, 1, 1)?;
                     self.eval_conv(&args[0], &ety)?
@@ -149,7 +151,9 @@ impl<'p> Machine<'p> {
                 }
                 Ok(Rv::Val(Value::Void))
             }
-            "insert" | "emplace" if growable => self.vec_insert(&rp, &ety, ver, len, name, args),
+            "insert" | "emplace" if growable && kind != VKind::Stack => {
+                self.vec_insert(&rp, &ety, ver, len, name, args)
+            }
             "erase" if growable => {
                 self.nargs(name, args, 1, 2)?;
                 let a = self.arg_iter(&args[0])?;
@@ -205,34 +209,7 @@ impl<'p> Machine<'p> {
             }
             "assign" if growable => {
                 self.nargs(name, args, 1, 2)?;
-                let new: Vec<Value> = if args.len() == 2 {
-                    let first = self.eval(&args[0])?;
-                    if let Some(n) = first.as_i128() {
-                        let x = self.eval_conv(&args[1], &ety)?;
-                        let n = self.count_arg(n)?;
-                        let per = leaves(&x).max(1);
-                        self.reserve(n.saturating_mul(per))?;
-                        self.charge(n.saturating_mul(per))?;
-                        (0..n).map(|_| x.clone()).collect()
-                    } else {
-                        let second = self.eval(&args[1])?;
-                        let vals = self.range_values(&first, &second)?;
-                        let mut out = Vec::with_capacity(vals.len());
-                        for v in vals {
-                            out.push(self.convert(v, &ety)?);
-                        }
-                        out
-                    }
-                } else if let ExprKind::InitList(elems) = &args[0].kind {
-                    let mut out = Vec::new();
-                    for e in elems {
-                        out.push(self.eval_conv(e, &ety)?);
-                    }
-                    self.charge(out.len() as u64)?;
-                    out
-                } else {
-                    return Err(self.err(RtKind::BadArg, "unsupported assign overload"));
-                };
+                let new = self.assign_items(&ety, args)?;
                 let c = self.vec_mut(&rp)?;
                 c.v = new;
                 c.ver = c.ver.wrapping_add(1);
@@ -245,19 +222,49 @@ impl<'p> Machine<'p> {
         }
     }
 
-    fn vec_insert(
+    /// The new contents of `assign(...)`: `n, x`, an iterator range or `{...}`.
+    pub(super) fn assign_items(&mut self, ety: &TyRc, args: &'p [Expr]) -> R<Vec<Value>> {
+        self.nargs("assign", args, 1, 2)?;
+        let new: Vec<Value> = if args.len() == 2 {
+            let first = self.eval(&args[0])?;
+            if let Some(n) = first.as_i128() {
+                let x = self.eval_conv(&args[1], ety)?;
+                let n = self.count_arg(n)?;
+                let per = leaves(&x).max(1);
+                self.reserve(n.saturating_mul(per))?;
+                self.charge(n.saturating_mul(per))?;
+                (0..n).map(|_| x.clone()).collect()
+            } else {
+                let second = self.eval(&args[1])?;
+                let vals = self.range_values(&first, &second)?;
+                let mut out = Vec::with_capacity(vals.len());
+                for v in vals {
+                    out.push(self.convert(v, ety)?);
+                }
+                out
+            }
+        } else if let ExprKind::InitList(elems) = &args[0].kind {
+            let mut out = Vec::new();
+            for e in elems {
+                out.push(self.eval_conv(e, ety)?);
+            }
+            self.charge(out.len() as u64)?;
+            out
+        } else {
+            return Err(self.err(RtKind::BadArg, "unsupported assign overload"));
+        };
+        Ok(new)
+    }
+
+    /// The values `insert(pos, ...)` / `emplace(pos, ...)` add, from the arguments after the position:
+    /// one value, `{...}`, `n, x`, or an iterator range.
+    pub(super) fn insert_items(
         &mut self,
-        rp: &Place,
         ety: &TyRc,
-        ver: u32,
-        len: usize,
-        name: &'p str,
+        name: &str,
         args: &'p [Expr],
-    ) -> R<Rv> {
-        self.nargs(name, args, 2, 100)?;
-        let a = self.arg_iter(&args[0])?;
-        let i = self.iter_idx(rp, &a, len, ver)?;
-        let items: Vec<Value> = if name == "emplace" {
+    ) -> R<Vec<Value>> {
+        Ok(if name == "emplace" {
             vec![self.construct_ty(ety, &args[1..], false)?]
         } else if args.len() == 2 {
             if let ExprKind::InitList(elems) = &args[1].kind {
@@ -293,7 +300,22 @@ impl<'p> Machine<'p> {
             }
         } else {
             return Err(self.err(RtKind::BadArg, "unsupported insert overload"));
-        };
+        })
+    }
+
+    fn vec_insert(
+        &mut self,
+        rp: &Place,
+        ety: &TyRc,
+        ver: u32,
+        len: usize,
+        name: &'p str,
+        args: &'p [Expr],
+    ) -> R<Rv> {
+        self.nargs(name, args, 2, 100)?;
+        let a = self.arg_iter(&args[0])?;
+        let i = self.iter_idx(rp, &a, len, ver)?;
+        let items = self.insert_items(ety, name, args)?;
         self.reserve(items.len() as u64)?;
         self.charge((len - i) as u64)?;
         let c = self.vec_mut(rp)?;
@@ -438,19 +460,25 @@ impl<'p> Machine<'p> {
                 Ok(Rv::Val(Value::Void))
             }
             "insert" | "emplace" if !queue => {
-                self.nargs(name, args, 2, 3)?;
+                self.nargs(name, args, 2, 100)?;
                 let a = self.arg_iter(&args[0])?;
                 let i = self.iter_idx(&rp, &a, len, ver)?;
-                let v = if name == "emplace" {
-                    self.construct_ty(&ety, &args[1..], false)?
-                } else {
-                    self.eval_conv(&args[1], &ety)?
-                };
-                self.charge(i.min(len - i.min(len)) as u64)?;
+                let items = self.insert_items(&ety, name, args)?;
+                self.reserve(items.len() as u64)?;
+                self.charge(i.min(len - i.min(len)) as u64 + items.len() as u64)?;
                 let c = self.dq_mut(&rp)?;
-                c.v.insert(i, v);
+                let tail = c.v.split_off(i);
+                c.v.extend(items);
+                c.v.extend(tail);
                 c.ver = c.ver.wrapping_add(1);
                 self.new_iter_at(&rp, i).map(Rv::Val)
+            }
+            "assign" if !queue => {
+                let new = self.assign_items(&ety, args)?;
+                let c = self.dq_mut(&rp)?;
+                c.v = new.into();
+                c.ver = c.ver.wrapping_add(1);
+                Ok(Rv::Val(Value::Void))
             }
             "erase" if !queue => {
                 self.nargs(name, args, 1, 2)?;
@@ -578,31 +606,28 @@ impl<'p> Machine<'p> {
                 Ok(Rv::Val(Value::Void))
             }
             "insert" | "emplace" => {
-                self.nargs(name, args, 2, 3)?;
+                self.nargs(name, args, 2, 100)?;
                 let at = self.list_node_arg(&rp, &args[0])?;
-                if args.len() == 3 && name == "insert" {
-                    let n = self.arg_int(&args[1])?;
-                    let x = self.eval_conv(&args[2], &ety)?;
-                    let n = self.count_arg(n)?;
-                    self.reserve(n)?;
-                    self.charge(n)?;
-                    let mut first = at;
-                    for k in 0..n {
-                        let id = self.list_mut(&rp)?.insert_before(at, x.clone());
-                        if k == 0 {
-                            first = id;
-                        }
+                let items = self.insert_items(&ety, name, args)?;
+                self.reserve(items.len() as u64)?;
+                self.charge(items.len() as u64)?;
+                let mut first = at;
+                for (k, x) in items.into_iter().enumerate() {
+                    let id = self.list_mut(&rp)?.insert_before(at, x);
+                    if k == 0 {
+                        first = id;
                     }
-                    return self.list_iter_at(&rp, first).map(Rv::Val);
                 }
-                let v = if name == "emplace" {
-                    self.construct_ty(&ety, &args[1..], false)?
-                } else {
-                    self.eval_conv(&args[1], &ety)?
-                };
-                self.reserve(1)?;
-                let id = self.list_mut(&rp)?.insert_before(at, v);
-                self.list_iter_at(&rp, id).map(Rv::Val)
+                self.list_iter_at(&rp, first).map(Rv::Val)
+            }
+            "assign" => {
+                let new = self.assign_items(&ety, args)?;
+                let l = self.list_mut(&rp)?;
+                *l = ListV::new(l.ety.clone());
+                for x in new {
+                    l.insert_before(NIL, x);
+                }
+                Ok(Rv::Val(Value::Void))
             }
             "erase" => {
                 self.nargs(name, args, 1, 2)?;
@@ -726,16 +751,25 @@ impl<'p> Machine<'p> {
                 Ok(Rv::Val(Value::Void))
             }
             "resize" => {
+                self.nargs(name, args, 1, 2)?;
                 let n = self.arg_int(&args[0])?;
                 let n = self.count_arg(n)?;
                 self.reserve(n)?;
                 self.charge(n)?;
+                let x = if args.len() == 2 {
+                    Some(self.eval_conv(&args[1], &ety)?)
+                } else {
+                    None
+                };
                 while self.list_ref(&rp)?.len > n as usize {
                     let t = self.list_ref(&rp)?.tail;
                     self.list_mut(&rp)?.remove(t);
                 }
                 while self.list_ref(&rp)?.len < n as usize {
-                    let v = self.zero_value(&ety)?;
+                    let v = match &x {
+                        Some(x) => x.clone(),
+                        None => self.zero_value(&ety)?,
+                    };
                     self.list_mut(&rp)?.insert_before(NIL, v);
                 }
                 Ok(Rv::Val(Value::Void))

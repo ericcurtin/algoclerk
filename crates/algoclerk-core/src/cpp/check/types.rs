@@ -57,8 +57,9 @@ impl Checker<'_> {
         if let Some(h) = r.header() {
             let name = r.to_string();
             let name = name.split('<').next().unwrap_or("").to_string();
-            if self.need_header(node, h, &name) {
-                self.check_locked(node, &[h.to_string(), name]);
+            // a lock wins over a missing include: the player learns why, not just "include it"
+            if self.check_locked(node, &[name.clone(), h.to_string()]) {
+                self.need_header(node, h, &name);
             }
         }
         r

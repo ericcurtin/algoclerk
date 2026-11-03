@@ -2,7 +2,7 @@
 //! The judge: compiles a solution, runs it on all tests with budgets, scores size and speed,
 //! estimates complexity.
 
-use crate::complexity::{Complexity, classify};
+use crate::complexity::{Complexity, SPACE_NOISE_CELLS, classify, classify_with_floor};
 use crate::cpp::ast::{
     Block, ExprKind, Init, ItemKind, Program, StmtKind, Ty, TypeSpec, stmt_exprs, walk_expr,
     walk_stmts,
@@ -636,7 +636,10 @@ impl Judge {
             ));
         }
         let time = classify(&samples.iter().map(|s| s.1 as f64).collect::<Vec<_>>());
-        let space = classify(&samples.iter().map(|s| s.2 as f64).collect::<Vec<_>>());
+        let space = classify_with_floor(
+            &samples.iter().map(|s| s.2 as f64).collect::<Vec<_>>(),
+            SPACE_NOISE_CELLS,
+        );
         Some(Complexity {
             time,
             space,

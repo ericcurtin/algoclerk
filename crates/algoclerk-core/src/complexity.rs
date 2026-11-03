@@ -58,8 +58,18 @@ pub fn class_of_ratio(r: f64) -> Class {
     }
 }
 
-/// Classify a series measured at doubling sizes.
+/// Auxiliary cells below which a space series counts as flat: locals, loop iterators and call frames of an
+/// O(1) solution move by a few cells depending on where the periodic sampling lands.
+pub const SPACE_NOISE_CELLS: f64 = 8.0;
+
+/// Classify a series measured at doubling sizes (time costs: a drift of a few steps is noise).
 pub fn classify(samples: &[f64]) -> Class {
+    classify_with_floor(samples, 4.0)
+}
+
+/// Classify a series measured at doubling sizes; steps of at most `floor` (or 3% of the last value) between
+/// neighbouring sizes are measurement noise and do not count as growth.
+pub fn classify_with_floor(samples: &[f64], floor: f64) -> Class {
     if samples.len() < 2 {
         return Class::Constant;
     }
@@ -67,7 +77,7 @@ pub fn classify(samples: &[f64]) -> Class {
     let last = samples[samples.len() - 1].max(1.0);
     let steps: Vec<f64> = samples.windows(2).map(|w| w[1] - w[0]).collect();
     // Mostly flat (a tiny drift is allowed for constants).
-    if steps.iter().all(|d| d.abs() <= (0.03 * last).max(4.0)) {
+    if steps.iter().all(|d| d.abs() <= (0.03 * last).max(floor)) {
         return Class::Constant;
     }
     // A steady, small increase per doubling is logarithmic growth.
@@ -85,7 +95,22 @@ pub fn classify(samples: &[f64]) -> Class {
         .map(|w| w[1].max(1.0) / w[0].max(1.0))
         .collect();
     let g = (ratios.iter().map(|r| r.ln()).sum::<f64>() / ratios.len() as f64).exp();
-    class_of_ratio(g)
+    let by_value = class_of_ratio(g);
+    // A constant offset (locals, set-up work) hides growth at small sizes: the steps between sizes do not
+    // carry it (`a + b n` has steps that double, `a + b n^2` steps that quadruple). Use them when the
+    // series clearly grows at its end.
+    let growing =
+        steps.len() >= 2 && steps.iter().all(|d| *d > 0.0) && steps[steps.len() - 1] > floor;
+    if growing {
+        let sr: Vec<f64> = steps.windows(2).map(|w| w[1] / w[0]).collect();
+        let g2 = (sr.iter().map(|r| r.ln()).sum::<f64>() / sr.len() as f64).exp();
+        // only ever corrects a hidden linear trend: steps of noisy samples are too coarse to tell
+        // n log n from n
+        if by_value < Class::Linear && class_of_ratio(g2) >= Class::Linear {
+            return Class::Linear;
+        }
+    }
+    by_value
 }
 
 /// Measured behaviour of a solution.
@@ -122,5 +147,20 @@ mod tests {
         );
         assert_eq!(classify(&series(|n| n * n * n / 100.0)), Class::Cubic);
         assert_eq!(classify(&series(|n| 4.0 * n.sqrt() + 5.0)), Class::Sqrt);
+    }
+
+    #[test]
+    fn space_noise_is_not_growth() {
+        let space = |v: &[f64]| classify_with_floor(v, SPACE_NOISE_CELLS);
+        // an O(1) solution whose first sizes were sampled before its locals existed
+        assert_eq!(space(&[0.0, 0.0, 5.0, 5.0]), Class::Constant);
+        assert_eq!(space(&[3.0, 8.0, 5.0, 6.0]), Class::Constant);
+        // real growth stays visible whatever the start size
+        assert_eq!(space(&[37.0, 69.0, 133.0, 261.0]), Class::Linear);
+        assert_eq!(space(&[133.0, 261.0, 524.0, 1047.0]), Class::Linear);
+        assert_eq!(space(&[18.0, 66.0, 258.0, 1026.0]), Class::Quadratic);
+        // a constant offset of locals on top of a linear series (start size 8)
+        assert_eq!(space(&[9.0, 13.0, 21.0, 37.0]), Class::Linear);
+        assert_eq!(space(&[13.0, 21.0, 37.0, 69.0]), Class::Linear);
     }
 }

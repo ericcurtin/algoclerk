@@ -129,11 +129,14 @@ fn codegen_prints_cpp_and_is_polite_about_other_languages() {
     }
     for lang in ["c", "rust"] {
         let o = cli(&["codegen", "two-sum", "--lang", lang]);
+        if stubbed(&o) {
+            continue;
+        }
         assert!(o.status.success(), "{lang}: {}", text(&o));
-        assert!(
-            text(&o).contains("not available yet"),
-            "{lang}: {}",
-            text(&o)
-        );
+        assert!(text(&o).contains("twoSum"), "{lang}: {}", text(&o));
     }
+    // an unknown language is refused with the list of the known ones
+    let o = cli(&["codegen", "two-sum", "--lang", "java"]);
+    assert!(!o.status.success());
+    assert!(text(&o).contains("use c, cpp or rust"), "{}", text(&o));
 }

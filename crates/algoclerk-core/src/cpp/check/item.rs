@@ -87,17 +87,21 @@ impl<'a> Checker<'a> {
             );
             return;
         }
+        // a lock wins over everything: show its reason
+        if !self.check_locked(id, std::slice::from_ref(&h)) {
+            return;
+        }
+        // including a header the prelude already includes is legal C++ and always accepted
         if let Some(set) = &self.o.unlocked_headers
             && !set.contains(&h)
+            && !self.prelude_headers.contains(&h)
         {
             self.err(
                 id,
                 "lock.header",
                 format!("the supply cupboard on this floor does not stock `{h}` yet"),
             );
-            return;
         }
-        self.check_locked(id, &[h]);
     }
 
     fn struct_item(&mut self, sd: &'a StructDecl, player: bool) {

@@ -319,8 +319,14 @@ impl Rs<'_> {
             let p = promote(at);
             let x = self.conv_int(x, at, &p)?;
             let y = self.own(y, bt);
+            // `a as i32 << 2` would read `<<` as the start of generic arguments
+            let xs = if op == BinOp::Shl && (x.cast || ends_with_cast(&x.s)) {
+                format!("({})", x.s)
+            } else {
+                x.at(11)
+            };
             return Ok(Ex::new(
-                format!("{} {} {}", x.at(11), op.text(), y.at(12)),
+                format!("{xs} {} {}", op.text(), y.at(12)),
                 11,
                 Kind::Val,
             ));

@@ -47,7 +47,6 @@ std::vector<int> rotateShelf(const std::vector<int>& nums, int k) {
 
 [budgets]
 large_steps = 3000000
-sweep_n0 = 256
 
 [medals]
 size = [68, 53, 42]

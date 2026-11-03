@@ -339,3 +339,79 @@ fn recursion_and_structs_locks() {
     o.structs = false;
     assert!(diags(st, &o).iter().any(|d| d.code == "lock.structs"));
 }
+
+fn level_diags(prelude: &str, player: &str, opts: &CheckOpts) -> Vec<Diag> {
+    match algoclerk_core::cpp::run::compile(prelude, player, opts) {
+        Ok(_) => Vec::new(),
+        Err(d) => d,
+    }
+}
+
+#[test]
+fn reincluding_a_prelude_header_is_accepted() {
+    let mut o = CheckOpts::all();
+    o.unlocked_headers = Some(["<algorithm>".to_string()].into_iter().collect());
+    let pre = "#include <vector>\n";
+    let ok = "#include <vector>\n#include <algorithm>\nint f(const std::vector<int>& v) { return static_cast<int>(v.size()); }";
+    assert!(level_diags(pre, ok, &o).is_empty());
+    // a header that is neither in the prelude nor unlocked stays refused
+    let bad = "#include <vector>\n#include <map>\nint f(const std::vector<int>& v) { return static_cast<int>(v.size()); }";
+    let ds = level_diags(pre, bad, &o);
+    assert!(
+        ds.iter()
+            .any(|d| d.code == "lock.header" && d.msg.contains("<map>")),
+        "{ds:?}"
+    );
+    assert!(!ds.iter().any(|d| d.msg.contains("<vector>")), "{ds:?}");
+}
+
+#[test]
+fn a_locked_header_shows_its_reason() {
+    let mut o = CheckOpts::all();
+    o.locked.insert(
+        "<algorithm>".into(),
+        "that drawer only holds search tools".into(),
+    );
+    let pre = "#include <vector>\n";
+    // the include itself, with every header unlocked or not
+    let inc = "#include <vector>\n#include <algorithm>\nint f(int a) { return a; }";
+    for unlocked in [
+        None,
+        Some(Vec::new()),
+        Some(vec!["<algorithm>".to_string()]),
+    ] {
+        o.unlocked_headers = unlocked.map(|v| v.into_iter().collect());
+        let ds = level_diags(pre, inc, &o);
+        assert!(
+            ds.iter().any(|d| d.code == "lock.name"
+                && d.msg.contains("does not stock `<algorithm>`: that drawer")),
+            "{ds:?}"
+        );
+    }
+    // using a name from the locked header without including it shows the lock, not "include it"
+    o.unlocked_headers = None;
+    let uses = "#include <vector>\nint f(std::vector<int> v) { std::sort(v.begin(), v.end()); return v[0]; }";
+    let ds = level_diags(pre, uses, &o);
+    assert!(
+        ds.iter()
+            .any(|d| d.code == "lock.name" && d.msg.contains("that drawer")),
+        "{ds:?}"
+    );
+    assert!(!ds.iter().any(|d| d.code == "name.header"), "{ds:?}");
+}
+
+#[test]
+fn a_locked_name_shows_its_reason_even_without_its_header() {
+    let mut o = CheckOpts::all();
+    o.locked
+        .insert("std::lower_bound".into(), "halving is the lesson".into());
+    let pre = "#include <vector>\n";
+    let src = "#include <vector>\nint f(std::vector<int> v) { auto it = std::lower_bound(v.begin(), v.end(), 3); return static_cast<int>(it - v.begin()); }";
+    let ds = level_diags(pre, src, &o);
+    assert!(
+        ds.iter()
+            .any(|d| d.code == "lock.name" && d.msg.contains("halving is the lesson")),
+        "{ds:?}"
+    );
+    assert!(!ds.iter().any(|d| d.code == "name.header"), "{ds:?}");
+}

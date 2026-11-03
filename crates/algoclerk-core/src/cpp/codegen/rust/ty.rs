@@ -11,7 +11,7 @@ impl Rs<'_> {
         Ok(match t {
             Ty::Void => "()".into(),
             Ty::Bool => "bool".into(),
-            Ty::Char => "u8".into(),
+            Ty::Char | Ty::UChar => "u8".into(),
             Ty::Int => "i32".into(),
             Ty::UInt => "u32".into(),
             Ty::LongLong => "i64".into(),
@@ -80,6 +80,7 @@ impl Rs<'_> {
             Ty::Void
             | Ty::Bool
             | Ty::Char
+            | Ty::UChar
             | Ty::Int
             | Ty::UInt
             | Ty::LongLong
@@ -101,7 +102,9 @@ impl Rs<'_> {
     pub fn default_val(&mut self, t: &Ty) -> R<String> {
         Ok(match t {
             Ty::Bool => "false".into(),
-            Ty::Char | Ty::Int | Ty::UInt | Ty::LongLong | Ty::ULongLong | Ty::Size => "0".into(),
+            Ty::Char | Ty::UChar | Ty::Int | Ty::UInt | Ty::LongLong | Ty::ULongLong | Ty::Size => {
+                "0".into()
+            }
             Ty::Str => "String::new()".into(),
             Ty::StrView => "\"\"".into(),
             Ty::Vector(_) | Ty::Stack(_) => "Vec::new()".into(),
@@ -134,7 +137,7 @@ impl Rs<'_> {
         };
         let (suffix, v) = match t {
             Ty::Int => ("", signed(32, v)),
-            Ty::Char => ("u8", v.rem_euclid(256)),
+            Ty::Char | Ty::UChar => ("u8", v.rem_euclid(256)),
             Ty::Bool => ("", v),
             Ty::UInt => ("u32", v.rem_euclid(1 << 32)),
             Ty::LongLong => ("i64", signed(64, v)),

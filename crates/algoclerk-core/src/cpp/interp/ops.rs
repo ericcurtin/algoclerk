@@ -11,7 +11,7 @@ pub type Fail = (RtKind, String);
 /// Integral promotion.
 pub fn promote(s: Sk) -> Sk {
     match s {
-        Sk::Bool | Sk::Char => Sk::Int,
+        Sk::Bool | Sk::Char | Sk::UChar => Sk::Int,
         o => o,
     }
 }
@@ -19,7 +19,7 @@ pub fn promote(s: Sk) -> Sk {
 fn rank(s: Sk) -> u8 {
     match s {
         Sk::Bool => 0,
-        Sk::Char => 0,
+        Sk::Char | Sk::UChar => 0,
         Sk::Int | Sk::UInt => 1,
         Sk::Size => 2,
         Sk::LL | Sk::Ull => 3,
@@ -58,6 +58,7 @@ pub fn name(s: Sk) -> &'static str {
     match s {
         Sk::Bool => "bool",
         Sk::Char => "char",
+        Sk::UChar => "unsigned char",
         Sk::Int => "int",
         Sk::UInt => "unsigned",
         Sk::LL => "long long",

@@ -280,56 +280,53 @@ impl<'p> Machine<'p> {
             | "find_last_not_of" => self.str_find(&rp, name, args),
             "compare" => {
                 self.nargs(name, args, 1, 5)?;
-                let other = if args.len() == 1 {
-                    self.arg_bytes(&args[0])?
-                } else if args.len() == 3 {
-                    let pos = self.arg_size(&args[0])?;
-                    let cnt = self.arg_size(&args[1])?;
-                    let o = self.arg_bytes(&args[2])?;
-                    let s = self.str_ref(&rp)?;
-                    if pos > s.len() as u64 {
-                        return Err(self.pos_err("compare"));
+                let whole = self.str_bytes(&rp)?;
+                let (mine, other) = match args.len() {
+                    1 => (whole, self.arg_bytes(&args[0])?),
+                    3..=5 => {
+                        let pos = self.arg_size(&args[0])?;
+                        let cnt = self.arg_size(&args[1])?;
+                        let o = self.arg_bytes(&args[2])?;
+                        let part = self.sub_bytes("compare", &whole, pos, cnt)?;
+                        let o = if args.len() >= 4 {
+                            let pos2 = self.arg_size(&args[3])?;
+                            let cnt2 = if args.len() == 5 {
+                                self.arg_size(&args[4])?
+                            } else {
+                                NPOS
+                            };
+                            self.sub_bytes("compare", &o, pos2, cnt2)?
+                        } else {
+                            o
+                        };
+                        (part, o)
                     }
-                    let end = pos.saturating_add(cnt).min(s.len() as u64) as usize;
-                    let part = s[pos as usize..end].to_vec();
-                    self.charge(part.len().min(o.len()) as u64)?;
-                    return Ok(Rv::Val(Value::Int(match part.cmp(&o) {
-                        std::cmp::Ordering::Less => -1,
-                        std::cmp::Ordering::Equal => 0,
-                        std::cmp::Ordering::Greater => 1,
-                    })));
-                } else {
-                    return Err(self.err(RtKind::BadArg, "unsupported compare overload"));
+                    _ => return Err(self.err(RtKind::BadArg, "unsupported compare overload")),
                 };
-                let s = self.str_ref(&rp)?;
-                let c = s.len().min(other.len()) as u64;
-                let r = match s.cmp(other.as_slice()) {
+                self.charge(mine.len().min(other.len()) as u64 + 1)?;
+                Ok(Rv::Val(Value::Int(match mine.cmp(&other) {
                     std::cmp::Ordering::Less => -1,
                     std::cmp::Ordering::Equal => 0,
                     std::cmp::Ordering::Greater => 1,
-                };
-                self.charge(c)?;
-                Ok(Rv::Val(Value::Int(r)))
+                })))
             }
             "append" => {
                 self.nargs(name, args, 1, 3)?;
                 let add: Vec<u8> = match args.len() {
                     1 => self.arg_bytes(&args[0])?,
                     2 => {
-                        // append(n, c)  or  append(str, pos) not valid: (n, c)
+                        // append(n, c), append(first, last) or append(str, pos)
                         let first = self.eval(&args[0])?;
-                        let c = self.eval(&args[1])?;
-                        match (first.as_i128(), c.as_i128(), first.bytes()) {
-                            (Some(n), Some(c), _) => {
+                        if let Some(s) = first.bytes().map(<[u8]>::to_vec) {
+                            let pos = self.arg_size(&args[1])?;
+                            self.sub_bytes("append", &s, pos, NPOS)?
+                        } else {
+                            let c = self.eval(&args[1])?;
+                            if let (Some(n), Some(c)) = (first.as_i128(), c.as_i128()) {
                                 let n = self.count_arg(n)?;
                                 self.reserve(n / 8)?;
                                 vec![c as u8; n as usize]
-                            }
-                            (_, _, Some(_)) => {
-                                return Err(self.err(RtKind::BadArg, "unsupported append overload"));
-                            }
-                            _ => {
-                                // iterator range
+                            } else {
                                 let vals = self.range_values(&first, &c)?;
                                 vals.iter()
                                     .map(|v| v.as_i128().unwrap_or(0) as u8)
@@ -341,11 +338,7 @@ impl<'p> Machine<'p> {
                         let s = self.arg_bytes(&args[0])?;
                         let pos = self.arg_size(&args[1])?;
                         let cnt = self.arg_size(&args[2])?;
-                        if pos > s.len() as u64 {
-                            return Err(self.pos_err("append"));
-                        }
-                        let end = pos.saturating_add(cnt).min(s.len() as u64) as usize;
-                        s[pos as usize..end].to_vec()
+                        self.sub_bytes("append", &s, pos, cnt)?
                     }
                 };
                 self.charge(add.len() as u64)?;
@@ -370,18 +363,38 @@ impl<'p> Machine<'p> {
             "insert" => self.str_insert(&rp, args),
             "erase" => self.str_erase(&rp, args),
             "replace" => {
-                self.nargs(name, args, 3, 3)?;
-                let pos = self.arg_size(&args[0])?;
-                let cnt = self.arg_size(&args[1])?;
-                let with = self.arg_bytes(&args[2])?;
+                self.nargs(name, args, 3, 5)?;
+                let first = self.eval(&args[0])?;
                 let len = self.str_ref(&rp)?.len();
-                if pos > len as u64 {
-                    return Err(self.pos_err("replace"));
-                }
-                let end = pos.saturating_add(cnt).min(len as u64) as usize;
-                self.charge((len - pos as usize + with.len()) as u64)?;
+                let (pos, end, with) = if let Value::Iter(it) = &first {
+                    // replace(first, last, str) and replace(first, last, n, c)
+                    let (Pos::Idx(i), Value::Iter(j)) = (&it.pos, self.eval(&args[1])?) else {
+                        return Err(self.err(RtKind::BadArg, "bad iterator for replace"));
+                    };
+                    let Pos::Idx(j) = j.pos else {
+                        return Err(self.err(RtKind::BadArg, "bad iterator for replace"));
+                    };
+                    if it.ver != self.str_len_ver(&rp)?.1 {
+                        return Err(self.fail(super::invalid_msg()));
+                    }
+                    if *i > j || j > len {
+                        return Err(self.err(RtKind::Index, "replace range is outside the string"));
+                    }
+                    let with = self.replace_text(args, 2)?;
+                    (*i, j, with)
+                } else {
+                    let pos = self.arg_size(&args[0])?;
+                    let cnt = self.arg_size(&args[1])?;
+                    if pos > len as u64 {
+                        return Err(self.pos_err("replace"));
+                    }
+                    let end = pos.saturating_add(cnt).min(len as u64) as usize;
+                    let with = self.replace_text(args, 2)?;
+                    (pos as usize, end, with)
+                };
+                self.charge((len - pos + with.len()) as u64)?;
                 let s = self.str_mut(&rp, true)?;
-                s.s.splice(pos as usize..end, with);
+                s.s.splice(pos..end, with);
                 Ok(Rv::Place(rp))
             }
             "resize" => {
@@ -438,6 +451,55 @@ impl<'p> Machine<'p> {
                 RtKind::BadArg,
                 format!("std::string has no member function `{name}` in this shop"),
             )),
+        }
+    }
+
+    /// The characters of a string-like or `char` value.
+    fn val_bytes(&self, v: &Value) -> R<Vec<u8>> {
+        match v {
+            Value::Char(c) => Ok(vec![*c as u8]),
+            v => v.bytes().map(<[u8]>::to_vec).ok_or_else(|| {
+                self.err(
+                    RtKind::BadArg,
+                    "this argument must be a string or a character",
+                )
+            }),
+        }
+    }
+
+    /// `s[pos..pos + len]` clamped, or the "pos out of range" error of `what`.
+    fn sub_bytes(&self, what: &str, s: &[u8], pos: u64, len: u64) -> R<Vec<u8>> {
+        if pos > s.len() as u64 {
+            return Err(self.pos_err(what));
+        }
+        let end = pos.saturating_add(len).min(s.len() as u64) as usize;
+        Ok(s[pos as usize..end].to_vec())
+    }
+
+    /// The replacement text of `replace` from `args[at..]`: `str`, `str, subpos[, sublen]` or `n, c`.
+    fn replace_text(&mut self, args: &'p [Expr], at: usize) -> R<Vec<u8>> {
+        let rest = &args[at..];
+        let first = self.eval(&rest[0])?;
+        match rest.len() {
+            1 => self.val_bytes(&first),
+            _ if first.bytes().is_some() => {
+                let s = self.val_bytes(&first)?;
+                let pos = self.arg_size(&rest[1])?;
+                let cnt = if rest.len() > 2 {
+                    self.arg_size(&rest[2])?
+                } else {
+                    NPOS
+                };
+                self.sub_bytes("replace", &s, pos, cnt)
+            }
+            2 => {
+                let n = first.as_i128().unwrap_or(0);
+                let c = self.arg_int(&rest[1])?;
+                let n = self.count_arg(n)?;
+                self.reserve(n / 8)?;
+                Ok(vec![c as u8; n as usize])
+            }
+            _ => Err(self.err(RtKind::BadArg, "unsupported replace overload")),
         }
     }
 
@@ -590,13 +652,23 @@ impl<'p> Machine<'p> {
                 if it.ver != self.str_len_ver(rp)?.1 {
                     return Err(self.fail(super::invalid_msg()));
                 }
-                let ins = if args.len() == 2 {
-                    self.arg_bytes(&args[1])?
-                } else {
-                    let n = self.arg_int(&args[1])?;
-                    let c = self.arg_int(&args[2])?;
-                    let n = self.count_arg(n)?;
-                    vec![c as u8; n as usize]
+                let ins = match args.len() {
+                    2 => self.arg_bytes(&args[1])?,
+                    _ => {
+                        let a = self.eval(&args[1])?;
+                        let b = self.eval(&args[2])?;
+                        if matches!(a, Value::Iter(_)) {
+                            let vals = self.range_values(&a, &b)?;
+                            vals.iter()
+                                .map(|v| v.as_i128().unwrap_or(0) as u8)
+                                .collect()
+                        } else {
+                            let n = a.as_i128().unwrap_or(0);
+                            let c = b.as_i128().unwrap_or(0);
+                            let n = self.count_arg(n)?;
+                            vec![c as u8; n as usize]
+                        }
+                    }
                 };
                 (i, ins)
             }
@@ -605,16 +677,30 @@ impl<'p> Machine<'p> {
                 if pos > len as u64 {
                     return Err(self.pos_err("insert"));
                 }
-                let ins = if args.len() == 2 {
-                    self.arg_bytes(&args[1])?
-                } else if args.len() == 3 {
-                    // insert(pos, n, c) or insert(pos, str, ...) : (pos, n, c)
-                    let n = self.arg_int(&args[1])?;
-                    let c = self.arg_int(&args[2])?;
-                    let n = self.count_arg(n)?;
-                    vec![c as u8; n as usize]
-                } else {
-                    return Err(self.err(RtKind::BadArg, "unsupported insert overload"));
+                let ins = match args.len() {
+                    2 => self.arg_bytes(&args[1])?,
+                    _ => {
+                        let a = self.eval(&args[1])?;
+                        if a.bytes().is_some() {
+                            // insert(pos, str, subpos[, sublen])
+                            let s = self.val_bytes(&a)?;
+                            let sub = self.arg_size(&args[2])?;
+                            let cnt = if args.len() > 3 {
+                                self.arg_size(&args[3])?
+                            } else {
+                                NPOS
+                            };
+                            self.sub_bytes("insert", &s, sub, cnt)?
+                        } else if args.len() == 3 {
+                            // insert(pos, n, c)
+                            let n = a.as_i128().unwrap_or(0);
+                            let c = self.arg_int(&args[2])?;
+                            let n = self.count_arg(n)?;
+                            vec![c as u8; n as usize]
+                        } else {
+                            return Err(self.err(RtKind::BadArg, "unsupported insert overload"));
+                        }
+                    }
                 };
                 (pos as usize, ins)
             }

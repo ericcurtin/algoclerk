@@ -209,7 +209,7 @@ fn render_into(v: &Plain, ty: &Ty, heap: &Heap, out: &mut String) {
             }
             out.push('}');
         }
-        _ => out.push_str("?"),
+        _ => out.push('?'),
     }
 }
 
@@ -266,7 +266,11 @@ fn render_ptr(p: u32, inner: &Ty, heap: &Heap, out: &mut String) {
         let mut cur = p;
         let mut cycle: Option<usize> = None;
         while cur != 0 && order.len() < RENDER_CAP {
-            if let Some(i) = order.iter().position(|&x| x == cur).filter(|_| order.len() < 5000) {
+            if let Some(i) = order
+                .iter()
+                .position(|&x| x == cur)
+                .filter(|_| order.len() < 5000)
+            {
                 cycle = Some(i);
                 break;
             }
@@ -365,7 +369,7 @@ impl Parser<'_> {
             .and_then(|t| t.parse::<i128>().ok())
             .ok_or_else(|| format!("expected a number at offset {st}"))
     }
-    fn escaped(&mut self, quote: u8) -> Result<u8, String> {
+    fn escaped(&mut self) -> Result<u8, String> {
         let c = *self.s.get(self.i).ok_or("unterminated literal")?;
         self.i += 1;
         if c != b'\\' {
@@ -387,10 +391,7 @@ impl Parser<'_> {
                 self.i += 2;
                 u8::from_str_radix(h, 16).map_err(|_| "bad \\x".to_string())?
             }
-            _ => return Err(format!("unknown escape \\{}", e as char)).map_err(|e: String| {
-                let _ = quote;
-                e
-            }),
+            _ => return Err(format!("unknown escape \\{}", e as char)),
         })
     }
     fn list<T>(
@@ -425,7 +426,7 @@ impl Parser<'_> {
             },
             Ty::Char => {
                 self.expect(b'\'')?;
-                let c = self.escaped(b'\'')?;
+                let c = self.escaped()?;
                 if self.s.get(self.i) != Some(&b'\'') {
                     return Err("unterminated char literal".into());
                 }
@@ -450,7 +451,7 @@ impl Parser<'_> {
                             self.i += 1;
                             return Ok(Plain::Str(out));
                         }
-                        _ => out.push(self.escaped(b'"')?),
+                        _ => out.push(self.escaped()?),
                     }
                 }
             }
@@ -468,7 +469,13 @@ impl Parser<'_> {
                 }
             }
             Ty::Pair(a, b) => {
-                let xs = self.list(|p, i| if i == 0 { p.value(a, heap) } else { p.value(b, heap) })?;
+                let xs = self.list(|p, i| {
+                    if i == 0 {
+                        p.value(a, heap)
+                    } else {
+                        p.value(b, heap)
+                    }
+                })?;
                 if xs.len() != 2 {
                     return Err("a pair has two values".into());
                 }
@@ -516,10 +523,10 @@ impl Parser<'_> {
                 Some(et) => {
                     let et = et.clone();
                     let xs = self.list(|p, _| p.value(&et, heap))?;
-                    if let Ty::Array(_, n) = t {
-                        if xs.len() != *n {
-                            return Err(format!("expected {n} elements, found {}", xs.len()));
-                        }
+                    if let Ty::Array(_, n) = t
+                        && xs.len() != *n
+                    {
+                        return Err(format!("expected {n} elements, found {}", xs.len()));
                     }
                     Ok(Plain::Seq(xs))
                 }
@@ -600,6 +607,7 @@ pub fn int_range(t: &Ty) -> (i128, i128) {
     match t {
         Ty::Bool => (0, 1),
         Ty::Char => (-128, 127),
+        Ty::UChar => (0, 255),
         Ty::Int => (i128::from(i32::MIN), i128::from(i32::MAX)),
         Ty::UInt => (0, i128::from(u32::MAX)),
         Ty::LongLong => (i128::from(i64::MIN), i128::from(i64::MAX)),

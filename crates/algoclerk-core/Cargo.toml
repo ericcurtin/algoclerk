@@ -1,6 +1,6 @@
 [package]
 name = "algoclerk-core"
-description = "Toolkit-free core of AlgoClerk: ClerkScript language, levels, judge and code generators"
+description = "Toolkit-free core of AlgoClerk: the C++17 subset (parser, checker, interpreter), levels, judge and code generators"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

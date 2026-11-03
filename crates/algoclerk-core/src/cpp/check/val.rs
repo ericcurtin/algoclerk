@@ -93,7 +93,7 @@ pub(super) fn is_cstr(t: &Ty) -> bool {
 /// Integral promotion.
 pub(super) fn promote(t: &Ty) -> Ty {
     match t {
-        Ty::Bool | Ty::Char => Ty::Int,
+        Ty::Bool | Ty::Char | Ty::UChar => Ty::Int,
         t => t.clone(),
     }
 }
@@ -102,7 +102,7 @@ pub(super) fn promote(t: &Ty) -> Ty {
 fn rank(t: &Ty) -> u8 {
     match t {
         Ty::Bool => 1,
-        Ty::Char => 2,
+        Ty::Char | Ty::UChar => 2,
         Ty::Int | Ty::UInt => 3,
         Ty::Size => 4,
         _ => 5,

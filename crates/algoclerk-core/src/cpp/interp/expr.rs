@@ -95,6 +95,7 @@ impl<'p> Machine<'p> {
                         Value::LL(i) => return Ok(Value::LL(*i)),
                         Value::Size(i) => return Ok(Value::Size(*i)),
                         Value::Char(i) => return Ok(Value::Char(*i)),
+                        Value::UChar(i) => return Ok(Value::UChar(*i)),
                         _ => {}
                     }
                 }
@@ -208,7 +209,7 @@ impl<'p> Machine<'p> {
             &names
         };
         match names {
-            ["string", "npos"] | ["npos"] => Ok(Rv::Val(Value::Size(u64::MAX))),
+            ["string" | "string_view", "npos"] | ["npos"] => Ok(Rv::Val(Value::Size(u64::MAX))),
             ["nullopt"] => Ok(Rv::Val(nullopt())),
             [n] => match lib_const(n) {
                 Some(v) => Ok(Rv::Val(v)),
@@ -790,6 +791,7 @@ impl<'p> Machine<'p> {
                 &v,
                 Value::Bool(_)
                     | Value::Char(_)
+                    | Value::UChar(_)
                     | Value::Int(_)
                     | Value::UInt(_)
                     | Value::LL(_)

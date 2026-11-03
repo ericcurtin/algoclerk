@@ -292,7 +292,7 @@ pub fn common_ty(a: &Ty, b: &Ty) -> Ty {
 /// Integer promotion: `bool` and `char` become `int`.
 pub fn promote(t: &Ty) -> Ty {
     match t {
-        Ty::Bool | Ty::Char => Ty::Int,
+        Ty::Bool | Ty::Char | Ty::UChar => Ty::Int,
         t => t.clone(),
     }
 }

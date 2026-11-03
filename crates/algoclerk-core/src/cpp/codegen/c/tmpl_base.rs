@@ -16,6 +16,7 @@ pub const HEADER: &str = r#"#include <ctype.h>
 #endif
 
 typedef unsigned uint;
+typedef unsigned char uchar;
 typedef long long ll;
 typedef unsigned long long ull;
 

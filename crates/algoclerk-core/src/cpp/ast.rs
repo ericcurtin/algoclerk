@@ -33,6 +33,8 @@ pub enum Ty {
     Bool,
     /// `char` (signed 8 bit; the subset is ASCII only)
     Char,
+    /// `unsigned char` (8 bit; promotes to `int`)
+    UChar,
     /// `int` (32 bit signed)
     Int,
     /// `unsigned` / `unsigned int` (32 bit)
@@ -122,6 +124,7 @@ impl Ty {
             self,
             Ty::Bool
                 | Ty::Char
+                | Ty::UChar
                 | Ty::Int
                 | Ty::UInt
                 | Ty::LongLong
@@ -131,13 +134,16 @@ impl Ty {
     }
     /// Unsigned integer types (`bool` is treated as unsigned).
     pub fn is_unsigned(&self) -> bool {
-        matches!(self, Ty::Bool | Ty::UInt | Ty::ULongLong | Ty::Size)
+        matches!(
+            self,
+            Ty::Bool | Ty::UChar | Ty::UInt | Ty::ULongLong | Ty::Size
+        )
     }
     /// Bit width of an integral type.
     pub fn bits(&self) -> u32 {
         match self {
             Ty::Bool => 1,
-            Ty::Char => 8,
+            Ty::Char | Ty::UChar => 8,
             Ty::Int | Ty::UInt => 32,
             _ => 64,
         }
@@ -211,6 +217,7 @@ impl fmt::Display for Ty {
             Ty::Void => f.write_str("void"),
             Ty::Bool => f.write_str("bool"),
             Ty::Char => f.write_str("char"),
+            Ty::UChar => f.write_str("unsigned char"),
             Ty::Int => f.write_str("int"),
             Ty::UInt => f.write_str("unsigned"),
             Ty::LongLong => f.write_str("long long"),

@@ -471,14 +471,16 @@ impl<'p> Machine<'p> {
         for (i, s) in rs.structs.iter().enumerate() {
             struct_ix.insert(s.decl.name.as_str(), i as u32);
         }
-        let trip = lim.steps.saturating_add(1).min(512);
+        // measuring (space sweeps) samples early and often so that short runs are not read as flat
+        let first_sample = if lim.measure { 8 } else { 512 };
+        let trip = lim.steps.saturating_add(1).min(first_sample);
         Machine {
             prog: p,
             lim,
             rs,
             cost: 0,
             trip,
-            next_sample: 512,
+            next_sample: first_sample,
             peak: 0,
             live_hint: 0,
             stack: Vec::new(),
@@ -570,7 +572,7 @@ impl<'p> Machine<'p> {
         self.live_hint = n;
         self.peak = self.peak.max(n);
         let gap = if self.lim.measure {
-            (n / 32).max(128)
+            (n / 32).max(8)
         } else {
             (n / 4).max(4096)
         };

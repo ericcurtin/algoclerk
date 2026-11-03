@@ -206,11 +206,11 @@ impl<'p> Machine<'p> {
                     let logical_fwd = steps > 0;
                     let phys_fwd = logical_fwd != it.rev;
                     pos = match (&pos, phys_fwd) {
-                        (Pos::Key(k), true) => m
-                            .m
-                            .range((Bound::Excluded(k.clone()), Bound::Unbounded))
-                            .next()
-                            .map_or(Pos::End, |(k, _)| Pos::Key(k.clone())),
+                        (Pos::Key(k), true) => {
+                            m.m.range((Bound::Excluded(k.clone()), Bound::Unbounded))
+                                .next()
+                                .map_or(Pos::End, |(k, _)| Pos::Key(k.clone()))
+                        }
                         (Pos::Key(k), false) => match m.m.range(..k.clone()).next_back() {
                             Some((k, _)) => Pos::Key(k.clone()),
                             None if it.rev && logical_fwd => Pos::End,
@@ -298,7 +298,9 @@ impl<'p> Machine<'p> {
                             } else if it.rev && logical_fwd {
                                 Pos::End
                             } else {
-                                return Err(self.err(RtKind::Index, "moved before begin() of a list"));
+                                return Err(
+                                    self.err(RtKind::Index, "moved before begin() of a list")
+                                );
                             }
                         }
                         (Pos::End, false) if !it.rev && l.tail != NIL => Pos::Node(l.tail),

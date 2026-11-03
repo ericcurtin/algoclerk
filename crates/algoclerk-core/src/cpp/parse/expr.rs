@@ -98,7 +98,14 @@ fn un_op(p: &str) -> Option<UnOp> {
 fn is_scalar(t: &Ty) -> bool {
     matches!(
         t,
-        Ty::Bool | Ty::Char | Ty::Int | Ty::UInt | Ty::LongLong | Ty::ULongLong | Ty::Size
+        Ty::Bool
+            | Ty::Char
+            | Ty::UChar
+            | Ty::Int
+            | Ty::UInt
+            | Ty::LongLong
+            | Ty::ULongLong
+            | Ty::Size
     )
 }
 
