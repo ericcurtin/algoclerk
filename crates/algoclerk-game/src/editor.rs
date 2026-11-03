@@ -144,6 +144,10 @@ struct Parts {
 /// Lines of the note shown under the code, at most six (the clerk's messages are shorter).
 const MSG_MAX_LINES: usize = 6;
 
+/// Chip payloads that edit the card's text instead of inserting it.
+const CHIP_BACKSPACE: &str = "\u{8}";
+const CHIP_CLEAR: &str = "\u{18}";
+
 fn parts(
     vp: &crate::layout::Viewport,
     area: Rect,
@@ -858,7 +862,34 @@ impl EditorPanel {
         Some((t, arrow, typed.is_some()))
     }
 
+    /// The chips of the current pad, led by the two editing chips (backspace and clear) so a card can be
+    /// changed with the mouse or a finger alone.
     fn pad_chips(&self, s: &Session, card: &CardEdit) -> Vec<(String, String)> {
+        let mut out = vec![
+            ("<-".to_string(), CHIP_BACKSPACE.to_string()),
+            ("clear".to_string(), CHIP_CLEAR.to_string()),
+        ];
+        out.extend(self.pad_symbols(s, card));
+        out
+    }
+
+    /// Label and on-screen rectangle of every chip of the open card editor (for tests and screenshots).
+    pub fn card_chip_rects(
+        &self,
+        vp: &crate::layout::Viewport,
+        area: Rect,
+        s: &Session,
+    ) -> Vec<(String, Rect)> {
+        let Some(card) = &self.card else {
+            return Vec::new();
+        };
+        let (_, _, _, _, chips_r, _, _) = self.card_layout(vp, area.inset(2));
+        let labels = self.pad_chips(s, card);
+        let rects = self.chip_rects(chips_r, &labels, vp, card.scroll);
+        labels.into_iter().map(|l| l.0).zip(rects).collect()
+    }
+
+    fn pad_symbols(&self, s: &Session, card: &CardEdit) -> Vec<(String, String)> {
         let mut v: Vec<(String, String)> = Vec::new();
         match card.pad {
             Pad::Names => {
@@ -1054,6 +1085,15 @@ impl EditorPanel {
         for (i, r) in rects.iter().enumerate() {
             if r.y >= chips_r.y && r.bottom() <= chips_r.bottom() && cx.ptr.tapped_in(r) {
                 let ins = labels[i].1.clone();
+                if ins == CHIP_BACKSPACE || ins == CHIP_CLEAR {
+                    if ins == CHIP_CLEAR {
+                        card.line.set_text("");
+                    } else {
+                        card.line.backspace();
+                    }
+                    cx.sfx("pick");
+                    continue;
+                }
                 if card.pad == Pad::Names {
                     let name = labels[i].0.clone();
                     card.last_var = self

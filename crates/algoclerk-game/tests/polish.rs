@@ -289,3 +289,57 @@ fn the_status_stays_calm_after_the_first_card_when_coming_from_the_brief() {
     assert!(p.session.soft_problem(), "pressed {}", p.session.pressed);
     assert!(!p.status_line(tr).1, "{:?}", p.status_line(tr));
 }
+
+#[test]
+fn a_card_can_be_cleared_and_rebuilt_with_chips_alone() {
+    let mut g = build(&Spec::new("play-empty")).unwrap();
+    // a body with one assignment card
+    {
+        let p = g.play_mut().unwrap();
+        p.session.set_text(
+            "int stampDuty(int price, int qty) {\n    int total = 0;\n    total = total;\n}\n",
+        );
+        let rows = p.session.rows();
+        let i = rows
+            .iter()
+            .position(|r| r.text == "total = total;")
+            .unwrap();
+        p.panel.sel = Some(i);
+        p.panel.tab = Tab::Blocks;
+        let node = rows[i].node;
+        p.panel.open_card(&p.session, node);
+    }
+    let tap = |g: &mut Game, label: &str| {
+        let vp = g.vp;
+        let p = g.play_mut().unwrap();
+        let area = p.rects(&vp).editor;
+        let chips = p.panel.card_chip_rects(&vp, area, &p.session);
+        let r = chips
+            .iter()
+            .find(|c| c.0 == label)
+            .unwrap_or_else(|| {
+                panic!(
+                    "no chip {label}: {:?}",
+                    chips.iter().map(|c| &c.0).collect::<Vec<_>>()
+                )
+            })
+            .1;
+        click(g, (r.x + r.w / 2, r.y + r.h / 2));
+    };
+    tap(&mut g, "clear");
+    let line = |g: &mut Game| {
+        g.play_mut()
+            .unwrap()
+            .panel
+            .card
+            .as_ref()
+            .unwrap()
+            .line
+            .text()
+    };
+    assert_eq!(line(&mut g), "");
+    tap(&mut g, "total"); // a name: the pad then offers members, so go back for the operator
+    assert_eq!(line(&mut g), "total");
+    tap(&mut g, "<-");
+    assert_eq!(line(&mut g), "total".trim_end_matches('l'));
+}
