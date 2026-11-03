@@ -291,7 +291,7 @@ impl<'p> Machine<'p> {
                     _ => return Err(self.internal("not a list")),
                 };
                 if let Pos::Node(x) = &it.pos
-                    && !l.nodes.get(*x as usize).is_some_and(|nd| nd.val.is_some())
+                    && l.nodes.get(*x as usize).is_none_or(|nd| nd.val.is_none())
                 {
                     return Err(self.fail(invalid_msg()));
                 }

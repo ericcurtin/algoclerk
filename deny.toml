@@ -21,6 +21,15 @@ targets = [
 ]
 all-features = true
 
+[advisories]
+version = 2
+# ttf-parser is flagged unmaintained (RUSTSEC-2026-0192, not a vulnerability). It is a transitive
+# dependency of Bevy's text stack (cosmic-text / owned_ttf_parser); AlgoClerk uses its own pixel
+# font and never loads untrusted font files. Revisit when Bevy moves to a maintained parser.
+ignore = [
+    { id = "RUSTSEC-2026-0192", reason = "unmaintained, not a vulnerability; transitive via Bevy text, no untrusted fonts are parsed" },
+]
+
 [licenses]
 version = 2
 confidence-threshold = 0.9
