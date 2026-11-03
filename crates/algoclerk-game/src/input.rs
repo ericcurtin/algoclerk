@@ -83,6 +83,59 @@ impl Input {
     }
 }
 
+/// Keeps typing in order when several key presses land in one tick (a slow frame rate, a fast typist, a
+/// scripted keyboard): editing keys (Return, Backspace, arrows) and typed text are split into segments that
+/// are handed out one per tick, so `a`, Return, `b` never turns into Return, `ab`.
+#[derive(Debug, Clone, Default)]
+pub struct KeyQueue {
+    segments: std::collections::VecDeque<(Vec<Key>, String)>,
+    keys: Vec<Key>,
+    typed: String,
+}
+
+impl KeyQueue {
+    /// A key that changes where or whether text goes (not a letter shortcut or Space).
+    fn is_edit(k: Key) -> bool {
+        !matches!(k, Key::Char(_) | Key::Space)
+    }
+
+    fn seal(&mut self) {
+        if !self.keys.is_empty() || !self.typed.is_empty() {
+            self.segments.push_back((
+                std::mem::take(&mut self.keys),
+                std::mem::take(&mut self.typed),
+            ));
+        }
+    }
+
+    /// A key was pressed.
+    pub fn push_key(&mut self, k: Key) {
+        if Self::is_edit(k) && !self.typed.is_empty() {
+            self.seal();
+        }
+        self.keys.push(k);
+    }
+
+    /// Text was typed.
+    pub fn push_text(&mut self, t: &str) {
+        if self.keys.iter().any(|k| Self::is_edit(*k)) {
+            self.seal();
+        }
+        self.typed.push_str(t);
+    }
+
+    /// The keys and text for the next tick (the oldest segment); the rest wait for later ticks.
+    pub fn take_tick(&mut self) -> (Vec<Key>, String) {
+        self.seal();
+        self.segments.pop_front().unwrap_or_default()
+    }
+
+    /// Segments still waiting.
+    pub fn pending(&self) -> usize {
+        self.segments.len() + usize::from(!self.keys.is_empty() || !self.typed.is_empty())
+    }
+}
+
 /// Tracks pointer gestures across ticks: taps, drags, long presses, scrolling.
 #[derive(Debug, Clone, Default)]
 pub struct Pointer {
@@ -253,5 +306,45 @@ mod tests {
             ..Input::default()
         };
         assert!(i.ctrl_ch('c') && !i.ch('c') && i.key(Key::Up));
+    }
+}
+
+#[cfg(test)]
+mod key_queue_tests {
+    use super::*;
+
+    #[test]
+    fn typing_stays_in_order_across_return_and_backspace() {
+        let mut q = KeyQueue::default();
+        q.push_text("ab");
+        q.push_key(Key::Enter);
+        q.push_text("c");
+        q.push_key(Key::Backspace);
+        q.push_key(Key::Backspace);
+        q.push_text("d");
+        assert_eq!(q.pending(), 5);
+        assert_eq!(q.take_tick(), (vec![], "ab".to_string()));
+        assert_eq!(q.take_tick(), (vec![Key::Enter], String::new()));
+        assert_eq!(q.take_tick(), (vec![], "c".to_string()));
+        // two Backspaces in a row share a tick, then the text after them
+        assert_eq!(
+            q.take_tick(),
+            (vec![Key::Backspace, Key::Backspace], String::new())
+        );
+        assert_eq!(q.take_tick(), (vec![], "d".to_string()));
+        assert_eq!(q.take_tick(), (vec![], String::new()));
+    }
+
+    #[test]
+    fn letter_keys_ride_with_their_text() {
+        let mut q = KeyQueue::default();
+        for c in ['a', 'b'] {
+            q.push_key(Key::Char(c));
+            q.push_text(&c.to_string());
+        }
+        assert_eq!(
+            q.take_tick(),
+            (vec![Key::Char('a'), Key::Char('b')], "ab".to_string())
+        );
     }
 }

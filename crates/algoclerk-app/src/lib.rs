@@ -41,8 +41,8 @@ struct AudioQueue(Vec<GameEvent>);
 /// Presses and releases that happen between two fixed ticks are latched here.
 #[derive(Resource, Default)]
 struct Latch {
-    keys: Vec<Key>,
-    typed: String,
+    /// Keys and typed text in the order they arrived (several can land in one tick).
+    keys: algoclerk_game::input::KeyQueue,
     pressed: bool,
     released: bool,
     wheel: f32,
@@ -208,11 +208,11 @@ fn collect_input(
             continue;
         }
         if let Some(k) = controls::map_key(e.key_code) {
-            latch.keys.push(k);
+            latch.keys.push_key(k);
         }
         match &e.logical_key {
-            LogicalKey::Character(s) => latch.typed.push_str(s.as_str()),
-            LogicalKey::Space => latch.typed.push(' '),
+            LogicalKey::Character(s) => latch.keys.push_text(s.as_str()),
+            LogicalKey::Space => latch.keys.push_text(" "),
             _ => {}
         }
     }
@@ -242,10 +242,13 @@ fn tick_game(
     mut game: ResMut<GameRes>,
     mut opts: ResMut<Opts>,
 ) {
-    let l = std::mem::take(&mut *latch);
+    // one segment of the typed input per tick, the rest waits (so Return never jumps ahead of the text before it)
+    let mut l = std::mem::take(&mut *latch);
+    let (keys, typed) = l.keys.take_tick();
+    latch.keys = std::mem::take(&mut l.keys);
     let mut input = Input {
-        keys: l.keys,
-        typed: l.typed,
+        keys,
+        typed,
         wheel: l.wheel,
         paste: l.paste,
         ..Input::default()

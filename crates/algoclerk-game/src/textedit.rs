@@ -272,7 +272,8 @@ impl TextEdit {
         if !input.typed.is_empty() && !input.ctrl {
             let before = self.chars.len();
             let typed: String = input.typed.chars().filter(|c| !c.is_control()).collect();
-            if self.smart && typed.chars().count() <= 2 {
+            // typed text is typing (a paste arrives as `paste`): every character gets the code behaviour
+            if self.smart {
                 for c in typed.chars() {
                     self.type_char(c);
                 }
