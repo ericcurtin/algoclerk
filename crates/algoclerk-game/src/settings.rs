@@ -4,7 +4,7 @@
 //! touch and keyboard.
 
 use crate::clerk::{ClerkArt, ClerkState, Dir, Pose};
-use crate::gfx::{Gfx, Kind, State, clip};
+use crate::gfx::{Gfx, Kind, State};
 use crate::input::Key;
 use crate::layout::{Hit, Viewport};
 use crate::modal::{Answer, Modal, Purpose};
@@ -13,7 +13,7 @@ use crate::result::blit_scaled;
 use crate::ui::{Ctx, GameEvent, Nav, View, widget_state};
 use algoclerk_core::i18n;
 use algoclerk_media::bank::PALETTES;
-use algoclerk_media::{ArtBank, Outfit, Rect};
+use algoclerk_media::{ArtBank, Font, Outfit, Rect};
 
 /// Settings rows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -198,10 +198,20 @@ impl Settings {
         v
     }
 
+    /// Left edge of the control of a row (where the label must end).
+    fn control_left(row: Row, r: &Rect, vp: &Viewport) -> i32 {
+        match row {
+            Row::TextSize | Row::Reduce | Row::Fullscreen | Row::Unlock => r.right() - 56,
+            Row::Reset => r.right() - 86,
+            Row::Back => r.right() - 90,
+            _ => Settings::arrows(r, vp).0.x,
+        }
+    }
+
     fn arrows(r: &Rect, vp: &Viewport) -> (Rect, Rect) {
         let w = if vp.touch { vp.hit_min() } else { 18 };
         let h = r.h - 2;
-        let value_w = if r.w < 260 { 64 } else { 80 };
+        let value_w = if r.w < 260 { 72 } else { 84 };
         (
             Rect::new(r.right() - 2 * w - value_w - 6, r.y + 1, w, h),
             Rect::new(r.right() - w - 2, r.y + 1, w, h),
@@ -498,12 +508,13 @@ impl Settings {
                 g.rect(r, 'y');
                 g.cursor(r.x + 2, r.y + (r.h - 9) / 2);
             }
-            g.text(
-                r.x + 14,
-                r.y + (r.h - 7) / 2,
-                &clip(&Settings::label(p.row, v), if r.w < 260 { 12 } else { 18 }),
-                'K',
-            );
+            // the label wraps into the room left of the control instead of being cut off
+            let room = (Settings::control_left(p.row, &r, &vp) - (r.x + 14) - 4).max(30);
+            let lines = Font::wrap(&Settings::label(p.row, v), (room / 6) as usize);
+            let top = r.y + (r.h - (lines.len() as i32 * 9 - 2)) / 2;
+            for (k, l) in lines.iter().enumerate() {
+                g.text(r.x + 14, top + k as i32 * 9, l, 'K');
+            }
             self.draw_value(g, v, p.row, r, s);
         }
         g.c.set_clip(saved);
@@ -597,7 +608,7 @@ impl Settings {
                     .find(|(id, _)| *id == s.palette)
                     .copied()
                     .unwrap_or(PALETTES[0]);
-                g.text_in(vr, &v.tr.t(&format!("palette.{id}")), 'K', 1);
+                value_text(g, vr, &v.tr.t(&format!("palette.{id}")));
             }
             Row::TextSize => {
                 let b = Rect::new(r.right() - 56, r.y + 1, 52, r.h - 2);
@@ -648,7 +659,7 @@ impl Settings {
                     .unwrap_or("en");
                 let name = i18n::load_language(code)
                     .map_or_else(|| code.to_string(), |t| t.t("meta.language"));
-                g.text_in(vr, &name, 'K', 1);
+                value_text(g, vr, &name);
             }
             Row::Preset => {
                 arrows(g);
@@ -659,7 +670,7 @@ impl Settings {
                     .iter()
                     .find(|(_, o)| *o == cur)
                     .map_or_else(|| v.tr.t("settings.custom"), |(n, _)| n.clone());
-                g.text_in(vr, &clip(&name, (vr.w / 6).max(3) as usize), 'K', 1);
+                value_text(g, vr, &name);
             }
             Row::Body => {
                 arrows(g);
@@ -695,4 +706,14 @@ pub fn outfit_of_settings(code: &str, bank: &ArtBank) -> Outfit {
     Outfit::from_code(code)
         .filter(|o| bank.has_template(&format!("clerk/body_{}", o.body)))
         .unwrap_or_default()
+}
+
+/// The value of a setting centred in `vr`; wrapped onto two lines when it is wider than the room.
+fn value_text(g: &mut Gfx<'_>, vr: Rect, text: &str) {
+    let cols = ((vr.w - 2) / 6).max(3) as usize;
+    let lines = Font::wrap(text, cols);
+    let top = vr.y + (vr.h - (lines.len() as i32 * 9 - 2)) / 2;
+    for (k, l) in lines.iter().enumerate() {
+        g.text_c(vr.x + vr.w / 2, top + k as i32 * 9, l, 'K', 1);
+    }
 }

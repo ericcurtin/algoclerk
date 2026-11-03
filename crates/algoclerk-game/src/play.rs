@@ -60,7 +60,7 @@ impl PlayRects {
         let top = Rect::new(0, 0, vp.w, 18);
         if vp.portrait {
             let bh = vp.btn_h();
-            let ch = bh * 2 + 8 + if vp.touch { 4 } else { 14 };
+            let ch = bh * 2 + 8 + if vp.touch { 13 } else { 14 };
             let scene = Rect::new((vp.w - SCENE_W) / 2, 20, SCENE_W, SCENE_H);
             let controls = Rect::new(2, scene.bottom() + 2, vp.w - 4, ch);
             let editor = Rect::new(
