@@ -7,7 +7,7 @@ use crate::gfx::Gfx;
 use crate::session::Frame;
 use crate::value_view::{self, W};
 use algoclerk_core::cpp::ast::Ty;
-use algoclerk_core::cpp::value::{Heap, parse_value, render};
+use algoclerk_core::cpp::value::{Heap, Plain, parse_value, render};
 use algoclerk_media::{ArtBank, Outfit, Rect};
 
 /// Scene width.
@@ -31,6 +31,25 @@ struct Tray {
 struct Spark {
     at: (f32, f32),
     ttl: u32,
+}
+
+/// A value that the trace cannot show (an iterator, whose type the trace reports as unknown) reads
+/// `<iterator>` on the watch board instead of `void`.
+fn watch_value(v: &Plain, ty: &Ty, heap: &Heap) -> String {
+    if *ty == Ty::Unknown && *v == Plain::Void {
+        "<iterator>".to_string()
+    } else {
+        render(v, ty, heap)
+    }
+}
+
+/// The C++ type shown on the watch board: `auto` for a type the trace does not know.
+fn watch_type(ty: &Ty) -> String {
+    if *ty == Ty::Unknown {
+        "auto".to_string()
+    } else {
+        ty.to_string().replace("std::", "")
+    }
 }
 
 /// The scene state.
@@ -114,7 +133,7 @@ impl Office {
         let texts: Vec<String> = f
             .vars
             .iter()
-            .map(|(_, ty, v)| render(v, ty, &f.heap))
+            .map(|(_, ty, v)| watch_value(v, ty, &f.heap))
             .collect();
         for (i, (name, ty, v)) in f.vars.iter().enumerate() {
             let changed = self
@@ -185,7 +204,7 @@ impl Office {
                 let on_shelf = trays.iter().any(|t| t.name == *name);
                 let entry = crate::watch::Entry {
                     name: name.clone(),
-                    ty: ty.to_string().replace("std::", ""),
+                    ty: watch_type(ty),
                     value: texts[i].clone(),
                     changed: trays.iter().any(|t| t.name == *name && t.changed),
                 };
@@ -560,5 +579,22 @@ impl Office {
                 g.text(x + 5, y + 4 + i as i32 * 10, l, 'K');
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_iterator_reads_as_auto_iterator_on_the_watch_board() {
+        let heap = Heap::default();
+        assert_eq!(watch_value(&Plain::Void, &Ty::Unknown, &heap), "<iterator>");
+        assert_eq!(watch_type(&Ty::Unknown), "auto");
+        assert_eq!(watch_value(&Plain::Int(3), &Ty::Int, &heap), "3");
+        assert_eq!(
+            watch_type(&Ty::Vector(Box::new(Ty::Int))),
+            "vector<int>".to_string()
+        );
     }
 }
