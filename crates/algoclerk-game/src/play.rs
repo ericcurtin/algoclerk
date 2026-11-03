@@ -275,26 +275,8 @@ impl Play {
     /// Open the card editor on the selected card.
     pub fn open_card_editor(&mut self) {
         let rows = self.session.rows();
-        if let (Some(i), Some(p)) = (self.panel.sel, &self.session.good) {
-            if let Some(row) = rows.get(i) {
-                let mut found = None;
-                for f in &p.fns {
-                    algoclerk_core::lang::ast::walk_stmts(&f.body, &mut |s| {
-                        if s.id == row.node {
-                            found = Some(crate::blocks::header_text(s));
-                        }
-                    });
-                }
-                if let Some(t) = found {
-                    self.panel.card = Some(crate::editor::CardEdit {
-                        node: row.node,
-                        line: crate::textedit::TextEdit::new(&t, false),
-                        pad: crate::editor::Pad::Names,
-                        last_var: None,
-                        msg: None,
-                    });
-                }
-            }
+        if let Some(row) = self.panel.sel.and_then(|i| rows.get(i)) {
+            self.panel.open_card(&self.session, row.node);
         }
     }
 
@@ -319,30 +301,22 @@ impl Play {
     fn show(&mut self) {
         let Some(r) = &self.session.run else { return };
         let Some(f) = r.frames.get(r.pos) else { return };
-        let nparams = self.session.level.as_ref().map_or_else(
-            || {
-                self.session
-                    .good
-                    .as_ref()
-                    .and_then(|p| p.fns.last().map(|f| f.params.len()))
-                    .unwrap_or(0)
-            },
-            |l| l.signature.params.len(),
-        );
-        let exp = (!r.expected.is_empty()).then_some((r.expected.as_str(), &r.ret));
+        let entry = self.session.entry_name();
+        let nparams = if f.depth == 0 {
+            self.session
+                .good
+                .as_ref()
+                .and_then(|p| p.find(&entry).map(|f| f.params.len()))
+                .unwrap_or(0)
+        } else {
+            0
+        };
         let got = match &r.result {
             Ok(t) => t.clone(),
             Err(_) => String::new(),
         };
-        let nodes = r.nodes.clone();
-        let f = f.clone();
-        match exp {
-            Some((text, ty)) => {
-                self.office
-                    .show(&f, &nodes, nparams, Some((text, ty, &nodes, &got)))
-            }
-            None => self.office.show(&f, &nodes, nparams, None),
-        }
+        let exp = (!r.expected.is_empty()).then_some((r.expected.as_str(), &r.ret, got.as_str()));
+        self.office.show(f, nparams, exp);
     }
 
     fn ensure_run(&mut self) -> bool {
@@ -485,7 +459,8 @@ impl Play {
         if cx.ptr.tapped_in(&back)
             || (cx.input.key(Key::Escape)
                 && self.panel.card.is_none()
-                && self.panel.palette.is_none())
+                && self.panel.palette.is_none()
+                && self.panel.ac.is_none())
         {
             self.save_draft(cx);
             return Some(if self.session.level.is_some() {
@@ -661,6 +636,9 @@ impl Play {
                     t("play.slow_bubble"),
                 ),
                 FailKind::MemoryLimit => (t("play.memory"), t("play.memory_bubble")),
+                FailKind::UnorderedOrder => {
+                    (f.kind.friendly().to_string(), t("play.unordered_bubble"))
+                }
                 FailKind::Error => {
                     let m = f.error.as_ref().map(|e| e.msg.clone()).unwrap_or_default();
                     (

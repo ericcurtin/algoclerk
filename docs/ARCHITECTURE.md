@@ -35,13 +35,26 @@ All drawing uses palette letters into a 480x270 (landscape) or 270x480 (portrait
 shell scales it by an integer and letterboxes. Because `algoclerk-game` has no engine types, every screen is
 rendered, laid out and tested without a window (`algoclerk-tools`, `crates/algoclerk-game/tests/ui.rs`).
 
-**Play screen.** The scene (`office.rs`) replays a recorded run: each trace event carries the locals, the scene
-lays them out as labelled trays drawn by `value_view.rs` (crate, letter tile, ribbon, shelf, rack, drawers,
-bin, spring plates, belt, pyramid, tag chain, org chart), sends the clerk to the tray that changed, shows the
-returned value in the outbox with the expected value and a tick or cross stamp, and ticks the wall clock with
-the abstract cost. The editor (`editor.rs`, `blocks.rs`) shows the same program as nested cards or as text.
-The program **text is the source of truth** (`session.rs`): card edits transform the tree and print it back,
-text edits re-parse, undo and redo are text history, so the two views are always in sync.
+**Play screen.** The scene (`office.rs`) replays a recorded run: each trace event carries the visible locals
+(with their C++ types), the scene lays them out as labelled trays drawn by `value_view.rs` (crate, letter tile,
+ribbon, shelf, rack, drawers, bin, spring plates, belt, pyramid, tag chain, org chart for `ListNode*` and
+`TreeNode*`) and writes the type (`vector<int>`) in the tray header when there is room. The clerk walks to the
+tray that changed, the returned value goes to the outbox with the expected value and a tick or cross stamp,
+and the wall clock shows the abstract cost. A runtime error becomes a speech bubble and the failing line is
+highlighted in both editor views (`RtError.node` through `Program.spans`).
+
+The editor (`editor.rs`, `blocks.rs`, `complete.rs`) shows the player's part of the program (the level's
+read-only prelude is summarised in a strip above it and shown in full on the brief) as nested cards or as
+text. The text view colours tokens with `cpp::lexer::highlight` (`syntax.rs`), underlines the problem with the
+clerk's message and offers autocomplete for `std::` names and for the members of the receiver before `.` or `->`
+(`stdlib::members_of` filtered by the unlocked headers and the level's locks; receiver types come from the
+checker's `scope_at` and declarator types). Cards are statements of the C++ tree: tap to edit one as text, move,
+delete, insert; what cards cannot express (`switch`, `do`-`while`, multi-line statements) is a read-only *raw
+C++* card, and every card edit re-prints through `cpp::print`. The program **text is the source of truth**
+(`session.rs`): card edits transform the tree and print it back, text edits re-parse, undo and redo are text
+history, so the two views are always in sync. The code reveal (`result.rs`) has C, C++ and Rust tabs behind
+`result::translations`; C++ shows the player's program, the other two say that the translation is coming until
+the code generators are connected.
 
 **Input.** The shell converts pointer positions to virtual pixels and latches presses between 60 Hz ticks;
 `input.rs` derives taps, drags and long presses. Gamepad support is not wired in the shell.

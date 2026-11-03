@@ -3,10 +3,8 @@
 //! virtual screen at several window sizes, the pixel font covers every string and every generated code
 //! sample, and the software renderer is deterministic and close to stored coarse "golden" maps.
 
-use algoclerk_core::codegen::{Lang, generate};
 use algoclerk_core::i18n;
 use algoclerk_core::judge::Judge;
-use algoclerk_core::lang::run::compile;
 use algoclerk_game::layout::{TOUCH_MIN, choose};
 use algoclerk_game::scenarios::{NAMES, Spec, build, render};
 use algoclerk_game::{Game, GameConfig, MemoryStorage};
@@ -144,7 +142,7 @@ fn the_pixel_font_covers_every_shipped_string() {
 }
 
 #[test]
-fn the_pixel_font_covers_all_level_text_and_all_generated_code() {
+fn the_pixel_font_covers_all_level_text_and_all_reference_code() {
     let b = bank();
     let campaign = Campaign::shipped();
     let mut missing: Vec<String> = Vec::new();
@@ -155,7 +153,8 @@ fn the_pixel_font_covers_all_level_text_and_all_generated_code() {
             level.statement.clone(),
             level.technique.clone(),
             level.big_o.clone(),
-            level.signature.text(),
+            level.signature_text.clone(),
+            level.prelude.clone(),
         ];
         texts.extend(level.constraints.iter().cloned());
         texts.extend(level.hints.iter().cloned());
@@ -167,13 +166,7 @@ fn the_pixel_font_covers_all_level_text_and_all_generated_code() {
                 .chain([e.expect.clone(), e.note.clone()])
         }));
         texts.push(level.reference.clone());
-        if let Ok(c) = compile(&level.reference, &level.check_opts()) {
-            for lang in Lang::ALL {
-                let g = generate(&c, lang, &level.signature.name);
-                texts.push(g.prelude);
-                texts.push(g.code);
-            }
-        }
+        texts.extend(level.naive.iter().cloned());
         for t in texts {
             let m = b.font.missing(&t.replace('\n', " "));
             if !m.is_empty() {
@@ -459,4 +452,69 @@ fn random_input_never_panics_on_any_screen() {
             }
         }
     }
+}
+
+#[test]
+fn the_autocomplete_popup_opens_navigates_and_accepts() {
+    use algoclerk_game::{Input, Key};
+    let mut g = build(&Spec::new("play-complete")).unwrap();
+    let pop = g
+        .play_mut()
+        .unwrap()
+        .panel
+        .ac
+        .clone()
+        .expect("popup after `seen.`");
+    assert!(pop.items.len() > 3);
+    let second = pop.items[1].insert.clone();
+    let tick = |g: &mut Game, keys: Vec<Key>, typed: &str| {
+        g.tick(&Input {
+            keys,
+            typed: typed.to_string(),
+            ..Input::default()
+        });
+    };
+    // Escape closes the popup without leaving the screen
+    tick(&mut g, vec![Key::Escape], "");
+    assert_eq!(g.scene.name(), "play");
+    assert!(g.play_mut().unwrap().panel.ac.is_none());
+    // typing a letter reopens it with the filtered list; Down then Enter picks the second suggestion
+    tick(&mut g, vec![], "e");
+    let pop = g
+        .play_mut()
+        .unwrap()
+        .panel
+        .ac
+        .clone()
+        .expect("popup after `seen.e`");
+    assert!(pop.items.iter().all(|i| i.label.starts_with('e')));
+    tick(&mut g, vec![Key::Down], "");
+    let want = pop.items[1].insert.clone();
+    tick(&mut g, vec![Key::Enter], "");
+    let text = g.play_mut().unwrap().session.text();
+    assert!(text.contains(&format!("seen.{want}")), "{text}");
+    assert!(!text.contains("seen.ee"), "{text}");
+    assert!(g.play_mut().unwrap().panel.ac.is_none());
+    let _ = second;
+}
+
+#[test]
+fn an_old_save_loads_with_a_one_time_note_and_progress_kept() {
+    use algoclerk_game::{Input, Key};
+    let mut g = build(&Spec::new("migrated")).unwrap();
+    assert_eq!(g.scene.name(), "title");
+    assert!(!g.progress.migration_note.is_empty());
+    assert!(
+        g.progress.record("two-sum").draft.is_empty(),
+        "old solutions are discarded"
+    );
+    assert!(g.progress.sandbox.is_empty());
+    // the notice swallows input until it is dismissed
+    assert_eq!(g.hits().len(), 3);
+    g.tick(&Input {
+        keys: vec![Key::Enter],
+        ..Input::default()
+    });
+    assert!(g.progress.migration_note.is_empty());
+    assert!(g.hits().len() > 3);
 }
