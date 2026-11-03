@@ -297,6 +297,11 @@ impl TextEdit {
         if col < self.scroll_col {
             self.scroll_col = col;
         }
+        // a cursor near the left edge of the text shows the line from its start (after a long line was
+        // scrolled sideways, Return brings the view home)
+        if col + 1 < cols / 2 {
+            self.scroll_col = 0;
+        }
         if col >= self.scroll_col + cols.max(1) {
             self.scroll_col = col + 1 - cols.max(1);
         }
@@ -1202,6 +1207,20 @@ mod tests {
             typed: s.to_string(),
             ..Input::default()
         }
+    }
+
+    #[test]
+    fn the_view_comes_home_when_the_cursor_returns_to_the_left() {
+        let mut e = TextEdit::new(
+            "a very long line of code that needs scrolling to the right a lot\nx",
+            true,
+        );
+        e.cursor = 60;
+        e.scroll_to_cursor(5, 20);
+        assert!(e.scroll_col > 0);
+        e.cursor = e.chars.len();
+        e.scroll_to_cursor(5, 20);
+        assert_eq!(e.scroll_col, 0);
     }
 
     #[test]

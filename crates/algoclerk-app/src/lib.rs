@@ -211,7 +211,20 @@ fn collect_input(
             latch.keys.push_key(k);
         }
         match &e.logical_key {
-            LogicalKey::Character(s) => latch.keys.push_text(s.as_str()),
+            LogicalKey::Character(s) => {
+                // some input methods and scripted keyboards (xdotool type) send a newline as a character
+                // (Linefeed) instead of the Enter key: it is still Return
+                for part in s.split_inclusive(['\n', '\r']) {
+                    let text = part.trim_end_matches(['\n', '\r']);
+                    if !text.is_empty() {
+                        latch.keys.push_text(text);
+                    }
+                    if text.len() != part.len() && controls::map_key(e.key_code) != Some(Key::Enter)
+                    {
+                        latch.keys.push_key(Key::Enter);
+                    }
+                }
+            }
             LogicalKey::Space => latch.keys.push_text(" "),
             _ => {}
         }
