@@ -22,7 +22,16 @@ impl Gen {
     }
 
     pub fn range_for(&mut self, d: u32) {
-        let all = [K::Vec, K::Vec, K::Str, K::Map, K::Set, K::Deque, K::Grid];
+        let all = [
+            K::Vec,
+            K::Vec,
+            K::Str,
+            K::Map,
+            K::Set,
+            K::Deque,
+            K::List,
+            K::Grid,
+        ];
         let Some(v) = self.pick_var(&all) else {
             return self.decl_container();
         };
@@ -33,7 +42,7 @@ impl Gen {
         let times = v.len.clamp(1, LEN_CAP);
         let x = self.fresh("e");
         match v.k {
-            K::Vec | K::Deque | K::Set => {
+            K::Vec | K::Deque | K::List | K::Set => {
                 let mut form = if v.k == K::Set {
                     self.src.below(2)
                 } else {
@@ -64,7 +73,7 @@ impl Gen {
                     _ => {
                         let i = self.fresh("i");
                         let big = self.src.chance(1, 2);
-                        if big && v.k != K::Set {
+                        if big && !matches!(v.k, K::Set | K::List) {
                             self.line(&format!("for (size_t {i} = 0; {i} < {n}.size(); ++{i}) {{"));
                             self.ro(
                                 format!("static_cast<unsigned long long>({i})"),
@@ -73,7 +82,7 @@ impl Gen {
                                 v.len as i128,
                                 false,
                             );
-                        } else if v.k != K::Set {
+                        } else if !matches!(v.k, K::Set | K::List) {
                             self.line(&format!(
                                 "for (int {i} = 0; {i} < static_cast<int>({n}.size()); ++{i}) {{"
                             ));
@@ -84,7 +93,7 @@ impl Gen {
                             ));
                             self.ro("*it".into(), K::Int, -KI, KI, false);
                         }
-                        if v.k != K::Set {
+                        if !matches!(v.k, K::Set | K::List) {
                             self.ro(format!("{n}[{i}]"), K::Int, -KI, KI, false);
                         }
                     }
@@ -297,7 +306,7 @@ impl Gen {
 
     /// `while (!c.empty()) { auto t = c.top(); c.pop(); ... }`
     pub fn drain_loop(&mut self, d: u32) {
-        let Some(v) = self.pick_var(&[K::Stack, K::Queue, K::Deque, K::Pq]) else {
+        let Some(v) = self.pick_var(&[K::Stack, K::Queue, K::Deque, K::List, K::Pq]) else {
             return self.decl_container();
         };
         if v.frozen {

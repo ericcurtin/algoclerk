@@ -11,6 +11,7 @@ pub const INCLUDES: &str = "#include <algorithm>
 #include <deque>
 #include <functional>
 #include <iterator>
+#include <list>
 #include <map>
 #include <numeric>
 #include <queue>

@@ -66,10 +66,10 @@ impl Gen {
                         "int {d} = static_cast<int>((({d}a % {M}) + {M}) % {M});"
                     ));
                 }
-                K::Stack | K::Queue | K::Deque | K::Pq => {
+                K::Stack | K::Queue | K::Deque | K::List | K::Pq => {
                     let t = format!("{d}t");
                     lines.push(format!("int {d} = 7;"));
-                    if v.k == K::Deque {
+                    if matches!(v.k, K::Deque | K::List) {
                         lines.push(format!("for (int e : {n}) {}", fold("(e % 1000 + 1000)")));
                     } else {
                         lines.push(format!("auto {t} = {n};"));

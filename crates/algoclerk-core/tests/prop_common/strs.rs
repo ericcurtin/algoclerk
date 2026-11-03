@@ -38,13 +38,14 @@ impl Gen {
             }
             3 => {
                 // a guard that is only safe because && short-circuits
-                let Some(v) = self.pick_var(&[K::Vec, K::Str, K::Stack, K::Queue, K::Deque, K::Pq])
+                let Some(v) =
+                    self.pick_var(&[K::Vec, K::Str, K::Stack, K::Queue, K::Deque, K::List, K::Pq])
                 else {
                     return self.boolean(0);
                 };
                 let n = v.name;
                 let last = match v.k {
-                    K::Vec | K::Deque | K::Str => format!("{n}.back()"),
+                    K::Vec | K::Deque | K::Str | K::List => format!("{n}.back()"),
                     K::Queue => format!("{n}.front()"),
                     _ => format!("{n}.top()"),
                 };

@@ -100,6 +100,7 @@ pub enum K {
     Stack,
     Queue,
     Deque,
+    List,
     Pq,
 }
 

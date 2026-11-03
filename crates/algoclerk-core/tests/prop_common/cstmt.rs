@@ -4,7 +4,7 @@
 use super::expr::*;
 use super::reads::LEN_CAP;
 
-const CONTAINERS: [K; 14] = [
+const CONTAINERS: [K; 15] = [
     K::Vec,
     K::Vec,
     K::Vec,
@@ -18,6 +18,7 @@ const CONTAINERS: [K; 14] = [
     K::Stack,
     K::Queue,
     K::Deque,
+    K::List,
     K::Pq,
 ];
 
@@ -144,6 +145,18 @@ impl Gen {
                 v = Var::new(name.clone(), k);
                 self.line(&format!("std::queue<int> {name};"));
             }
+            K::List => {
+                let name = self.fresh("ls");
+                v = Var::new(name.clone(), k);
+                if self.src.chance(1, 2) {
+                    self.line(&format!("std::list<int> {name};"));
+                } else {
+                    let n = self.src.range(1, 4) as usize;
+                    let it = self.items(n);
+                    v.len = n as i64;
+                    self.line(&format!("std::list<int> {name} = {{{it}}};"));
+                }
+            }
             K::Deque => {
                 let name = self.fresh("dq");
                 v = Var::new(name.clone(), k);
@@ -209,6 +222,7 @@ impl Gen {
             K::Stack,
             K::Queue,
             K::Deque,
+            K::List,
             K::Pq,
         ];
         let Some(v) = self.pick_var(&all) else {
@@ -217,6 +231,57 @@ impl Gen {
         if v.frozen {
             return self.assign_scalar();
         }
+        if self.src.chance(1, 6) && !matches!(v.k, K::Grid | K::Pq) {
+            return self.alias_op(v);
+        }
+        self.container_op_on(v);
+    }
+
+    /// Operate on a container through a reference alias: `{ T& al = v; ...ops on al... }`.
+    fn alias_op(&mut self, v: Var) {
+        let al = self.fresh("al");
+        let ty = self.type_of(&v);
+        self.line("{");
+        self.indent += 1;
+        self.push_scope();
+        self.line(&format!("{ty}& {al} = {};", v.name));
+        let mut a = v.clone();
+        a.name = al.clone();
+        a.capturable = false;
+        self.add(a.clone());
+        for _ in 0..1 + self.src.below(3) {
+            self.container_op_on(a.clone());
+            // later operations see the alias with its grown length
+            if let Some(cur) = self.find_vars(&[a.k]).into_iter().find(|x| x.name == al) {
+                a = cur;
+            }
+        }
+        let grown = a.len;
+        self.pop_scope();
+        self.indent -= 1;
+        self.line("}");
+        if let Some(o) = self.var_mut(&v.name) {
+            o.len = o.len.max(grown);
+        }
+    }
+
+    fn type_of(&self, v: &Var) -> &'static str {
+        match v.k {
+            K::Vec => "std::vector<int>",
+            K::Str => "std::string",
+            K::Map => "std::map<int, int>",
+            K::UMap => "std::unordered_map<int, int>",
+            K::Set => "std::set<int>",
+            K::USet => "std::unordered_set<int>",
+            K::Stack => "std::stack<int>",
+            K::Queue => "std::queue<int>",
+            K::Deque => "std::deque<int>",
+            K::List => "std::list<int>",
+            _ => "std::priority_queue<int>",
+        }
+    }
+
+    fn container_op_on(&mut self, v: Var) {
         let can = if self.room(&v) { 1 } else { 0 };
         let n = v.name.clone();
         let m = self.mult;
@@ -231,7 +296,22 @@ impl Gen {
                 let other = self
                     .pick_var(&[K::Vec])
                     .filter(|o| o.name != n && o.len * m + v.len <= LEN_CAP);
-                let w = [3 * can, can, 2, 3, 2 * can, 2, 1, 1, 1, 3, 2, 2 * can, can];
+                let w = [
+                    3 * can,
+                    can,
+                    2,
+                    3,
+                    2 * can,
+                    2,
+                    1,
+                    1,
+                    1,
+                    3,
+                    2,
+                    2 * can,
+                    can,
+                    2,
+                ];
                 match self.src.weighted(&w) {
                     0 => {
                         self.line(&format!("{n}.push_back({e});"));
@@ -303,9 +383,19 @@ impl Gen {
                             self.grow(&n, m);
                         }
                     }
-                    _ => {
+                    12 => {
                         self.line(&format!("if (!{n}.empty()) {n}.push_back({n}.back());"));
                         self.grow(&n, m);
+                    }
+                    _ => {
+                        // a reference to an element, written through
+                        let r = self.num(N::Int, 1);
+                        let r = self.reduce(r, 17).s;
+                        let rf = self.fresh("r");
+                        self.line(&format!(
+                            "if (!{n}.empty()) {{ int& {rf} = {n}[{i}]; {rf} = ({rf} + {r}) % {}; }}",
+                            KI + 1
+                        ));
                     }
                 }
             }
@@ -375,6 +465,27 @@ impl Gen {
                     self.line(&format!("{n}.emplace({e});"));
                     self.grow(&n, m);
                 }
+            },
+            K::List => match self.src.weighted(&[2 * can, 2 * can, 2, 2, can, 1, 1]) {
+                0 => {
+                    self.line(&format!("{n}.push_back({e});"));
+                    self.grow(&n, m);
+                }
+                1 => {
+                    self.line(&format!("{n}.push_front({e});"));
+                    self.grow(&n, m);
+                }
+                2 => self.line(&format!("if (!{n}.empty()) {n}.pop_back();")),
+                3 => self.line(&format!("if (!{n}.empty()) {n}.pop_front();")),
+                4 => {
+                    let k = self.fit_int_text(1);
+                    self.line(&format!(
+                        "{n}.insert(std::next({n}.begin(), static_cast<int>(static_cast<size_t>({k}) % ({n}.size() + 1))), {e});"
+                    ));
+                    self.grow(&n, m);
+                }
+                5 => self.line(&format!("if (!{n}.empty()) {n}.erase({n}.begin());")),
+                _ => self.line(&format!("if (!{n}.empty()) {n}.front() = {e};")),
             },
             _ => {
                 let i = {

@@ -199,6 +199,11 @@ impl Gen {
                 1 => ik(format!("({n}.empty() ? 0 : {n}.back())"), -KI, KI),
                 _ => ik(format!("static_cast<int>({n}.size())"), 0, v.len as i128),
             },
+            K::List => match self.src.below(3) {
+                0 => ik(format!("({n}.empty() ? 0 : {n}.front())"), -KI, KI),
+                1 => ik(format!("({n}.empty() ? 0 : {n}.back())"), -KI, KI),
+                _ => ik(format!("static_cast<int>({n}.size())"), 0, v.len as i128),
+            },
             K::Deque => match self.src.below(4) {
                 0 => ik(format!("({n}.empty() ? 0 : {n}.front())"), -KI, KI),
                 1 => ik(format!("({n}.empty() ? 0 : {n}.back())"), -KI, KI),
