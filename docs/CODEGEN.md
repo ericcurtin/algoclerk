@@ -27,8 +27,7 @@ faithfully gives an `Err`, never wrong code, and a panic inside a translator is 
 way. The game shows the message in the tab instead of code. `prelude` is the part the UI collapses by default
 (imports, helpers, node arenas, container templates), `code` the translated functions.
 
-The module is independent of the old ClerkScript generator (`crate::codegen`); that module can be deleted
-without touching this one.
+The module replaces the earlier generator, which has been deleted.
 
 ## C++ tab
 

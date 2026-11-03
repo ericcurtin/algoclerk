@@ -336,7 +336,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// Number of levels the finished campaign has (the old ClerkScript files are skipped by the loader
+    /// Number of levels the finished campaign has (old-format level files are skipped by the loader
     /// until each is converted to the C++ level format).
     const FULL_CAMPAIGN: usize = 80;
 

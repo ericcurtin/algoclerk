@@ -114,7 +114,7 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
     };
     let mut storage = MemoryStorage::default();
     if spec.name == "migrated" {
-        // a save written by the ClerkScript era game: version 1, a solved level and a draft in the old syntax
+        // a save written by the first game version (own language): version 1, a solved level and a draft in the old syntax
         use crate::storage::Storage;
         let old = r#"{"version":1,"levels":{"two-sum":{"solved":true,"stars":3,"draft":"fn two_sum(nums: vec<int>) -> int { return 0; }"}},"sandbox":"fn main() -> int { return 1; }"}"#;
         let _ = storage.write(crate::PROGRESS_FILE, old);

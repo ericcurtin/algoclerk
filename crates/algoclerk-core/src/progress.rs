@@ -7,11 +7,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// Current on-disk format version. Version 1 saves were written when players still wrote the invented
-/// ClerkScript language; version 2 is the C++ era.
+/// invented player language; version 2 is the C++ era.
 pub const PROGRESS_VERSION: u32 = 2;
 
 /// Shown once after an old save was converted (see [`Progress::from_json`]).
-pub const MIGRATION_NOTE: &str = "The office switched from ClerkScript to real C++. Old solutions cannot be migrated, so drafts and saved solutions were cleared; your solved levels, stars and settings were kept.";
+pub const MIGRATION_NOTE: &str = "The office switched to real C++ as the player language. Old solutions cannot be migrated, so drafts and saved solutions were cleared; your solved levels, stars and settings were kept.";
 
 /// Per-level record.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
@@ -138,8 +138,8 @@ impl Default for Progress {
 impl Progress {
     /// Parse JSON; falls back to defaults on corrupt data (never panics, never loses the app).
     ///
-    /// Saves older than [`PROGRESS_VERSION`] (ClerkScript era) are migrated: settings, solved flags, medals
-    /// and stars are kept; everything that contained ClerkScript text (drafts, saved best solutions,
+    /// Saves older than [`PROGRESS_VERSION`] (pre-C++ era) are migrated: settings, solved flags, medals
+    /// and stars are kept; everything that contained old-language text (drafts, saved best solutions,
     /// sandbox) and the numbers that are not comparable with the C++ size metric (best size, best speed,
     /// measured complexity) are cleared, and [`Progress::migration_note`] says so.
     pub fn from_json(s: &str) -> Progress {
@@ -297,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn clerkscript_era_saves_are_migrated_not_crashed_on() {
+    fn pre_cpp_era_saves_are_migrated_not_crashed_on() {
         let old = r#"{
             "version": 1,
             "levels": {

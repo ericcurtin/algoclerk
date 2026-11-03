@@ -3,8 +3,8 @@
 A level is one TOML file under `levels/<pack>/<id>.toml`; the file name (without `.toml`) is the id. A pack is
 a directory with a `pack.toml` (`title`, `blurb`, `order`). Levels are embedded in the binary at build time
 and extra packs can be loaded from a user directory on desktop (`ALGOCLERK_LEVELS=/path` or the data
-directory's `levels/`). Files that do not parse (for example a level still written for the old ClerkScript
-language) are skipped and reported in `Campaign::load_errors`; they never stop the game.
+directory's `levels/`). Files that do not parse (for example a level still written in the retired
+pre-C++ format) are skipped and reported in `Campaign::load_errors`; they never stop the game.
 
 Players write real C++17 (see [CPP_SUBSET.md](CPP_SUBSET.md)). The level supplies a read-only **prelude**
 (includes and helper structs) and a fixed **signature**; the player's text is the prelude, then the player's
@@ -123,7 +123,7 @@ Arguments and expected values use the C++ brace-initialiser notation of `crates/
 Old `[..]` becomes `{..}`, `null` becomes `nullptr`, `none` becomes `nullopt`.
 
 Remember C++ integer semantics: `int` is 32 bits and overflow is undefined behaviour (reported by the
-interpreter and by `-fsanitize=undefined`). The old ClerkScript `int` was 64 bits: when a value or an
+interpreter and by `-fsanitize=undefined`). The pre-C++ `int` was 64 bits: when a value or an
 intermediate result can exceed about 2 billion, the signature and the reference must use `long long`. Check
 the generators' ranges (a `sum_of` argument, `n * n`, prefix sums, products).
 
@@ -262,7 +262,7 @@ traps:
 - the `naive` solution compiles, passes every standard test, and **times out on a large test**;
 - the reference does not depend on unordered iteration order;
 - at least two examples, three hints, a story, a technique, and at least one large generator;
-- independent oracles written in plain Rust (`crates/algoclerk-levels/tests/oracles.rs`) agree with the
+- independent oracles written in plain Rust (`crates/algoclerk-levels/tests/common/mod.rs`, run by `tests/oracles.rs`) agree with the
   expected value of every test of every level.
 
 ## Differential testing against real compilers
