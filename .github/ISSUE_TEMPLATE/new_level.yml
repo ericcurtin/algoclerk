@@ -12,7 +12,7 @@ body:
     id: pack
     attributes:
       label: Which pack?
-      options: [Mail Room, Counting House, Number Cruncher, The Shelves, Sort & Search, Ledger Room, Executive Floor, A new pack]
+      options: [Mail Room, Records Office, Filing Cabinets, Stack Room, Search and Sort Annex, Grid Hall, Chain and Tree Gallery, Strategy Suite, Basement Bits, Executive Floor, A new pack]
   - type: textarea
     id: topic
     attributes:
@@ -30,7 +30,8 @@ body:
   - type: textarea
     id: solution
     attributes:
-      label: Idea for a reference solution (optional)
+      label: Idea for a reference solution in C++ (optional)
+      description: Signature such as `std::vector<int> twoSum(const std::vector<int>& nums, int target)`, the container or algorithm idea, and what a slow naive solution would look like.
   - type: checkboxes
     id: terms
     attributes:

@@ -1,6 +1,6 @@
 # ADR 0006: replace the assembly puzzle language with ClerkScript
 
-Status: accepted. Supersedes the instruction-set part of ADR 0002 and ADR 0003's level semantics.
+Status: superseded by ADR 0007 (real C++ is now the player language). Originally accepted; it superseded the instruction-set part of ADR 0002 and ADR 0003's level semantics.
 
 ## Context
 

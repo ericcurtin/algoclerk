@@ -1,6 +1,6 @@
 # ADR 0002: Player programs run in our own interpreter; no WebAssembly
 
-- Status: accepted (the interpreter now runs ClerkScript, see ADR 0006; the instruction set described here is gone)
+- Status: accepted (the interpreter now runs a subset of C++17, see ADR 0007; the instruction set described here is gone)
 
 ## Context
 

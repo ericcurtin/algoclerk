@@ -36,20 +36,84 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      # The code generator is compile-tested with gcc, g++, clang and rustc.
+      # The differential tests compile the player's C++ with g++ and clang++ and compare the result with the
+      # interpreter; the code generator tests also use rustc and gcc/clang. Every compiler run is wrapped in
+      # GNU `timeout`, so macOS gets coreutils (gnubin puts `timeout` on PATH). A missing compiler skips its
+      # tests with a message, so the Linux leg installs all of them and the `differential` job below runs the
+      # compiler suites with more random programs.
       - name: Install compilers (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y gcc g++ clang libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev libx11-dev libxcursor-dev libxi-dev libxrandr-dev pkg-config
-      - name: Install compilers (Windows)
-        if: runner.os == 'Windows'
-        run: choco install -y llvm mingw --no-progress
+      - name: Install GNU timeout (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install coreutils
+          echo "$(brew --prefix coreutils)/libexec/gnubin" >> "$GITHUB_PATH"
+      - name: Show the toolchains
+        shell: bash
+        run: |
+          rustc --version
+          g++ --version | head -n 1 || true
+          clang++ --version | head -n 1 || true
+          timeout --version | head -n 1 || true
       - name: Clippy (warnings are errors)
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Tests
+        if: runner.os != 'Windows'
         run: cargo test --workspace
+      # Windows has no GNU `timeout` (System32 ships a different program of that name), so the suites that
+      # compile C++ or the translations are not run there; everything that only needs the interpreter is.
+      - name: Tests without compiler suites (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cargo test --workspace --lib --bins
+          cargo test -p algoclerk-core --test cpp_check_corpus --test cpp_check_negative --test cpp_check_stdlib --test cpp_interp_smoke --test cpp_interp_ub --test cpp_parse_fuzz --test cpp_prop_fuzz --test robustness
+          cargo test -p algoclerk-levels --test oracles --test shipped
+          cargo test -p algoclerk-cli
+          cargo test -p algoclerk-game
       - name: Clippy with audio (Linux)
         if: runner.os == 'Linux'
         run: cargo clippy -p algoclerk-app --all-targets --features audio -- -D warnings
+
+  differential:
+    name: differential tests against g++, clang++ and rustc
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      # Both compilers for every program (the default compiles clang++ for a sample only), more random
+      # programs than the default 40, and a seed that changes on every run so CI explores new programs.
+      # The seed is printed with every run; ALGOCLERK_PROP_SEED=<n> reproduces a failure locally.
+      ALGOCLERK_DIFF_CLANG: "1"
+      ALGOCLERK_PROP_CASES: "400"
+      ALGOCLERK_PROP_SEED: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install compilers (g++ brings the sanitizer runtimes)
+        run: sudo apt-get update && sudo apt-get install -y gcc g++ clang libasound2-dev libudev-dev libwayland-dev libxkbcommon-dev libx11-dev libxcursor-dev libxi-dev libxrandr-dev pkg-config
+      - name: Show the toolchains
+        run: |
+          rustc --version
+          g++ --version | head -n 1
+          clang++ --version | head -n 1
+          gcc --version | head -n 1
+          clang --version | head -n 1
+          timeout --version | head -n 1
+      - name: Interpreter against compilers (snippets, round trip, random programs, UB table, fuzz)
+        run: >
+          cargo test -p algoclerk-core
+          --test cpp_interp_diff --test cpp_parse_roundtrip --test cpp_harness_selftest
+          --test cpp_prop_diff --test cpp_prop_ub --test cpp_prop_fuzz --test cpp_interp_ub
+        env:
+          RUST_BACKTRACE: "1"
+      - name: Level solutions against compilers (reference and naive, warnings are errors, sanitizers)
+        run: cargo test -p algoclerk-levels --test cpp_diff_levels
+      - name: Rust and C translations against the interpreter
+        run: |
+          cargo test -p algoclerk-core --test cpp_codegen_random
+          cargo test -p algoclerk-levels --test cpp_codegen_levels
 
   levels:
     name: validate levels

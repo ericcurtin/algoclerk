@@ -7,88 +7,108 @@
   <a href="docs/BUILDING.md"><img alt="Platforms" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-lightgrey.svg"></a>
 </p>
 
-<p align="center"><b>A charming pixel-art puzzle game for practising interview-style algorithm questions.</b><br>
-You write the solution in a small, typed, high-level language with strings, vectors, maps and more;
-the clerk acts it out in an office, and when you win the game shows your program as real C, C++ and Rust.</p>
+<p align="center"><b>Write real C++ to solve office puzzles.</b><br>
+A charming pixel-art game for practising interview-style algorithm questions. You write a real C++17 function
+with <code>std::vector</code>, <code>std::unordered_map</code> and friends; the clerk acts it out in an office, and the game
+tells you, politely, when your code would be undefined behaviour in a real compiler.</p>
 
 <p align="center">
-  <img src="docs/screenshots/play.png" width="48%" alt="The clerk running two_sum: the map drawers, the shelf of numbers and the outbox">
+  <img src="docs/screenshots/play.png" width="48%" alt="The clerk running twoSum: the map drawers, the shelf of numbers and the outbox, with the program as cards">
   <img src="docs/screenshots/play-portrait.png" width="22%" alt="Phone layout">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/play-grid.png" width="31%" alt="A grid rack, a set bin and a queue belt">
-  <img src="docs/screenshots/code-rust.png" width="31%" alt="The code reveal in Rust">
-  <img src="docs/screenshots/select.png" width="31%" alt="The office-building level map">
+  <img src="docs/screenshots/brief.png" width="31%" alt="The memo: the job, the read-only prelude and the function you write">
+  <img src="docs/screenshots/play-text.png" width="31%" alt="The text editor with syntax colours and a friendly error under the failing statement">
+  <img src="docs/screenshots/victory.png" width="31%" alt="Victory: stars, medals and the measured time and space class">
 </p>
 
 ## What it is
 
-Each level is a function with a typed signature, for example
-`fn two_sum(nums: vec<int>, target: int) -> vec<int>`, and you write the body in **ClerkScript** with the same
-ideas as a real interview answer. Nothing is assembly-like. The campaign has **80 levels in ten wings** of the
-office building, from "sum a shelf" to hash maps, sliding windows, stacks, heaps, binary search, BFS on grids
-and graphs, linked lists, trees and dynamic programming, with a few boss floors.
+Each level is a real C++ function with a real signature, for example
+`std::vector<int> twoSum(const std::vector<int>& nums, int target)`. The level shows a read-only prelude (the
+`#include` lines and helper structs such as `ListNode`) and you write the function, plus helpers where the
+level allows. Nothing is assembly-like and nothing is invented: what you type is what you would type in an
+interview. The campaign has **80 levels in ten wings** of the office building, from "sum a shelf" to hash
+maps, sliding windows, stacks, heaps, binary search, BFS on grids and graphs, linked lists, trees and dynamic
+programming, with a few boss floors.
 
-```text
-fn two_sum(nums: vec<int>, target: int) -> vec<int> {
-    let seen = map<int, int>();
-    for i in range(len(nums)) {
-        let want = target - nums[i];
-        if seen.contains(want) {
-            return [seen[want], i];
+```cpp
+#include <vector>
+#include <unordered_map>
+
+std::vector<int> twoSum(const std::vector<int>& nums, int target) {
+    std::unordered_map<int, int> seen;
+    for (int i = 0; i < static_cast<int>(nums.size()); ++i) {
+        if (auto it = seen.find(target - nums[i]); it != seen.end()) {
+            return {it->second, i};
         }
         seen[nums[i]] = i;
     }
-    return [];
+    return {};
 }
 ```
 
+The game does not run a compiler. It has its own lexer, parser, type checker and interpreter for a carefully
+defined subset of C++17, and the repository tests that interpreter against real `g++` and `clang++`. See
+[docs/CPP_SUBSET.md](docs/CPP_SUBSET.md) for what is in the subset and
+[docs/adr/0007-real-cpp-as-the-player-language.md](docs/adr/0007-real-cpp-as-the-player-language.md) for why.
+
 ## Features
 
-- **Visual-first.** Variables live in labelled trays and are drawn as what they are: ints as crates, strings as
-  ribbons of letter tiles, vectors as shelves with indexed slots, grids as filing racks, maps as filing-cabinet
-  drawers, sets as bins, stacks as spring plates, queues as belts, heaps as pyramids, linked lists as chains of
-  tags, trees as org charts. The clerk walks to what changed; the wall clock ticks the abstract cost.
-- **Cards and text, always in sync.** Edit the program as nested paper cards (a chip pad of variables, numbers,
-  operators and the unlocked tools filtered by type; drag to reorder; undo and redo) or as text (auto-indent,
-  error squiggles, on-screen keyboard). No typing is needed to finish the game on a phone.
-- **Interview-grade scoring.** Speed is an abstract cost that mirrors real complexity, and every level runs
-  hidden **large** tests: a brute-force O(n squared) answer runs out of time exactly like a time-limit-exceeded
-  verdict. A solved level reports its measured time and space class, plus medals for size and speed.
-- **The thing a level is about is locked.** Each memo lists unlocked and locked tools (no `sorted` in the
-  "sort it yourself" level, no `sum` in the accumulator level) and a hint ladder of sticky notes.
-- **Real code reveal.** Your solution as idiomatic C++ (`std::vector`, `std::unordered_map`, range-for), Rust
-  (`Vec`, `HashMap`, iterators) and C (a small readable helper prelude), compiled with gcc, g++, clang and
-  rustc and compared against the interpreter on every level and on random programs. See
+- **Real C++17, with a safety net.** Every accepted program is valid C++17 that behaves the same with `g++` and
+  `clang++`. Real C++ silently accepts bugs; the clerk does not: out-of-range indexing, signed overflow,
+  division by zero, null and dangling pointers, uninitialised reads, iterator invalidation, missing returns and
+  more are detected, highlighted on the line and explained in a speech bubble, and the judge rejects the
+  program. The full list is in [docs/CPP_SUBSET.md](docs/CPP_SUBSET.md).
+- **Visual-first.** Variables live in labelled trays and are drawn as what they are, with their C++ type in the
+  header (`vector<int>`): ints as crates, strings as ribbons of letter tiles, vectors as shelves with indexed
+  slots, grids as filing racks, maps as filing-cabinet drawers, sets as bins, stacks as spring plates, queues
+  as belts, heaps as pyramids, linked lists as chains of tags, trees as org charts. The clerk walks to what
+  changed; the wall clock ticks the abstract cost.
+- **Cards and text, always in sync.** Edit the program as nested paper cards or as real C++ text with syntax
+  colours, `std::` autocomplete filtered to what the level unlocks, error squiggles and an on-screen keyboard
+  with C++ symbol rows. The text is the source of truth; what the cards cannot express yet is shown as a
+  read-only "raw C++" card, and comments survive the round trip.
+- **Interview-grade scoring.** Speed is an abstract cost that mirrors the real complexity of each STL operation
+  (`unordered_map` lookups cost 1, `map` and `priority_queue` operations log n, `std::sort` n log n, copying a
+  vector by value costs its length, so `const&` matters). Every level runs hidden **large** tests, and a
+  brute-force O(n squared) answer runs out of time like a time-limit-exceeded verdict. A solved level reports its
+  measured time and space class plus medals for size and speed. See [docs/COST_MODEL.md](docs/COST_MODEL.md).
+- **The thing a level is about is locked.** Each memo lists unlocked and locked headers and `std::` names, with a
+  reason ("the supply cupboard on this floor does not stock `<numeric>`: adding things up is the exercise"), and
+  a hint ladder of sticky notes.
+- **Code reveal.** The C++ tab shows your accepted solution as a clean formatted answer. Rust and C translations
+  are generated from the checked C++ tree and compile-tested with `rustc`, `gcc` and `clang` against the
+  interpreter; the command line prints them today (`algoclerk-cli codegen LEVEL --lang rust`) and wiring them
+  into the victory screen tabs is tracked in [docs/PROGRESS.md](docs/PROGRESS.md). See
   [docs/CODEGEN.md](docs/CODEGEN.md).
-- **Levels are data.** One TOML file per level with seeded typed generators, a naive solution that must time
-  out, and independent Rust oracles. See [docs/LEVEL_FORMAT.md](docs/LEVEL_FORMAT.md).
+- **Levels are data.** One TOML file per level with a prelude, a real signature, seeded typed generators, a
+  naive solution that must time out, and independent Rust oracles. See
+  [docs/LEVEL_FORMAT.md](docs/LEVEL_FORMAT.md).
 - **Five platforms, one Rust code base**: Linux, macOS, Windows, Android and iOS, touch, mouse and keyboard,
   with a warm retro-office palette, a colour-blind safe palette and a high-contrast theme, reduce-motion and
   text-size options, and original text-defined chiptune music.
-- **Own interpreter, no WebAssembly.** Programs run in a deterministic, sandboxed Rust interpreter (step,
-  depth and memory limits, no I/O, no `unsafe`, fuzzed). There is no web build and no scripting engine.
-
-## The language in 30 seconds
-
-Types `int bool char string vec<T> set<T> map<K,V> (A,B) option<T> stack<T> queue<T> deque<T> heap<T> lnode
-tnode`; statements `let if else while for break continue return`; helpers, `&mut` parameters and recursion
-where a level unlocks them. Reference, grammar and the cost model: [docs/LANGUAGE.md](docs/LANGUAGE.md).
+- **Own interpreter, no WebAssembly, no compiler at run time.** Programs run in a deterministic, sandboxed Rust
+  interpreter (cost, depth and memory limits, no I/O, no `unsafe`, fuzzed). There is no web build, no libclang
+  and no scripting engine, so the game works on a phone with no toolchain.
 
 ## Quick start
 
 Requirements: Rust 1.95 or newer (`rustup update`). On Linux the build needs a few system libraries for
 Bevy (`libudev-dev`, `libwayland-dev`, `libxkbcommon-dev`, and `libasound2-dev` for sound); see
-[docs/BUILDING.md](docs/BUILDING.md).
+[docs/BUILDING.md](docs/BUILDING.md). To run the full test suite you also need `g++`, `clang++` and `rustc`
+(see below).
 
 ```sh
 cargo run --release -p algoclerk-app --bin algoclerk           # the game (add --features audio for sound)
 cargo run -p algoclerk-cli -- list                             # all 80 levels
 cargo run -p algoclerk-cli -- show two-sum                     # a brief
-cargo run -p algoclerk-cli -- judge two-sum my.ck              # judge a solution from the terminal
-cargo run -p algoclerk-cli -- codegen two-sum --lang cpp       # the reference as C++ (also c, rust)
+cargo run -p algoclerk-cli -- starter two-sum > my.cpp         # the starting program for a level
+cargo run -p algoclerk-cli -- judge two-sum my.cpp             # judge your solution from the terminal
+cargo run -p algoclerk-cli -- codegen two-sum --lang rust      # the reference as Rust (also c, cpp)
 cargo run -p algoclerk-cli -- validate                         # prove every level is sound
+cargo run -p algoclerk-cli -- diff two-sum                     # compile the level's solutions with g++ and clang++
 scripts/screenshots.sh                                         # headless screenshots, no window or GPU
 ```
 
@@ -102,18 +122,31 @@ scripts/screenshots.sh                                         # headless screen
 
 Per-platform requirements and an honest verification status are in [docs/BUILDING.md](docs/BUILDING.md).
 
+### Tests
+
+```sh
+cargo test --workspace                          # everything; the compiler tests skip when a compiler is missing
+ALGOCLERK_DIFF_CLANG=1 ALGOCLERK_PROP_CASES=500 \
+  cargo test -p algoclerk-core --test cpp_prop_diff   # 500 random programs against g++ and clang++
+```
+
+The differential tests compile real C++ with `g++` and `clang++` and compare the result with the interpreter;
+the translation tests also use `rustc`. Install all three for the full suite. Details and environment variables
+are in [docs/BUILDING.md](docs/BUILDING.md).
+
 ## Add a level
 
-1. Copy a neighbouring file in `levels/<wing>/` and change the texts, `signature`, `reference`, optional
-   `naive`, examples, tests and generators.
-2. `cargo run -p algoclerk-cli -- tune <id> --write` (medal targets), then `cargo run -p algoclerk-cli -- validate <id>`.
-3. Add the independent oracle to `crates/algoclerk-levels/tests/oracles.rs` and open a pull request.
+1. Copy a neighbouring file in `levels/<wing>/` and change the texts, `prelude`, `signature`, `reference`,
+   optional `naive`, examples, tests and generators.
+2. `cargo run -p algoclerk-cli -- tune <id> --write` (medal targets), then
+   `cargo run -p algoclerk-cli -- validate <id>` and `cargo run -p algoclerk-cli -- diff <id>` (real compilers).
+3. Add the independent oracle to `crates/algoclerk-levels/tests/common/mod.rs` and open a pull request.
    Details: [docs/LEVEL_FORMAT.md](docs/LEVEL_FORMAT.md), [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Project layout
 
 ```text
-crates/algoclerk-core    ClerkScript, judge, complexity estimator, level model, validator, code generators
+crates/algoclerk-core    C++ front end and interpreter, judge, complexity estimator, level model, validator, code generators
 crates/algoclerk-levels  the 80 shipped levels, embedded into the binary
 crates/algoclerk-media   pixel-art engine: palettes, .px sprites, fonts, software canvas, chiptune synth
 crates/algoclerk-game    the game itself (engine-free: Game::tick / Game::draw), headless scenarios
@@ -126,10 +159,10 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/ART_PIPELINE.md](docs
 
 ## Community
 
-New levels, art, music, translations and palettes are welcome. Start with
-[docs/GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md), read the [Code of Conduct](CODE_OF_CONDUCT.md) and
-[CONTRIBUTING.md](CONTRIBUTING.md). The plan is in [ROADMAP.md](ROADMAP.md), governance in
-[GOVERNANCE.md](GOVERNANCE.md). There is no server and no leaderboard.
+New levels, art, music, translations and palettes are welcome, and so are fixes for gaps in the C++ subset.
+Start with [docs/GOOD_FIRST_ISSUES.md](docs/GOOD_FIRST_ISSUES.md), read the
+[Code of Conduct](CODE_OF_CONDUCT.md) and [CONTRIBUTING.md](CONTRIBUTING.md). The plan is in
+[ROADMAP.md](ROADMAP.md), governance in [GOVERNANCE.md](GOVERNANCE.md). There is no server and no leaderboard.
 
 ## Licence and credits
 

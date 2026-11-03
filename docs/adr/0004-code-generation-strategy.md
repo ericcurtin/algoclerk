@@ -1,6 +1,6 @@
 # ADR 0004: Code generation: structure recovery with a correct fallback, verified by compilers
 
-- Status: superseded: code is now generated directly from the typed syntax tree (no goto, no decompilation), see docs/CODEGEN.md and ADR 0006
+- Status: superseded: code is now generated directly from the typed syntax tree (no goto, no decompilation), see docs/CODEGEN.md and ADR 0007
 
 ## Context
 
