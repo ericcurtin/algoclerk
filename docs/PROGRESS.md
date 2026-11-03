@@ -1,6 +1,6 @@
 # Progress log (branch `cpp-lang`)
 
-The branch replaces ClerkScript with a subset of real C++17 as the language players write (ADR 0007). This file
+The branch replaces the invented player language of ADR 0006 with a subset of real C++17 (ADR 0007). This file
 says what was done, what was decided, and, honestly, what is not finished or not verified.
 
 ## Milestones
@@ -46,8 +46,8 @@ says what was done, what was decided, and, honestly, what is not finished or not
 - **The cost model charges copies**: a by-value container parameter costs its leaves, `const&` costs nothing.
 - **Differential tests are part of the product**: the interpreter's claim to be C++ is exactly as good as the
   suite that compares it with `g++` and `clang++`, so CI installs both and runs it.
-- **Old saves are migrated, not crashed on**: the progress format is version 2; ClerkScript drafts and saved
-  solutions cannot be converted and are dropped with a note.
+- **Old saves are migrated, not crashed on**: the progress format is version 2; drafts and saved
+  solutions written in the old language cannot be converted and are dropped with a note.
 - Interpreter values use `Arc` (not `Rc`) so the whole `Game` is `Send + Sync` for Bevy resources.
 - Compiler and runtime diagnostics stay English in the core (stable codes); UI chrome is in `lang/en.toml`.
 
@@ -58,8 +58,13 @@ says what was done, what was decided, and, honestly, what is not finished or not
   `unsigned long long` multiplication of two large values panics in a debug build), `str_plus_charref`,
   `append_n` (`string::append(count, ch)` rejected), `partial_sum` and `for_each` (checked but not
   interpreted). The reproductions are in the work-package notes (`lvl-bugs/prop.md` in the run directory); the
-  list has to shrink, it must never be used to hide a new divergence. Some other cases (advancing an erased
-  `std::map` iterator, `T* p = p;`) are known to be reported with a different class than the sanitizers would.
+  list has to shrink, it must never be used to hide a new divergence.
+- `prop_common/ub.rs::UB_KNOWN` lists undefined-behaviour cases that the interpreter does **not** yet report
+  with the right class, so the "every UB class is detected" policy has these exceptions today:
+  `int x = x;` stops with a generic bad-argument error instead of `uninit`; `T* p = p;` stops with an internal
+  error instead of `uninit`; advancing an erased `std::map` iterator (`++it` after `m.erase(it)`) is **not
+  reported at all** (only dereferencing it is), so the classic erase-in-a-loop bug is accepted. The first two
+  still stop the run, the third does not.
 - The Rust and C tabs of the victory screen are not connected (M10). The translators exist and are tested
   through the CLI and `cpp_codegen_levels`; a level may be refused by a translator only if it is listed with a
   reason (the list is empty at the time of writing).

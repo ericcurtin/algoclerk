@@ -13,7 +13,7 @@ id, with English as the fallback for any missing key. The catalogues live in
 4. Run `cargo test -p algoclerk-core` (checks that the file parses) and start the game: the language
    appears in Settings, Language.
 5. Open a pull request. You do not need to translate everything at once; untranslated keys fall back
-   to English. Please keep the names of ClerkScript types and tools (`vec`, `push`, ...) as they are: they are code.
+   to English. Please keep C++ code and names (`std::vector`, `push_back`, `#include`, ...) exactly as they are: they are code.
 
 ## What is translated
 

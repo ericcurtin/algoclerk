@@ -52,7 +52,9 @@ division and remainder by zero, invalid shift counts, null, dangling and deleted
 uninitialised scalar, using an iterator or reference after the container changed, unsequenced modification of
 one scalar, falling off the end of a non-void function, reading from an empty container, and comparators
 that are not a strict weak ordering where this is detectable. Runaway loops, too-deep recursion and huge
-allocations stop with `time`, `depth` and `memory` errors. The full table is in `docs/CPP_SUBSET.md`.
+allocations stop with `time`, `depth` and `memory` errors. The full table is in `docs/CPP_SUBSET.md`. The policy
+is the goal; the few cases where the interpreter still misses or misclassifies a class are listed, honestly,
+in `docs/PROGRESS.md` and covered by a shrinking `UB_KNOWN` list in the tests.
 
 Where C++ leaves behaviour unspecified instead of undefined, the interpreter takes a fixed choice and the judge
 guards against dependence on it: the iteration order of `unordered_map` and `unordered_set` is unspecified, so
