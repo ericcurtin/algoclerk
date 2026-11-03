@@ -123,10 +123,12 @@ impl Session {
     }
 
     fn raw(level: Option<Level>, judge: Option<Arc<Judge>>, text: &str) -> Session {
+        let mut edit = TextEdit::new(text, true);
+        edit.smart = true;
         Session {
             level,
             judge,
-            edit: TextEdit::new(text, true),
+            edit,
             last_text: text.to_string(),
             undo: Vec::new(),
             redo: Vec::new(),

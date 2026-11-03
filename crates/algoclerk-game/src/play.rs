@@ -121,6 +121,23 @@ struct Controls {
     status: Rect,
 }
 
+impl Controls {
+    /// Controls that cannot be tapped (the editor has the whole screen).
+    fn hidden() -> Controls {
+        let r = Rect::new(-100, -100, 1, 1);
+        Controls {
+            reset: r,
+            back: r,
+            play: r,
+            step: r,
+            speed: r,
+            check: r,
+            cases: Vec::new(),
+            status: r,
+        }
+    }
+}
+
 fn controls(vp: &Viewport, c: Rect, ncases: usize) -> Controls {
     let bh = vp.btn_h();
     let row = Rect::new(c.x, c.y, c.w, bh);
@@ -200,9 +217,40 @@ impl Play {
         }
     }
 
+    /// The editor takes the whole screen below the top bar: portrait with the keyboard open, where the
+    /// scene would leave the text two lines.
+    pub fn editor_only(&self, vp: &Viewport) -> bool {
+        vp.portrait
+            && self.panel.kb_open
+            && self.panel.tab == Tab::Text
+            && self.panel.card.is_none()
+    }
+
+    /// The screen rectangles for the current state.
+    pub fn rects(&self, vp: &Viewport) -> PlayRects {
+        let mut r = PlayRects::new(vp);
+        if self.editor_only(vp) {
+            r.editor = Rect::new(2, 20, vp.w - 4, vp.h - 22);
+        }
+        r
+    }
+
     /// Hit rectangles for layout tests.
     pub fn hits(&self, vp: &Viewport) -> Vec<Hit> {
-        let r = PlayRects::new(vp);
+        let r = self.rects(vp);
+        if self.editor_only(vp) {
+            let mut v = self.panel.hits(vp, r.editor);
+            v.push(Hit::tap(
+                "brief",
+                Rect::new(
+                    vp.w - 50.max(vp.hit_min()),
+                    0,
+                    50.max(vp.hit_min()),
+                    vp.hit_min().max(18),
+                ),
+            ));
+            return v;
+        }
         let c = controls(vp, r.controls, self.session.case_count());
         let mut v = vec![
             Hit::area("scene", r.scene),
@@ -407,7 +455,7 @@ impl Play {
     /// Handle one tick of input.
     pub fn update(&mut self, cx: &mut Ctx<'_>) -> Option<Nav> {
         let vp = cx.vp;
-        let r = PlayRects::new(&vp);
+        let r = self.rects(&vp);
         self.office.reduce_motion = cx.progress.settings.reduce_motion;
         let speed = Self::speed_level(cx);
         self.office.speed = [0.5, 0.8, 1.2, 2.0, 6.0][speed];
@@ -488,8 +536,12 @@ impl Play {
             self.office.clear();
             self.save_draft(cx);
         }
-        // controls
-        let c = controls(&vp, r.controls, self.session.case_count());
+        // controls (the editor may have taken the whole screen meanwhile)
+        let c = if self.editor_only(&vp) {
+            Controls::hidden()
+        } else {
+            controls(&vp, self.rects(&vp).controls, self.session.case_count())
+        };
         let typing = self.panel.tab == Tab::Text || self.panel.card.is_some();
         if cx.ptr.tapped_in(&c.reset) || (!typing && cx.input.ch('r')) {
             self.rewind();
@@ -659,7 +711,7 @@ impl Play {
     /// Draw the screen.
     pub fn draw(&self, g: &mut Gfx<'_>, v: &View<'_>) {
         let vp = v.vp;
-        let r = PlayRects::new(&vp);
+        let r = self.rects(&vp);
         g.rect(vp.screen(), 'k');
         // top bar
         g.rect(r.top, 'K');
@@ -682,6 +734,12 @@ impl Play {
         if self.session.level.is_some() {
             g.icon("memo", vp.w - 46, 4, 'y');
             g.text(vp.w - 34, 5, &v.tr.t("play.memo"), 'W');
+        }
+        if self.editor_only(&vp) {
+            self.panel
+                .draw(g, v, &self.session, r.editor, self.session.current_node());
+            self.draw_overlays(g, v);
+            return;
         }
         self.office.draw(g, (r.scene.x, r.scene.y), v.tr);
         g.frame(r.scene.grow(1), 'K');
@@ -777,6 +835,10 @@ impl Play {
         }
         let exec = self.session.current_node();
         self.panel.draw(g, v, &self.session, r.editor, exec);
+        self.draw_overlays(g, v);
+    }
+
+    fn draw_overlays(&self, g: &mut Gfx<'_>, v: &View<'_>) {
         if let Some(m) = &self.memo {
             if let Some(l) = &self.session.level {
                 let rec = v.progress.record(&l.id);

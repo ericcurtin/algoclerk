@@ -5,7 +5,7 @@
 use crate::blocks::{self, CardKind, PALETTE};
 use crate::complete::{self, Item};
 use crate::gfx::{Gfx, Kind, State, clip};
-use crate::input::{Input, Key};
+use crate::input::Key;
 use crate::layout::Hit;
 use crate::session::Session;
 use crate::textedit::{self, KbAction, Keyboard, TextEdit};
@@ -95,6 +95,8 @@ pub struct EditorPanel {
     pub ac: Option<Popup>,
     /// The popup was dismissed for this text and cursor.
     dismissed: Option<(String, usize)>,
+    /// Typing an opening bracket or quote adds the closing one.
+    pub auto_close: bool,
 }
 
 impl Default for EditorPanel {
@@ -111,6 +113,7 @@ impl Default for EditorPanel {
             note: None,
             ac: None,
             dismissed: None,
+            auto_close: false,
         }
     }
 }
@@ -126,9 +129,15 @@ struct Parts {
     tabs: Rect,
     strip: Rect,
     body: Rect,
+    /// The compiler message under the text (text tab).
+    msg: Rect,
+    /// Action bar (cards) or tool row (text).
     bar: Rect,
     kb: Rect,
 }
+
+/// Lines of the problem message shown under the text, at most three.
+const MSG_MAX_LINES: usize = 3;
 
 fn parts(
     vp: &crate::layout::Viewport,
@@ -137,26 +146,38 @@ fn parts(
     has_bar: bool,
     tab: Tab,
     has_strip: bool,
+    msg_lines: usize,
 ) -> Parts {
     let th = vp.btn_h();
     let tabs = Rect::new(area.x, area.y, area.w, th);
-    let bar_h = if has_bar || tab == Tab::Text {
-        th + 2
-    } else {
-        0
-    };
-    let kb_h = if kb_open && tab == Tab::Text {
+    let text = tab == Tab::Text;
+    let kb_h = if kb_open && text {
         if vp.touch {
-            120
+            124
         } else {
-            (area.h * 2 / 5).clamp(70, 100)
+            (area.h * 2 / 5).clamp(78, 104)
         }
     } else {
         0
     };
+    // with the keyboard open its keyword strip holds the tools, so the tool row disappears
+    let bar_h = if text {
+        if kb_open { 0 } else { th + 2 }
+    } else if has_bar {
+        th + 2
+    } else {
+        0
+    };
+    let msg_h = if text {
+        msg_lines.clamp(1, MSG_MAX_LINES) as i32 * 9 + 3
+    } else {
+        0
+    };
+    let below = |h: i32| if h > 0 { h + 1 } else { 0 };
+    let tail = below(msg_h) + below(bar_h) + below(kb_h);
     // the prelude strip only fits when the text keeps at least a few lines
-    let room = area.h - th - 2 - bar_h - kb_h;
-    let strip_h = if has_strip && tab == Tab::Text && room >= 50 {
+    let room = area.h - th - 2 - tail;
+    let strip_h = if has_strip && text && room >= 50 {
         10
     } else {
         0
@@ -166,14 +187,16 @@ fn parts(
         area.x,
         area.y + th + 2 + strip_h,
         area.w,
-        area.h - th - 2 - strip_h - bar_h - kb_h,
+        (area.h - th - 2 - strip_h - tail).max(20),
     );
-    let bar = Rect::new(area.x, body.bottom() + 1, area.w, bar_h);
-    let kb = Rect::new(area.x, bar.bottom() + 1, area.w, kb_h.max(0));
+    let msg = Rect::new(area.x, body.bottom() + 1, area.w, msg_h);
+    let bar = Rect::new(area.x, msg.y + below(msg_h), area.w, bar_h);
+    let kb = Rect::new(area.x, bar.y + below(bar_h), area.w, kb_h.max(0));
     Parts {
         tabs,
         strip,
         body,
+        msg,
         bar,
         kb,
     }
@@ -193,7 +216,15 @@ fn fresh_name(text: &str) -> String {
 impl EditorPanel {
     /// Hit rectangles for layout tests.
     pub fn hits(&self, vp: &crate::layout::Viewport, area: Rect) -> Vec<Hit> {
-        let p = parts(vp, area, self.kb_open, self.sel.is_some(), self.tab, false);
+        let p = parts(
+            vp,
+            area,
+            self.kb_open,
+            self.sel.is_some(),
+            self.tab,
+            false,
+            1,
+        );
         let mut v = vec![Hit::area("editor", area), Hit::area("editor body", p.body)];
         for (i, r) in tab_rects(p.tabs, 4).into_iter().enumerate() {
             v.push(Hit::tap(["tab blocks", "tab text", "undo", "redo"][i], r));
@@ -216,6 +247,7 @@ impl EditorPanel {
             self.sel.is_some(),
             self.tab,
             !s.prelude().trim().is_empty(),
+            msg_line_count(s, area.w),
         );
         let tr = tab_rects(p.tabs, 4);
         if self.card.is_some() {
@@ -237,10 +269,11 @@ impl EditorPanel {
             out.changed = true;
             cx.sfx("button");
         }
-        if cx.input.ctrl_ch('z') && s.undo() {
+        let ctrl_z = cx.input.ctrl_ch('z');
+        if ctrl_z && !cx.input.shift && s.undo() {
             out.changed = true;
         }
-        if (cx.input.ctrl_ch('y') || (cx.input.ctrl_ch('Z'))) && s.redo() {
+        if ((ctrl_z && cx.input.shift) || cx.input.ctrl_ch('y')) && s.redo() {
             out.changed = true;
         }
         match self.tab {
@@ -254,9 +287,12 @@ impl EditorPanel {
         let scale = 1;
         let line_h = 9;
         let mut changed = false;
-        let kb_btn = Rect::new(p.bar.x, p.bar.y, (p.bar.w / 2).min(70), p.bar.h);
+        let [keys_btn, cmt_btn, close_btn] = tool_rects(p.bar);
         let ed_rect = p.body;
         s.edit.focused = true;
+        s.edit.smart = true;
+        s.edit.auto_close = self.auto_close;
+        s.edit.gutter = textedit::gutter_width(s.edit.line_count(), scale);
         // the popup takes the navigation keys and taps on its rows
         let mut inp = cx.input.clone();
         let mut accept: Option<usize> = None;
@@ -314,34 +350,46 @@ impl EditorPanel {
         if inp.key(Key::Tab) && !o.changed {
             s.edit.insert("    ");
         }
+        if inp.ctrl_ch('/') {
+            s.edit.toggle_comment();
+        }
+        let (rows, cols) = textedit::view_size(&s.edit, ed_rect, scale, line_h);
         if !tapped_popup {
             s.edit.pointer(cx.ptr, ed_rect, scale, line_h);
         }
-        let rows = ((ed_rect.h - 4) / line_h).max(1) as usize;
-        let cols = ((ed_rect.w - 8) / 6).max(1) as usize;
-        if cx.ptr.wheel != 0.0 {
-            s.edit.scroll_by(-(cx.ptr.wheel.signum() as i32), rows);
+        if cx.ptr.wheel != 0.0 && cx.ptr.pos.is_some_and(|p| ed_rect.contains(p.0, p.1)) {
+            let n = -(cx.ptr.wheel.signum() as i32);
+            if inp.shift {
+                s.edit.scroll_view(n * 4, 0, rows, cols);
+            } else {
+                s.edit.scroll_view(0, n, rows, cols);
+            }
         }
-        // auto-indent after Enter
-        if inp.key(Key::Enter) && s.edit.text() != before {
-            auto_indent(&mut s.edit);
-        }
-        s.edit.scroll_to_cursor(rows, cols);
-        if cx.ptr.tapped_in(&kb_btn)
+        s.edit.follow_cursor(rows, cols);
+        // tool row: keyboard, comment, auto-close
+        if cx.ptr.tapped_in(&keys_btn)
             || (cx.config.touch && cx.ptr.tapped_in(&ed_rect) && !self.kb_open)
         {
             self.kb_open = !self.kb_open || !cx.ptr.tapped_in(&ed_rect);
         }
+        if p.bar.h > 0 && cx.ptr.tapped_in(&cmt_btn) {
+            s.edit.toggle_comment();
+        }
+        if p.bar.h > 0 && cx.ptr.tapped_in(&close_btn) {
+            self.auto_close = !self.auto_close;
+            cx.sfx("button");
+        }
         if self.kb_open {
             for a in self.kb.update(cx.ptr, p.kb) {
                 match a {
-                    KbAction::Char(c) => s.edit.insert(&c.to_string()),
+                    KbAction::Char(c) => s.edit.type_char(c),
+                    KbAction::Text(t) => s.edit.insert(&t),
                     KbAction::Backspace => {
-                        s.edit.backspace();
+                        s.edit.backspace_smart();
                     }
-                    KbAction::Enter => {
-                        s.edit.insert("\n");
-                        auto_indent(&mut s.edit);
+                    KbAction::Enter => s.edit.smart_newline(),
+                    KbAction::Comment => {
+                        s.edit.toggle_comment();
                     }
                     KbAction::Hide => self.kb_open = false,
                 }
@@ -416,7 +464,10 @@ impl EditorPanel {
             .unwrap_or(60)
             .clamp(70, (body.w - 8).max(70));
         let cy = body.y + 2 + (line as i32 - s.edit.scroll_line as i32) * 9;
-        let cx = body.x + 3 + (col as i32 - s.edit.scroll_col as i32) * 6;
+        let cx = body.x
+            + 3
+            + textedit::gutter_width(s.edit.line_count(), 1)
+            + (col as i32 - s.edit.scroll_col as i32) * 6;
         let x = cx.clamp(body.x, (body.right() - w).max(body.x));
         let below = cy + 10;
         let y = if below + n * rh + 2 > body.bottom() {
@@ -915,6 +966,7 @@ impl EditorPanel {
             self.sel.is_some(),
             self.tab,
             !s.prelude().trim().is_empty(),
+            msg_line_count(s, area.inset(2).w),
         );
         let tr = tab_rects(p.tabs, 4);
         let st = |r: &Rect| widget_state(v.ptr, r, false, false);
@@ -1151,35 +1203,55 @@ impl EditorPanel {
         let msg = s.problem_message();
         let span = s.problem_span().or_else(|| s.run_error_span());
         let exec_line = executing.and_then(|n| s.node_line(n));
-        let sq: Vec<(usize, usize, usize)> = span.into_iter().collect();
-        let err_lines: Vec<usize> = span.map(|x| x.0).into_iter().collect();
         if p.strip.h > 0 {
             self.draw_strip(g, s, p.strip);
         }
-        textedit::draw_editor(g, &s.edit, p.body, 1, 9, &err_lines, exec_line, &sq, v.tick);
-        let kb_btn = Rect::new(p.bar.x, p.bar.y, (p.bar.w / 2).min(70), p.bar.h);
-        g.button(
-            kb_btn,
-            &if self.kb_open {
-                v.tr.t("editor.hide_keys")
-            } else {
-                v.tr.t("editor.keys")
-            },
-            Kind::Normal,
-            widget_state(v.ptr, &kb_btn, false, false),
-        );
-        let msg_r = Rect::new(kb_btn.right() + 4, p.bar.y, p.bar.w - kb_btn.w - 4, p.bar.h);
-        if let Some(m) = msg {
-            let lines = algoclerk_media::Font::wrap(&m, (msg_r.w / 6).max(8) as usize);
-            for (i, l) in lines.iter().take(2).enumerate() {
-                g.text(msg_r.x, msg_r.y + 1 + i as i32 * 8, l, 'R');
+        let look = textedit::EditorLook {
+            line_numbers: true,
+            error_lines: span.map(|x| x.0).into_iter().collect(),
+            exec_line,
+            squiggles: span.into_iter().collect(),
+            brackets: true,
+            tick: v.tick,
+        };
+        let mut ed = s.edit.clone();
+        ed.gutter = textedit::gutter_width(ed.line_count(), 1);
+        textedit::draw_editor(g, &ed, p.body, 1, 9, &look);
+        // the clerk's message under the text, wrapped, never cut off
+        match msg {
+            Some(m) => {
+                g.rect(p.msg, 'p');
+                for (i, l) in algoclerk_media::Font::wrap(&m, ((p.msg.w - 6) / 6).max(8) as usize)
+                    .iter()
+                    .take(MSG_MAX_LINES)
+                    .enumerate()
+                {
+                    g.text(p.msg.x + 3, p.msg.y + 2 + i as i32 * 9, l, 'K');
+                }
             }
-        } else {
-            g.text(
-                msg_r.x,
-                msg_r.y + (msg_r.h - 7) / 2,
-                &v.tr.t("editor.looks_good"),
-                'G',
+            None => {
+                g.text(p.msg.x + 3, p.msg.y + 2, &v.tr.t("editor.looks_good"), 'G');
+            }
+        }
+        if p.bar.h > 0 {
+            let [keys_btn, cmt_btn, close_btn] = tool_rects(p.bar);
+            let st = |r: &Rect| widget_state(v.ptr, r, false, false);
+            g.button(
+                keys_btn,
+                &v.tr.t("editor.keys"),
+                Kind::Normal,
+                st(&keys_btn),
+            );
+            g.button(cmt_btn, "//", Kind::Normal, st(&cmt_btn));
+            g.button(
+                close_btn,
+                "()",
+                if self.auto_close {
+                    Kind::On
+                } else {
+                    Kind::Normal
+                },
+                st(&close_btn),
             );
         }
         if self.kb_open {
@@ -1344,17 +1416,18 @@ impl EditorPanel {
     }
 }
 
-#[allow(dead_code)]
-fn unused(_: &Input) {}
+/// How many lines of the problem message the text view reserves under the editor.
+fn msg_line_count(s: &Session, w: i32) -> usize {
+    s.problem_message().map_or(1, |m| {
+        algoclerk_media::Font::wrap(&m, ((w - 6) / 6).max(8) as usize)
+            .len()
+            .clamp(1, MSG_MAX_LINES)
+    })
+}
 
-/// Indent a new line like the one above it (and one level deeper after `{`).
-fn auto_indent(ed: &mut TextEdit) {
-    let t = ed.text();
-    let (line, _) = ed.line_col(ed.cursor);
-    if line > 0 {
-        let prev = t.split('\n').nth(line - 1).unwrap_or("");
-        let indent = prev.len() - prev.trim_start().len();
-        let extra = if prev.trim_end().ends_with('{') { 4 } else { 0 };
-        ed.insert(&" ".repeat(indent + extra));
-    }
+/// The chips and keys buttons under the text.
+fn tool_rects(bar: Rect) -> [Rect; 3] {
+    let n = 3;
+    let c = crate::layout::columns(bar, n, 2);
+    [c[0], c[1], c[2]]
 }
