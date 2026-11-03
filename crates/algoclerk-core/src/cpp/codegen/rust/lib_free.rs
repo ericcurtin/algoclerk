@@ -98,11 +98,15 @@ impl Rs<'_> {
         if matches!(ty, Ty::Stack(_) | Ty::Queue(_) | Ty::PriorityQueue(..)) {
             return no("Rust", "building this container from a range");
         }
-        Ok(format!(
-            "{}.collect::<{}>()",
-            self.range_iter(r),
-            self.rty(ty)?
-        ))
+        let (src, dst) = (self.elem_of(&r.ty), self.elem_of(ty));
+        let it = self.range_iter(r);
+        // elements that change type on the way: `vector<long long>(ints.begin(), ints.end())`
+        let it = if src != dst && src.is_integral() && dst.is_integral() {
+            format!("{it}.map(|x| x as {})", self.rty(&dst)?)
+        } else {
+            it
+        };
+        Ok(format!("{it}.collect::<{}>()", self.rty(ty)?))
     }
 
     fn end_call(e: &Expr) -> bool {

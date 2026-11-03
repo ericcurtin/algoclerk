@@ -288,7 +288,12 @@ impl Rs<'_> {
             (None, Init::Direct(a)) => self.construct(&ty, a, false)?.s,
             (None, Init::Brace { elems, .. }) => self.construct(&ty, elems, true)?.s,
         };
-        self.declare(&v.name, ty.clone(), Rk::Val);
+        let rk = if ty == Ty::StrView {
+            Rk::StrRef
+        } else {
+            Rk::Val
+        };
+        self.declare(&v.name, ty.clone(), rk);
         if let Ty::Lambda(_) = ty {
             return Ok(format!("let {m}{name} = {init};"));
         }

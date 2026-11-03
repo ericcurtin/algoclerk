@@ -113,6 +113,18 @@ impl Cx<'_> {
                 }
                 [a, b] => match self.range(a, b)? {
                     Some(r) if self.is_seq(&r.ty) => {
+                        let src = self.elem_of(&r.ty);
+                        if src != **el && src.is_integral() && el.is_integral() {
+                            // the elements change type on the way: a small converting copy
+                            let (sn, en) = (self.name_of(&src)?, self.name_of(el)?);
+                            let f = format!("{n}_from_{sn}");
+                            self.lifted.push(format!(
+                                "static {n} {f}(const {sn} *a, size_t len) {{\n    {n} v = {n}_zero();\n    \
+                                 for (size_t i = 0; i < len; ++i) {{\n        {n}_push(&v, ({en})a[i]);\n    }}\n    \
+                                 return v;\n}}\n"
+                            ));
+                            return Ok(Ex::val(format!("{f}({}, {})", r.ptr, r.count)));
+                        }
                         Ok(Ex::val(format!("{n}_from({}, {})", r.ptr, r.count)))
                     }
                     _ => no("C", "this vector constructor"),

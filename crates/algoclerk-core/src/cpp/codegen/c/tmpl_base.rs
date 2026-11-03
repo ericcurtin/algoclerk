@@ -259,6 +259,11 @@ pub const VEC: &str = r#"
         for (size_t i = 0; i < v->len; ++i) if (i == 0 || !E##_eq(v->data[i], v->data[w - 1])) v->data[w++] = v->data[i]; \
         v->len = w; \
     } \
+    static void NAME##_remove(NAME *v, T x) { \
+        size_t w = 0; \
+        for (size_t i = 0; i < v->len; ++i) if (!E##_eq(v->data[i], x)) v->data[w++] = v->data[i]; \
+        v->len = w; \
+    } \
     static size_t NAME##_upper(const T *a, size_t n, T x) { \
         size_t lo = 0, hi = n; \
         while (lo < hi) { \

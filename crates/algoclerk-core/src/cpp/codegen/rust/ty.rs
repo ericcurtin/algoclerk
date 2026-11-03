@@ -180,6 +180,9 @@ impl Rs<'_> {
     /// of types that are not `Copy`.
     pub fn own(&self, x: Ex, ty: &Ty) -> Ex {
         let copy = self.is_copy(ty);
+        if *ty == Ty::StrView && x.slice {
+            return x;
+        }
         if *ty == Ty::Str && (x.slice || x.kind == Kind::Ref) {
             return Ex::new(format!("{}.to_string()", x.at(19)), 19, Kind::Val);
         }
@@ -214,6 +217,7 @@ impl Rs<'_> {
                 let y = self.convert(x, f, inner)?;
                 Ok(Ex::val(format!("Some({})", y.s)))
             }
+            (Ty::Str, Ty::StrView) if x.slice => Ok(x),
             (Ty::Str, Ty::StrView) => Ok(Ex::new(format!("{}.as_str()", x.at(19)), 19, Kind::Val)),
             (Ty::Pair(a1, b1), Ty::Pair(a2, b2)) if a1 == a2 && b1 == b2 => Ok(self.own(x, from)),
             _ => Ok(self.own(x, from)),

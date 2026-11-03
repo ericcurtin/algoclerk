@@ -122,8 +122,10 @@ pub fn generate(comp: &Compiled, entry: &str) -> R<Generated> {
             ItemKind::Func(f) => {
                 let text = cx.function(f)?;
                 for l in std::mem::take(&mut cx.lifted) {
-                    code.push_str(&l);
-                    code.push('\n');
+                    if !code.contains(&l) {
+                        code.push_str(&l);
+                        code.push('\n');
+                    }
                 }
                 code.push_str(&text);
                 code.push('\n');

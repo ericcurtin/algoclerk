@@ -79,13 +79,25 @@ impl Rs<'_> {
                 val(format!("{o}.push_str({})", y.s))
             }
             ("substr", [p]) | ("substr", [p, _]) => {
-                self.helpers.insert("substr");
+                let view = self.ty_of(obj) == Ty::StrView;
+                self.helpers
+                    .insert(if view { "substr_view" } else { "substr" });
                 let s = self.str_ref(obj)?;
                 let pos = self.conv_val(p, &Ty::Size)?;
                 let len = match args.get(1) {
                     Some(l) => self.conv_val(l, &Ty::Size)?.s,
                     None => "usize::MAX".to_string(),
                 };
+                if view {
+                    // a string_view of a string_view stays a view
+                    let mut x = Ex::new(
+                        format!("substr_view({}, {}, {len})", s.s, pos.s),
+                        19,
+                        Kind::Ref,
+                    );
+                    x.slice = true;
+                    return Ok(x);
+                }
                 val(format!("substr({}, {}, {len})", s.s, pos.s))
             }
             ("find" | "rfind", [_, ..]) => {

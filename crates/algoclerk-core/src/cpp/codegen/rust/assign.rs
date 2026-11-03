@@ -225,6 +225,15 @@ impl Rs<'_> {
                 }
                 _ => no("Rust", "this string constructor"),
             },
+            Ty::StrView => match args {
+                [] => {
+                    let mut x = Ex::val("\"\"");
+                    x.slice = true;
+                    Ok(x)
+                }
+                [a] if matches!(self.ty_of(a), Ty::Str | Ty::StrView) => self.str_ref(a),
+                _ => no("Rust", "this string_view constructor"),
+            },
             Ty::Pair(a, b) => match args {
                 [] => Ok(Ex::val(self.default_val(ty)?)),
                 [x, y] => Ok(Ex::val(format!(

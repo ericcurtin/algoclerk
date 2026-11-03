@@ -12,6 +12,14 @@ fn substr(s: &str, pos: usize, len: usize) -> String {
 }
 ";
 
+const SUBSTR_VIEW: &str = "\
+/// `std::string_view::substr`: a view of the same bytes, the length clamped to the end.
+fn substr_view(s: &str, pos: usize, len: usize) -> &str {
+    let end = pos.saturating_add(len).min(s.len());
+    &s[pos..end]
+}
+";
+
 const STOI: &str = "\
 /// `std::stoi`: optional blanks and sign, then digits; stops at the first other character.
 fn stoi(s: &str) -> i32 {
@@ -102,6 +110,7 @@ impl Rs<'_> {
             blocks.push(
                 match h {
                     "substr" => SUBSTR,
+                    "substr_view" => SUBSTR_VIEW,
                     "stoi" => STOI,
                     "stoll" => STOLL,
                     "str_resize" => STR_RESIZE,

@@ -176,6 +176,20 @@ impl Cx<'_> {
                 {
                     return val(format!("{n}_unique({})", self.recv(obj, ot)?));
                 }
+                if let ExprKind::Call { callee, args: ra } = &a.kind
+                    && let Some(Resolved::Lib(mem)) = self.info.resolved(callee.id)
+                    && mem.name == "std::remove"
+                    && ra.len() == 3
+                    && matches!(iter_pos(b), Some(Pos::End(_, None, false)))
+                {
+                    // `v.erase(std::remove(v.begin(), v.end(), x), v.end())` over the whole vector
+                    let (lo, hi) = (self.pos_idx(obj, &ra[0])?, self.pos_idx(obj, &ra[1])?);
+                    if lo == "0" && hi.ends_with(".len") {
+                        let x = self.conv_val(&ra[2], el)?;
+                        return val(format!("{n}_remove({}, {})", self.recv(obj, ot)?, x.s));
+                    }
+                    return no("C", "this erase-remove range");
+                }
                 let (lo, hi) = (self.pos_idx(obj, a)?, self.pos_idx(obj, b)?);
                 val(format!(
                     "{n}_erase({}, {lo}, {hi} - {lo})",
