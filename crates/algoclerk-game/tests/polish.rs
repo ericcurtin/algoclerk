@@ -163,7 +163,8 @@ fn a_filled_body_has_no_add_button_in_the_list() {
 
 #[test]
 fn constraints_use_a_bullet_with_a_gap() {
-    assert!(algoclerk_game::brief::BULLET_GAP >= 4);
+    // the bullet is a 3 px square at x+2..x+5; the text starts BULLET_GAP px after it
+    const { assert!(algoclerk_game::brief::BULLET_GAP >= 4) };
 }
 
 /// Type `src` the way a person does: no leading spaces (the editor indents), Return between the lines.
