@@ -1359,12 +1359,9 @@ impl EditorPanel {
             }
         }
         if pop.items.len() > POPUP_ROWS {
-            g.tiny(
-                all.right() - 22,
-                all.bottom() + 2,
-                &format!("{} OF {}", pop.sel + 1, pop.items.len()),
-                'k',
-            );
+            let count = format!("{} OF {}", pop.sel + 1, pop.items.len());
+            let w = count.chars().count() as i32 * 4 - 1;
+            g.tiny(all.right() - 3 - w, all.bottom() + 2, &count, 'k');
         }
     }
 

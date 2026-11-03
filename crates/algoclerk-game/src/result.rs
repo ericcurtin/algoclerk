@@ -154,7 +154,9 @@ fn layout(vp: &Viewport) -> Layout {
     let row = Rect::new(panel.x + 6, panel.y + 16, panel.w - 12, bh);
     let five = crate::layout::columns(row, 5, 2);
     let tog_h = if vp.touch { 22 } else { 12 };
-    let note = Rect::new(panel.x + 6, by - 24, panel.w - 12, 22);
+    // the note under the code may need four lines on a narrow screen (technique and complexity of the C++ tab)
+    let note_h = if vp.portrait { 40 } else { 22 };
+    let note = Rect::new(panel.x + 6, by - note_h - 2, panel.w - 12, note_h);
     let prelude = Rect::new(panel.x + 6, note.y - tog_h - 1, panel.w - 12, tog_h);
     let top = panel.y + 18 + bh + 2;
     let body = Rect::new(panel.x + 6, top, panel.w - 12, prelude.y - top - 2);
@@ -284,7 +286,8 @@ impl ResultScreen {
                 });
             }
         }
-        (rows, pre_lines)
+        // the C++ tab shows its includes inline, there is nothing to fold away
+        (rows, if self.lang == 1 { 0 } else { pre_lines })
     }
 
     /// The longest line in columns (scroll mode).
@@ -413,7 +416,7 @@ impl ResultScreen {
                 }
                 self.scroll = self.scroll.clamp(0, max_scroll);
                 self.hscroll = self.hscroll.clamp(0, max_h);
-                if cx.ptr.tapped_in(&l.prelude) {
+                if cx.ptr.tapped_in(&l.prelude) && self.lang != 1 {
                     if let Some(f) = self.show_prelude.get_mut(self.lang) {
                         *f = !*f;
                     }
@@ -560,12 +563,13 @@ impl ResultScreen {
             if let Some(c) = &vd.complexity {
                 g.text(x, y, &v.tr.t("result.measured"), 'k');
                 y += 11;
-                g.round_rect(Rect::new(x, y, 118, 24), 'K', 'k');
+                let bw = ((p.right() - x - 10 - 6) / 2).clamp(40, 118);
+                g.round_rect(Rect::new(x, y, bw, 24), 'K', 'k');
                 g.text(x + 5, y + 4, &v.tr.t("result.time"), 'a');
                 g.text(x + 5, y + 13, &c.time.to_string(), 'y');
-                g.round_rect(Rect::new(x + 124, y, 118, 24), 'K', 'k');
-                g.text(x + 129, y + 4, &v.tr.t("result.space"), 'a');
-                g.text(x + 129, y + 13, &c.space.to_string(), 'y');
+                g.round_rect(Rect::new(x + bw + 6, y, bw, 24), 'K', 'k');
+                g.text(x + bw + 11, y + 4, &v.tr.t("result.space"), 'a');
+                g.text(x + bw + 11, y + 13, &c.space.to_string(), 'y');
                 y += 30;
             }
             if let Some(l) = &self.play.session.level {
@@ -576,7 +580,7 @@ impl ResultScreen {
                     ((p.right() - x - 8) / 6) as usize,
                 )
                 .iter()
-                .take(3)
+                .take(5)
                 {
                     g.text(x, y, line, 'K');
                     y += 9;
@@ -791,7 +795,11 @@ impl ResultScreen {
                 );
             }
         }
-        for (i, line) in Font::wrap(&text, cols).iter().take(2).enumerate() {
+        for (i, line) in Font::wrap(&text, cols)
+            .iter()
+            .take(((l.note.h - 2) / 10).max(1) as usize)
+            .enumerate()
+        {
             g.text(l.note.x + 1, l.note.y + 2 + i as i32 * 10, line, 'k');
         }
     }

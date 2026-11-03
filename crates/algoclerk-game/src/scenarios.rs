@@ -13,7 +13,7 @@ use crate::ui::{GameConfig, Nav};
 use algoclerk_media::{Assets, Canvas};
 
 /// All scenario names, in documentation order.
-pub const NAMES: [&str; 22] = [
+pub const NAMES: [&str; 24] = [
     "title",
     "select",
     "select-locked",
@@ -25,6 +25,8 @@ pub const NAMES: [&str; 22] = [
     "play-error",
     "play-text",
     "play-card",
+    "play-members",
+    "play-drag",
     "play-palette",
     "play-keyboard",
     "play-complete",
@@ -231,6 +233,60 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
                 p.panel.suggest_now(&p.session);
             }
             tick_n(&mut g, 2);
+        }
+        "play-members" => {
+            g.goto(Nav::Play("two-sum".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.load_reference();
+            let rows = p.session.rows();
+            p.panel.sel = rows.iter().position(|r| r.text == "seen[nums[i]] = i;");
+            tick_n(&mut g, 2);
+            if let Some(p) = g.play_mut() {
+                p.open_card_editor();
+                if let Some(c) = p.panel.card.as_mut() {
+                    c.line.set_text("seen.");
+                    c.pad = crate::editor::Pad::Members;
+                }
+            }
+            tick_n(&mut g, 4);
+        }
+        "play-drag" => {
+            g.goto(Nav::Play("two-sum".into()));
+            let p = g.play_mut().ok_or("no play")?;
+            p.load_reference();
+            tick_n(&mut g, 4);
+            let vp = g.vp;
+            let p = g.play_mut().ok_or("no play")?;
+            let list = p
+                .hits(&vp)
+                .into_iter()
+                .find(|h| h.name == "editor body")
+                .map(|h| h.rect)
+                .ok_or("no editor body")?;
+            let rows = p.session.rows();
+            let geo = crate::cards::geometry(&rows, list, if vp.touch { 24 } else { 14 });
+            let find = |t: &str| rows.iter().position(|r| r.text.starts_with(t));
+            let (src, dst) = (
+                find("seen[nums[i]]").ok_or("no source card")?,
+                find("for (int i").ok_or("no target card")?,
+            );
+            let at = |i: usize, lower: bool| {
+                let b = &geo.boxes[i];
+                (
+                    b.x + b.w / 2,
+                    list.y + b.y + if lower { b.h - 2 } else { b.h / 2 },
+                )
+            };
+            let (from, to) = (at(src, false), at(dst, true));
+            let ev = |pt: (i32, i32), pressed: bool| Input {
+                pointer: Some(pt),
+                down: true,
+                pressed,
+                ..Input::default()
+            };
+            g.tick(&ev(from, true));
+            g.tick(&ev(to, false));
+            g.tick(&ev(to, false));
         }
         "play-card" | "play-palette" => {
             g.goto(Nav::Play("count-vowels".into()));
