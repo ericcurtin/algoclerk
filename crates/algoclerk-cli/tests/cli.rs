@@ -111,6 +111,9 @@ fn harness_prints_a_complete_test_program() {
     );
 }
 
+// Windows has no GNU `timeout` (System32 ships a different program of that name), which the real-compiler
+// harness shells out to, so this test only runs where it exists.
+#[cfg(not(windows))]
 #[test]
 fn diff_compares_a_level_with_the_real_compilers() {
     let o = cli(&["diff", "two-sum", "--no-sanitize"]);
