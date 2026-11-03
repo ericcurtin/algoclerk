@@ -72,6 +72,15 @@ editor: a one-line syntax coloured editor and chip pages for the variables in sc
 operators, member functions of the value left of the cursor (only rows with `card: true`, filtered by the receiver's
 static type) and `std::` names (only unlocked headers).
 
+*Notes under the code.* `EditorPanel::note_of` decides what the strip under the code says, in both views, and the
+strip is always tall enough for every wrapped line (`note_layout`). An untouched or emptied starter (`Session::nudge`)
+is not an error: the note is a yellow "Write your answer between the braces" and the cards offer a big
+"+ Add a statement" button (`cards::empty_slot`, then the card palette). A body that only lacks its `return`
+(`Session::soft_problem`) is a yellow heads-up until Run or Check is pressed; after that every problem is red. The
+status line under the controls never repeats a message the note already shows (`Play::status_line`). The card editor's
+chip pages start with a backspace and a clear chip and have a `;` chip, so a card can be rebuilt with a mouse or a
+finger alone.
+
 The program **text is the source of truth** (`session.rs`): card edits transform the tree and print it back, text
 edits re-parse, undo and redo (buttons, `Ctrl+Z`, `Ctrl+Shift+Z`) are one text history shared by both views, so the
 two views are always in sync. The current statement of a run is highlighted in the text view and on its card.
@@ -85,7 +94,11 @@ a construct a generator cannot express turns into a friendly message on that tab
 sideways and keep their line numbers, so no line is ever cut off.
 
 **Input.** The shell converts pointer positions to virtual pixels and latches presses between 60 Hz ticks;
-`input.rs` derives taps, drags and long presses. Gamepad support is not wired in the shell.
+`input.rs` derives taps, drags and long presses. Typed text and editing keys go through `input::KeyQueue`, which
+hands out one segment per tick so that several keys landing in one tick (slow frames, fast typists, scripted
+keyboards such as `xdotool type`) can never reorder Return and the text around it; a newline delivered as a
+character counts as Return. Typing `}` on a blank line with auto-close on reuses the brace that auto-close added
+instead of doubling it (`tests/polish.rs` types every level's reference solution, with and without auto-close). Gamepad support is not wired in the shell.
 
 **Audio.** `GameEvent::Sfx(name)` and `GameEvent::Music(name)`; the shell renders `assets/music/<name>.song`
 once, caches the WAV and plays it. Failure to open an audio device or a missing song is ignored.

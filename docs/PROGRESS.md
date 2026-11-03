@@ -86,6 +86,10 @@ What exists (and what each gives you):
   verified by the commands in `docs/BUILDING.md`, which the final report of the branch records.
 - The headless screenshots in `docs/screenshots/` were regenerated for the C++ UI by the UI package. The
   Rust and C tabs show the placeholder until M10.
+- The UI-C package ran the real windowed game (Xvfb + lavapipe) end to end: typing a reference solution, cards with
+  the mouse only, a runtime error, level select, settings, a map level with the watch board, the victory screen and
+  the code tabs. The findings and fixes are in `UI_REVIEW_CPP.md` (section "Real windowed game"); the
+  `docs/screenshots/window-*.png` files are captures of that run.
 - The real-window smoke test (`scripts/gui-smoke.sh`) was last run on the pre-C++ code. Its click coordinates
   depend on the layout, so it must be re-run and may need updating (M12).
 
