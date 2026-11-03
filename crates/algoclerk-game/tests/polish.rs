@@ -159,3 +159,57 @@ fn a_filled_body_has_no_add_button_in_the_list() {
 fn constraints_use_a_bullet_with_a_gap() {
     assert!(algoclerk_game::brief::BULLET_GAP >= 4);
 }
+
+/// Type `src` the way a person does: no leading spaces (the editor indents), Return between the lines.
+fn type_like_a_person(src: &str, auto_close: bool) -> String {
+    let mut e = algoclerk_game::textedit::TextEdit::new("", true);
+    e.smart = true;
+    e.auto_close = auto_close;
+    for ch in src.trim_start_matches('\n').chars() {
+        match ch {
+            '\n' => e.smart_newline(),
+            c => e.type_char(c),
+        }
+        // leading spaces of a line are the editor's job
+    }
+    e.text()
+}
+
+fn strip_indent(src: &str) -> String {
+    src.trim_start_matches('\n')
+        .lines()
+        .map(str::trim_start)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn typing_every_reference_solution_gives_the_same_code() {
+    let mut bad = Vec::new();
+    for l in algoclerk_levels::Campaign::shipped().all_levels() {
+        let want = l.reference.trim_start_matches('\n').trim_end().to_string();
+        for auto_close in [false, true] {
+            let typed = strip_indent(&l.reference);
+            let got = type_like_a_person(&typed, auto_close);
+            // continuation lines are aligned by hand in a few references: compare them without leading spaces,
+            // and every other line exactly
+            let exact = |a: &str, b: &str| {
+                a.lines().count() == b.lines().count()
+                    && a.lines().zip(b.lines()).all(|(x, y)| {
+                        x == y || (y.starts_with("          ") && x.trim_start() == y.trim_start())
+                    })
+            };
+            if !exact(got.trim_end(), &want) {
+                bad.push(format!(
+                    "--- {} (auto_close {auto_close})\n{}\n+++ typed gave\n{}",
+                    l.id,
+                    want,
+                    got.trim_end()
+                ));
+            }
+        }
+    }
+    let n = bad.len();
+    bad.truncate(3);
+    assert!(n == 0, "{n} mismatches, first:\n{}", bad.join("\n"));
+}

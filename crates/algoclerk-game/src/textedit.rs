@@ -531,6 +531,46 @@ impl TextEdit {
         }
     }
 
+    /// Typing `}` on an otherwise empty line, when the braces of the text already balance and the next thing
+    /// after the blank space is a `}` (the one auto-close added when `{` was typed): reuse that brace, dedented
+    /// to the line of its opening brace, instead of adding a second one.
+    fn type_over_closing_brace(&mut self) -> bool {
+        if !self.auto_close {
+            return false;
+        }
+        let (line, _) = self.line_col(self.cursor);
+        let (s, _) = self.line_range(line);
+        if !self.chars[s..self.cursor].iter().all(|c| *c == ' ') {
+            return false;
+        }
+        let mask = self.literal_mask();
+        let count = |b: char| {
+            (0..self.chars.len())
+                .filter(|i| !mask[*i] && self.chars[*i] == b)
+                .count()
+        };
+        let (opens, closes) = (count('{'), count('}'));
+        if opens > closes {
+            return false;
+        }
+        let Some(j) = (self.cursor..self.chars.len()).find(|i| !self.chars[*i].is_whitespace())
+        else {
+            return false;
+        };
+        if self.chars[j] != '}' {
+            return false;
+        }
+        let target = self
+            .open_brace_before(self.cursor)
+            .map(|b| self.indent_of(self.line_col(b).0))
+            .unwrap_or(0);
+        self.chars.drain(s..j);
+        self.cursor = s;
+        self.insert(&" ".repeat(target));
+        self.move_to(self.cursor + 1, false);
+        true
+    }
+
     /// Type one character with the code behaviour (dedent on `}`, auto-close, type over the closer).
     pub fn type_char(&mut self, c: char) {
         let next = self.chars.get(self.cursor).copied();
@@ -541,6 +581,9 @@ impl TextEdit {
         let closer = matches!(c, ')' | ']' | '}' | '"' | '\'');
         if self.auto_close && closer && next == Some(c) && self.selection().is_none() {
             self.move_to(self.cursor + 1, false);
+            return;
+        }
+        if c == '}' && self.smart && self.selection().is_none() && self.type_over_closing_brace() {
             return;
         }
         if c == '}' && self.smart && self.selection().is_none() {

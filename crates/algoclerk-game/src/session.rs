@@ -574,8 +574,17 @@ mod tests {
     fn the_starter_is_the_signature_with_an_empty_body() {
         let l = level("two-sum");
         let s = Session::for_level(&l, "").unwrap();
-        assert_eq!(s.text().trim_end(), l.starter_code().replacen("{\n}", "{\n    \n}", 1).trim_end());
-        assert_eq!(s.edit.line_col(s.edit.cursor), (1, 4), "the cursor waits inside the braces");
+        assert_eq!(
+            s.text().trim_end(),
+            l.starter_code()
+                .replacen("{\n}", "{\n    \n}", 1)
+                .trim_end()
+        );
+        assert_eq!(
+            s.edit.line_col(s.edit.cursor),
+            (1, 4),
+            "the cursor waits inside the braces"
+        );
         // the only thing wrong with the empty body is the missing `return`, which is not shown yet
         assert_eq!(s.raw_problem().map(|d| d.code), Some("flow.missing-return"));
         assert!(s.nudge() && s.problem().is_none());
