@@ -991,14 +991,13 @@ impl<'p> Machine<'p> {
             }
             "rotate" => {
                 self.nargs(name, args, 3, 3)?;
-                let (a, b) = self.range2(args)?;
-                let m = self.val_arg(&args[1])?;
+                // (first, middle, last): each argument is evaluated exactly once
+                let (a, m) = self.range2(args)?;
                 let c = self.val_arg(&args[2])?;
                 let r = self.seq_range(&a, &c)?;
                 let (Value::Iter(mi), Value::Iter(ai)) = (&m, &a) else {
                     return Err(self.err(RtKind::BadArg, "rotate needs iterators"));
                 };
-                let _ = b;
                 let (Pos::Idx(mp), Pos::Idx(ap)) = (&mi.pos, &ai.pos) else {
                     return Err(self.err(RtKind::BadArg, "rotate needs random access iterators"));
                 };

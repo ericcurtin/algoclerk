@@ -696,7 +696,6 @@ impl<'p> Machine<'p> {
                 [e] => {
                     let v = self.eval(e)?;
                     if matches_ty(&v, ty) {
-                        self.charge(leaves(&v))?;
                         Ok(v)
                     } else {
                         Err(self.err(RtKind::BadArg, "unsupported container constructor"))
@@ -715,7 +714,6 @@ impl<'p> Machine<'p> {
                 [e] => {
                     let v = self.eval(e)?;
                     if matches_ty(&v, ty) {
-                        self.charge(leaves(&v))?;
                         Ok(v)
                     } else {
                         Err(self.err(RtKind::BadArg, "unsupported adaptor constructor"))
@@ -850,7 +848,7 @@ impl<'p> Machine<'p> {
                     return self.seq_from_vec(ty, vs);
                 }
                 if matches_ty(&v, ty) {
-                    self.charge(leaves(&v))?;
+                    // an lvalue was already charged its copy when it was evaluated
                     return Ok(v);
                 }
                 Err(self.err(RtKind::BadArg, "unsupported container constructor"))
