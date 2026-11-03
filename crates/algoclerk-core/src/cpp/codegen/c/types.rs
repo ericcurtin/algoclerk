@@ -120,7 +120,9 @@ impl Cx<'_> {
         for s in &self.used_structs {
             let _ = writeln!(o, "\ntypedef struct {s} {s};");
         }
-        o.push_str(STR);
+        if reg.iter().any(|(t, _)| matches!(t, Ty::Str | Ty::StrView)) {
+            o.push_str(STR);
+        }
         for m in ["VEC", "DEQ", "HEAP", "HMAP", "SMAP"] {
             if used.contains(&m) {
                 o.push_str(match m {

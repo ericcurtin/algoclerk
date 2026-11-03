@@ -24,6 +24,8 @@ mod tmpl_base;
 mod tmpl_more;
 mod types;
 
+pub(super) use tmpl_base::STR as STR_TEMPLATE;
+
 const RESERVED: &[&str] = &[
     "auto", "char", "const", "double", "enum", "extern", "float", "int", "long", "register",
     "restrict", "short", "signed", "sizeof", "static", "struct", "typedef", "union", "unsigned",
