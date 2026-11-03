@@ -244,10 +244,10 @@ fn tick_game(
 ) {
     // one segment of the typed input per tick, the rest waits (so Return never jumps ahead of the text before it)
     let mut l = std::mem::take(&mut *latch);
-    let (keys, typed) = l.keys.take_tick();
+    let (tick_keys, typed) = l.keys.take_tick();
     latch.keys = std::mem::take(&mut l.keys);
     let mut input = Input {
-        keys,
+        keys: tick_keys,
         typed,
         wheel: l.wheel,
         paste: l.paste,
