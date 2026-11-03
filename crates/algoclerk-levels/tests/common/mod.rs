@@ -37,7 +37,9 @@ pub fn conv(v: &Plain, t: &Ty, heap: &Heap) -> V {
         (Plain::Int(i), Ty::Char) => C(*i as u8 as char),
         (Plain::Int(i), _) => I(*i as i64),
         (Plain::Str(s), _) => S(String::from_utf8_lossy(s).into_owned()),
-        (Plain::Seq(xs), Ty::Vector(et)) => L(xs.iter().map(|x| conv(x, et, heap)).collect()),
+        (Plain::Seq(xs), Ty::Vector(et) | Ty::List(et)) => {
+            L(xs.iter().map(|x| conv(x, et, heap)).collect())
+        }
         (Plain::Ptr(h), Ty::Ptr(inner)) if matches!(&**inner, Ty::Struct(n) if n == "ListNode") => {
             let mut vals = Vec::new();
             let mut seen: HashMap<u32, usize> = HashMap::new();
@@ -1037,6 +1039,42 @@ pub fn oracle(id: &str, a: &[V]) -> Option<V> {
                 })
                 .collect())
         }
+        // ---- supply cupboard ----
+        "heaviest-pair" => {
+            let w = ints(&a[0]);
+            I(w.windows(2).map(|p| p[0] + p[1]).max().unwrap_or(0))
+        }
+        "drop-all" => {
+            let bad = int(&a[1]);
+            il(ints(&a[0]).into_iter().filter(|&x| x != bad))
+        }
+        "label-order" => {
+            let mut w = strs(&a[0]);
+            w.sort_by(|x, y| y.len().cmp(&x.len()).then_with(|| x.cmp(y)));
+            L(w.into_iter().map(S).collect())
+        }
+        "join-ropes" => {
+            use std::cmp::Reverse;
+            use std::collections::BinaryHeap;
+            let mut heap: BinaryHeap<Reverse<i64>> = ints(&a[0]).into_iter().map(Reverse).collect();
+            let mut total = 0;
+            while heap.len() > 1 {
+                let Reverse(x) = heap.pop().unwrap();
+                let Reverse(y) = heap.pop().unwrap();
+                total += x + y;
+                heap.push(Reverse(x + y));
+            }
+            I(total)
+        }
+        "count-seals" => {
+            let (t, p) = (st(&a[0]).into_bytes(), st(&a[1]).into_bytes());
+            I(if p.is_empty() || p.len() > t.len() {
+                0
+            } else {
+                t.windows(p.len()).filter(|w| *w == &p[..]).count() as i64
+            })
+        }
+        "drop-negatives" => il(ints(&a[0]).into_iter().filter(|&x| x >= 0)),
         _ => return None,
     })
 }

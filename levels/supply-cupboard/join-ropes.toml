@@ -1,0 +1,104 @@
+title = "Cable Cupboard"
+order = 4
+story = "The cable cupboard is full of loose cable pieces of different lengths. Splicing two pieces together costs as much effort as the total length of the new piece, and the electrician wants one long cable at the end with the least total effort. Always splice the two shortest pieces."
+statement = "Join all the cables into one. Joining two cables of lengths a and b costs a + b and produces a cable of length a + b. Return the least possible total cost (0 when there are fewer than two cables)."
+prelude = '''
+#include <vector>
+'''
+signature = "long long joinCost(const std::vector<int>& cables)"
+constraints = ["0 <= cables.size() <= 5000", "1 <= cables[i] <= 1000"]
+technique = "Min-heap (priority_queue with std::greater)"
+big_o = "O(n log n) time, O(n) space"
+unlocked = ["<queue>", "<functional>", "<algorithm>"]
+hints = [
+  "Greedy works: splicing the two shortest pieces first keeps the expensive big pieces out of as many splices as possible. You need the two smallest items again and again, and the new piece goes back into the pile.",
+  "`std::priority_queue<T>` is a max-heap: `top()` is the largest. For the smallest first, give it all three template arguments: `std::priority_queue<long long, std::vector<long long>, std::greater<long long>>` (needs `<queue>`, `<vector>` and `<functional>`).",
+  "Each push and pop costs about log n. Re-sorting the whole pile after every splice (`std::sort` each round) costs n log n per round and n rounds: O(n^2 log n). The heap keeps just enough order.",
+  "Use `long long` for the heap and the running total: spliced pieces and the total grow much faster than any single cable.",
+]
+reference = '''
+#include <functional>
+#include <queue>
+
+long long joinCost(const std::vector<int>& cables) {
+    std::priority_queue<long long, std::vector<long long>, std::greater<long long>> heap;
+    for (int c : cables) {
+        heap.push(c);
+    }
+    long long total = 0;
+    while (heap.size() > 1) {
+        const long long a = heap.top();
+        heap.pop();
+        const long long b = heap.top();
+        heap.pop();
+        total += a + b;
+        heap.push(a + b);
+    }
+    return total;
+}
+'''
+naive = '''
+#include <algorithm>
+
+long long joinCost(const std::vector<int>& cables) {
+    std::vector<long long> pieces(cables.begin(), cables.end());
+    long long total = 0;
+    while (pieces.size() > 1) {
+        std::sort(pieces.begin(), pieces.end());
+        const long long merged = pieces[0] + pieces[1];
+        total += merged;
+        pieces.erase(pieces.begin());
+        pieces[0] = merged;
+    }
+    return total;
+}
+'''
+
+[budgets]
+large_steps = 1500000
+
+[medals]
+size = [79, 62, 49]
+speed = [404, 216, 150]
+
+[[examples]]
+args = ["{4, 3, 2, 6}"]
+expect = "29"
+note = "2+3=5, then 4+5=9, then 6+9=15: 5 + 9 + 15 = 29."
+
+[[examples]]
+args = ["{8}"]
+expect = "0"
+note = "Nothing to join."
+
+[[examples]]
+args = ["{1, 2}"]
+expect = "3"
+
+[[tests]]
+args = ["{}"]
+expect = "0"
+
+[[tests]]
+args = ["{5, 5, 5, 5}"]
+expect = "40"
+
+[[tests]]
+args = ["{1, 1, 1, 1, 1, 1, 1, 1}"]
+expect = "24"
+
+[[generate]]
+seed = 1401
+count = 12
+args = [
+  { kind = "vec_int", len = [0, 10], range = [1, 30] },
+]
+
+[[generate]]
+seed = 1402
+count = 1
+large = true
+n = 5000
+args = [
+  { kind = "vec_int", len = "n", range = [1, 1000] },
+]

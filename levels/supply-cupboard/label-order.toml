@@ -1,0 +1,106 @@
+title = "Label Maker"
+order = 3
+story = "The label printer needs the day's names in a very particular order: the longest names first, because they need the wide stickers, and names of the same length in dictionary order so the clerk can find them."
+statement = "Return a copy of words sorted by length, longest first. Words of the same length go in alphabetical order. (Words that are equal are interchangeable.) Sort with `std::sort` or `std::stable_sort` and a comparator of your own: no hand-written sorting loops."
+prelude = '''
+#include <string>
+#include <vector>
+'''
+signature = "std::vector<std::string> labelOrder(const std::vector<std::string>& words)"
+constraints = ["0 <= words.size() <= 2000", "words are lower case, 1 to 12 letters"]
+technique = "Sort with a custom comparator (lambda)"
+big_o = "O(n log n) time, O(n) space"
+unlocked = ["<algorithm>"]
+locked = [
+  { name = "<map>", why = "A map keeps its keys in order, which dodges the comparator. The comparator is the lesson." },
+  { name = "<set>", why = "A set sorts for you too. Write the comparison yourself." },
+  { name = "<queue>", why = "A priority queue would sort by default order only." },
+]
+hints = [
+  "`std::sort(first, last, cmp)` takes a third argument: a callable that answers \"does a go strictly before b?\". A lambda is the usual way to write one: `[](const std::string& a, const std::string& b) { ... }`.",
+  "Compare the lengths first. If they differ, the longer one goes first: `return a.size() > b.size();`. If the lengths are equal, fall back to `a < b`. Use `>` and `<`, never `>=` or `<=`: a comparator must be a strict ordering.",
+  "Take the lambda's parameters by `const std::string&`. By value would copy both strings on every comparison, and a copy costs its length. Sort a copy of the input: `std::vector<std::string> out = words;`.",
+]
+reference = '''
+#include <algorithm>
+
+std::vector<std::string> labelOrder(const std::vector<std::string>& words) {
+    std::vector<std::string> out = words;
+    std::sort(out.begin(), out.end(), [](const std::string& a, const std::string& b) {
+        if (a.size() != b.size()) {
+            return a.size() > b.size();
+        }
+        return a < b;
+    });
+    return out;
+}
+'''
+naive = '''
+std::vector<std::string> labelOrder(const std::vector<std::string>& words) {
+    std::vector<std::string> out = words;
+    const int n = static_cast<int>(out.size());
+    for (int i = 1; i < n; ++i) {
+        int j = i;
+        while (j > 0) {
+            const bool before = out[j].size() > out[j - 1].size() ||
+                                (out[j].size() == out[j - 1].size() && out[j] < out[j - 1]);
+            if (!before) {
+                break;
+            }
+            const std::string tmp = out[j];
+            out[j] = out[j - 1];
+            out[j - 1] = tmp;
+            --j;
+        }
+    }
+    return out;
+}
+'''
+
+[budgets]
+large_steps = 3000000
+
+[medals]
+size = [98, 77, 61]
+speed = [289, 155, 107]
+
+[[examples]]
+args = ['{"pen", "stapler", "ink", "folder", "tape"}']
+expect = '{"stapler", "folder", "tape", "ink", "pen"}'
+note = "Length 7, 6, 4, then the two 3-letter names alphabetically."
+
+[[examples]]
+args = ['{"b", "a"}']
+expect = '{"a", "b"}'
+
+[[examples]]
+args = ["{}"]
+expect = "{}"
+
+[[tests]]
+args = ['{"zz", "aaa", "yy", "bbb", "x"}']
+expect = '{"aaa", "bbb", "yy", "zz", "x"}'
+
+[[tests]]
+args = ['{"only"}']
+expect = '{"only"}'
+
+[[tests]]
+args = ['{"abc", "abd", "ab", "abcd", "a"}']
+expect = '{"abcd", "abc", "abd", "ab", "a"}'
+
+[[generate]]
+seed = 1301
+count = 12
+args = [
+  { kind = "vec_string", len = [0, 10], item_len = [1, 5], alphabet = "abc" },
+]
+
+[[generate]]
+seed = 1302
+count = 1
+large = true
+n = 2000
+args = [
+  { kind = "vec_string", len = "n", item_len = [1, 12] },
+]

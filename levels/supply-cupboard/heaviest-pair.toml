@@ -1,0 +1,114 @@
+title = "Divide the Load"
+order = 1
+story = "The loading dock splits every delivery in two and hands each half to a different clerk. Each clerk reports the heaviest pair of neighbouring crates in their half, and the foreman only has to check the crates at the cut. Handing a clerk a photocopy of the whole manifest every time is slow, though."
+statement = "Return the largest sum of two neighbouring crates in weights (weights[i] + weights[i + 1]). Return 0 when there are fewer than two crates. Helper functions and recursion are unlocked: try a divide and conquer helper that takes the manifest plus a range."
+prelude = '''
+#include <vector>
+'''
+signature = "int heaviestPair(const std::vector<int>& weights)"
+constraints = ["0 <= weights.size() <= 2000", "1 <= weights[i] <= 1000"]
+technique = "Divide and conquer without copying (pass by const reference)"
+big_o = "O(n) time, O(log n) space"
+unlocked = ["<algorithm>"]
+hints = [
+  "Split the range [lo, hi) at mid. The best neighbouring pair is either wholly in the left half, wholly in the right half, or the pair `weights[mid - 1] + weights[mid]` that straddles the cut.",
+  "Write a helper `int best(const std::vector<int>& weights, int lo, int hi)` and let it call itself on both halves. A range with fewer than two crates has no pair: return 0 (all weights are positive).",
+  "Look at the helper's first parameter. `std::vector<int> weights` (by value) copies the whole vector on every call, and a copy costs its length: with about n calls that is O(n^2) work. `const std::vector<int>&` is a reference to the original, so the call costs nothing extra.",
+]
+reference = '''
+#include <algorithm>
+
+int best(const std::vector<int>& weights, int lo, int hi) {
+    if (hi - lo < 2) {
+        return 0;
+    }
+    if (hi - lo == 2) {
+        return weights[lo] + weights[lo + 1];
+    }
+    const int mid = (lo + hi) / 2;
+    const int left = best(weights, lo, mid);
+    const int right = best(weights, mid, hi);
+    return std::max({left, right, weights[mid - 1] + weights[mid]});
+}
+
+int heaviestPair(const std::vector<int>& weights) {
+    return best(weights, 0, static_cast<int>(weights.size()));
+}
+'''
+naive = '''
+#include <algorithm>
+
+int best(std::vector<int> weights, int lo, int hi) {
+    if (hi - lo < 2) {
+        return 0;
+    }
+    if (hi - lo == 2) {
+        return weights[lo] + weights[lo + 1];
+    }
+    const int mid = (lo + hi) / 2;
+    const int left = best(weights, lo, mid);
+    const int right = best(weights, mid, hi);
+    return std::max({left, right, weights[mid - 1] + weights[mid]});
+}
+
+int heaviestPair(const std::vector<int>& weights) {
+    return best(weights, 0, static_cast<int>(weights.size()));
+}
+'''
+
+[unlock]
+helpers = true
+recursion = true
+
+[budgets]
+large_steps = 300000
+
+[medals]
+size = [109, 85, 68]
+speed = [302, 161, 112]
+
+[[examples]]
+args = ["{4, 9, 2, 8, 7}"]
+expect = "15"
+note = "9 + 2 = 11, 2 + 8 = 10, 8 + 7 = 15."
+
+[[examples]]
+args = ["{5}"]
+expect = "0"
+note = "A single crate has no neighbour."
+
+[[examples]]
+args = ["{6, 6}"]
+expect = "12"
+
+[[tests]]
+args = ["{}"]
+expect = "0"
+
+[[tests]]
+args = ["{1, 1, 1, 1, 1, 1, 1}"]
+expect = "2"
+
+[[tests]]
+args = ["{9, 1, 1, 1, 1, 1, 9}"]
+expect = "10"
+
+[[tests]]
+args = ["{1, 2, 3, 4, 5, 6, 7, 8}"]
+expect = "15"
+
+[[generate]]
+seed = 1101
+count = 12
+args = [
+  { kind = "vec_int", len = [0, 12], range = [1, 20] },
+]
+
+[[generate]]
+seed = 1102
+count = 1
+large = true
+n = 2000
+args = [
+  { kind = "vec_int", len = "n", range = [1, 1000] },
+]

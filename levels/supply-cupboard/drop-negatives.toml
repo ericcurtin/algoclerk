@@ -1,0 +1,97 @@
+title = "Refund Sweep"
+order = 6
+story = "The ledger is a chain of entries, and the auditor wants every refund (negative entry) struck out, leaving the remaining entries in their original order. Striking out while walking along the chain is fine, as long as you keep your finger on a valid entry."
+statement = "Return the ledger with every negative number removed, order preserved. Zero is not negative. The list's own `remove` and `remove_if` are locked: erase through an iterator."
+prelude = '''
+#include <list>
+'''
+signature = "std::list<int> dropNegatives(std::list<int> ledger)"
+constraints = ["0 <= ledger.size() <= 5000"]
+technique = "Erase while iterating: it = list.erase(it)"
+big_o = "O(n) time, O(n) space"
+locked = [
+  { name = "std::list::remove_if", why = "One line, but it hides the iterator idiom you are here to learn." },
+  { name = "std::list::remove", why = "Same reason." },
+  { name = "std::list::unique", why = "Not what you want, and it would hide the iterator idiom." },
+]
+hints = [
+  "Walk the list with an iterator: `for (auto it = ledger.begin(); it != ledger.end(); ) { ... }`. Note the empty increment slot.",
+  "`ledger.erase(it)` destroys the element `it` points to, so `it` is invalid afterwards: using it (including `++it` or `for (int x : ledger)` carrying on) is undefined behaviour. This game reports it as an invalidated iterator.",
+  "`erase` returns an iterator to the element after the erased one. So: `if (*it < 0) { it = ledger.erase(it); } else { ++it; }`. For a `std::list` each erase costs O(1); a quadratic find-then-erase from the front each time is what you are avoiding.",
+]
+reference = '''
+std::list<int> dropNegatives(std::list<int> ledger) {
+    for (auto it = ledger.begin(); it != ledger.end();) {
+        if (*it < 0) {
+            it = ledger.erase(it);
+        } else {
+            ++it;
+        }
+    }
+    return ledger;
+}
+'''
+naive = '''
+std::list<int> dropNegatives(std::list<int> ledger) {
+    bool found = true;
+    while (found) {
+        found = false;
+        for (auto it = ledger.begin(); it != ledger.end(); ++it) {
+            if (*it < 0) {
+                ledger.erase(it);
+                found = true;
+                break;
+            }
+        }
+    }
+    return ledger;
+}
+'''
+
+[budgets]
+large_steps = 300000
+
+[medals]
+size = [48, 38, 30]
+speed = [237, 127, 88]
+
+[[examples]]
+args = ["{3, -1, 4, -1, -5, 9}"]
+expect = "{3, 4, 9}"
+
+[[examples]]
+args = ["{-2, -2}"]
+expect = "{}"
+
+[[examples]]
+args = ["{0, 1, 2}"]
+expect = "{0, 1, 2}"
+note = "Zero stays."
+
+[[tests]]
+args = ["{}"]
+expect = "{}"
+
+[[tests]]
+args = ["{-1, 5}"]
+expect = "{5}"
+
+[[tests]]
+args = ["{5, -1}"]
+expect = "{5}"
+
+[[generate]]
+seed = 1601
+count = 12
+args = [
+  { kind = "vec_int", len = [0, 12], range = [-6, 6] },
+]
+
+[[generate]]
+seed = 1602
+count = 1
+large = true
+n = 5000
+args = [
+  { kind = "vec_int", len = "n", range = [-1000, 1000] },
+]

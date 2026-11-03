@@ -1,0 +1,131 @@
+title = "Seal Counter"
+order = 5
+story = "Every parcel in the mailroom carries a long strip of seal code, and the inspector wants to know how often a particular short seal pattern shows up on it, even when two copies overlap. The old clerk photocopied the rest of the strip at every position before looking at it. The new clerk just points at the strip."
+statement = "Count the positions i where pattern appears in text starting at i (matches may overlap: \"aa\" occurs 3 times in \"aaaa\"). Return that count. The library searches (`find`) are locked: do the comparison yourself, in place."
+prelude = '''
+#include <string>
+'''
+signature = "int countSeals(const std::string& text, const std::string& pattern)"
+constraints = ["0 <= text.size() <= 5000", "1 <= pattern.size() <= 8", "lower case letters"]
+technique = "Compare in place with std::string_view instead of copying with substr"
+big_o = "O(n) time, O(1) space"
+unlocked = ["<string_view>"]
+locked = [
+  { name = "std::string::find", why = "A ready-made search would hide the lesson." },
+  { name = "std::string::rfind", why = "Same reason." },
+  { name = "std::string_view::find", why = "Same reason." },
+  { name = "std::string_view::rfind", why = "Same reason." },
+]
+hints = [
+  "For each start position i, ask: do the characters of text from i on begin with the pattern? Count the yes answers.",
+  "`text.substr(i)` builds a brand new `std::string` holding every character from i to the end. That copy costs the length of the rest of the text, so doing it at every position is O(n^2) before you even compare anything.",
+  "`std::string_view` is a non-owning window onto characters that already exist: it is just a pointer and a length. Copying it or taking `.substr(i)` of it costs O(1). Make a view of the text once: `const std::string_view view(text);`.",
+  "Write a helper `bool startsWith(std::string_view s, std::string_view p)` that compares character by character and stops at the first mismatch, then call `startsWith(view.substr(i), pattern)`. A `const std::string&` converts to a `std::string_view` automatically.",
+]
+reference = '''
+#include <string_view>
+
+bool startsWith(std::string_view s, std::string_view p) {
+    if (s.size() < p.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < p.size(); ++i) {
+        if (s[i] != p[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int countSeals(const std::string& text, const std::string& pattern) {
+    const std::string_view view(text);
+    int count = 0;
+    for (std::size_t i = 0; i < view.size(); ++i) {
+        if (startsWith(view.substr(i), pattern)) {
+            ++count;
+        }
+    }
+    return count;
+}
+'''
+naive = '''
+bool startsWith(const std::string& s, const std::string& p) {
+    if (s.size() < p.size()) {
+        return false;
+    }
+    for (std::size_t i = 0; i < p.size(); ++i) {
+        if (s[i] != p[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int countSeals(const std::string& text, const std::string& pattern) {
+    int count = 0;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        if (startsWith(text.substr(i), pattern)) {
+            ++count;
+        }
+    }
+    return count;
+}
+'''
+
+[unlock]
+helpers = true
+
+[budgets]
+large_steps = 1000000
+
+[medals]
+size = [103, 80, 64]
+speed = [533, 284, 197]
+
+[[examples]]
+args = ['"abcabcab"', '"ab"']
+expect = "3"
+
+[[examples]]
+args = ['"aaaa"', '"aa"']
+expect = "3"
+note = "Overlapping matches count."
+
+[[examples]]
+args = ['"xyz"', '"q"']
+expect = "0"
+
+[[tests]]
+args = ['""', '"a"']
+expect = "0"
+
+[[tests]]
+args = ['"ab"', '"abc"']
+expect = "0"
+note = "The pattern is longer than the text."
+
+[[tests]]
+args = ['"abababab"', '"abab"']
+expect = "3"
+
+[[tests]]
+args = ['"a"', '"a"']
+expect = "1"
+
+[[generate]]
+seed = 1501
+count = 12
+args = [
+  { kind = "string", len = [0, 14], alphabet = "ab" },
+  { kind = "string", len = [1, 3], alphabet = "ab" },
+]
+
+[[generate]]
+seed = 1502
+count = 1
+large = true
+n = 5000
+args = [
+  { kind = "string", len = "n", alphabet = "ab" },
+  { kind = "string", len = [6, 6], alphabet = "ab" },
+]

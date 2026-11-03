@@ -1,0 +1,92 @@
+title = "Clear the Shelf"
+order = 2
+story = "A recall notice came in: every box with one particular serial number must come off the shelf. The clerk who pulls the boxes out one at a time, shuffling the rest along after each, will be here all week."
+statement = "Return the shelf with every occurrence of bad removed; the other numbers keep their order. The shelf arrives by value, so you may change it and return it."
+prelude = '''
+#include <vector>
+'''
+signature = "std::vector<int> dropAll(std::vector<int> shelf, int bad)"
+constraints = ["0 <= shelf.size() <= 20000"]
+technique = "The erase-remove idiom"
+big_o = "O(n) time, O(n) space"
+unlocked = ["<algorithm>"]
+locked = [
+  { name = "<list>", why = "A list could erase in the middle cheaply, but this shelf is a vector and the lesson is how to erase from one properly." },
+  { name = "std::vector::insert", why = "You are removing things, not adding them." },
+]
+hints = [
+  "Erasing one element from the middle of a `std::vector` shifts every later element one place left: `erase(it)` costs about n minus the position. Doing that once per unwanted box is O(n^2).",
+  "`std::remove(first, last, value)` from `<algorithm>` does not shrink anything: it moves the keepers to the front in one pass and returns the new logical end. The tail behind it is left over.",
+  "Finish with the erase-remove idiom: `shelf.erase(std::remove(shelf.begin(), shelf.end(), bad), shelf.end());` One pass to compact, one range erase to cut the tail. Then `return shelf;` (a local or by-value parameter is moved out, not copied).",
+]
+reference = '''
+#include <algorithm>
+
+std::vector<int> dropAll(std::vector<int> shelf, int bad) {
+    shelf.erase(std::remove(shelf.begin(), shelf.end(), bad), shelf.end());
+    return shelf;
+}
+'''
+naive = '''
+std::vector<int> dropAll(std::vector<int> shelf, int bad) {
+    int i = 0;
+    while (i < static_cast<int>(shelf.size())) {
+        if (shelf[i] == bad) {
+            shelf.erase(shelf.begin() + i);
+        } else {
+            ++i;
+        }
+    }
+    return shelf;
+}
+'''
+
+[budgets]
+large_steps = 400000
+
+[medals]
+size = [29, 23, 18]
+speed = [67, 36, 26]
+
+[[examples]]
+args = ["{3, 1, 3, 2, 3}", "3"]
+expect = "{1, 2}"
+
+[[examples]]
+args = ["{4, 5, 6}", "9"]
+expect = "{4, 5, 6}"
+note = "Nothing to remove."
+
+[[examples]]
+args = ["{7, 7, 7}", "7"]
+expect = "{}"
+
+[[tests]]
+args = ["{}", "1"]
+expect = "{}"
+
+[[tests]]
+args = ["{1, 2, 1, 2, 1, 2}", "2"]
+expect = "{1, 1, 1}"
+
+[[tests]]
+args = ["{-1, 0, -1, 0}", "0"]
+expect = "{-1, -1}"
+
+[[generate]]
+seed = 1201
+count = 12
+args = [
+  { kind = "vec_int", len = [0, 14], range = [-4, 4] },
+  { kind = "int", pick_from = 0, miss = 15, range = [-5, 5] },
+]
+
+[[generate]]
+seed = 1202
+count = 1
+large = true
+n = 20000
+args = [
+  { kind = "vec_int", len = "n", range = [0, 1] },
+  { kind = "int", range = [1, 1] },
+]
