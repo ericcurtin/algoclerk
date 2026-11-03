@@ -107,7 +107,7 @@ fn icon_of(k: &StmtKind) -> &'static str {
         | StmtKind::DoWhile { .. } => "reset",
         StmtKind::Break => "cross",
         StmtKind::Continue => "fast",
-        StmtKind::Return(_) => "op_outbox",
+        StmtKind::Return(_) => "right",
         StmtKind::Block(_) | StmtKind::Empty => "code",
     }
 }
