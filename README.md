@@ -29,9 +29,11 @@ Each level is a real C++ function with a real signature, for example
 `std::vector<int> twoSum(const std::vector<int>& nums, int target)`. The level shows a read-only prelude (the
 `#include` lines and helper structs such as `ListNode`) and you write the function, plus helpers where the
 level allows. Nothing is assembly-like and nothing is invented: what you type is what you would type in an
-interview. The campaign has **80 levels in ten wings** of the office building, from "sum a shelf" to hash
+interview. The campaign has **86 levels in eleven wings** of the office building, from "sum a shelf" to hash
 maps, sliding windows, stacks, heaps, binary search, BFS on grids and graphs, linked lists, trees and dynamic
-programming, with a few boss floors.
+programming, with a few boss floors. The last wing, **The Supply Cupboard**, is about C++ itself: passing by
+reference or by value, the erase-remove idiom, a custom comparator, `std::priority_queue` with
+`std::greater`, `std::string_view` against a copy, and the iterator `erase` idiom.
 
 ```cpp
 #include <vector>
@@ -73,15 +75,17 @@ defined subset of C++17, and the repository tests that interpreter against real 
 - **Interview-grade scoring.** Speed is an abstract cost that mirrors the real complexity of each STL operation
   (`unordered_map` lookups cost 1, `map` and `priority_queue` operations log n, `std::sort` n log n, copying a
   vector by value costs its length, so `const&` matters). Every level runs hidden **large** tests, and a
-  brute-force O(n squared) answer runs out of time like a time-limit-exceeded verdict. A solved level reports its
+  brute-force O(n squared) answer runs out of time like a time-limit-exceeded verdict (53 of the 86 levels
+  have such a naive solution). A solved level reports its
   measured time and space class plus medals for size and speed. See [docs/COST_MODEL.md](docs/COST_MODEL.md).
 - **The thing a level is about is locked.** Each memo lists unlocked and locked headers and `std::` names, with a
   reason ("the supply cupboard on this floor does not stock `<numeric>`: adding things up is the exercise"), and
   a hint ladder of sticky notes.
-- **Code reveal.** The C++ tab shows your accepted solution as a clean formatted answer. Rust and C translations
-  are generated from the checked C++ tree and compile-tested with `rustc`, `gcc` and `clang` against the
-  interpreter; the command line prints them today (`algoclerk-cli codegen LEVEL --lang rust`) and wiring them
-  into the victory screen tabs is tracked in [docs/PROGRESS.md](docs/PROGRESS.md). See
+- **Code reveal.** The victory screen opens on the C++ tab with your accepted solution as a clean formatted
+  answer; the Rust and C tabs show the same program translated from the checked C++ tree. The translations are
+  compile-tested with `rustc`, `gcc` and `clang` against the interpreter for every level reference and naive
+  solution (one level, `drop-negatives`, a `std::list` erase loop, is deliberately not translated and shows a
+  friendly message instead). The command line prints them too (`algoclerk-cli codegen LEVEL --lang rust`). See
   [docs/CODEGEN.md](docs/CODEGEN.md).
 - **Levels are data.** One TOML file per level with a prelude, a real signature, seeded typed generators, a
   naive solution that must time out, and independent Rust oracles. See
@@ -102,7 +106,7 @@ Bevy (`libudev-dev`, `libwayland-dev`, `libxkbcommon-dev`, and `libasound2-dev` 
 
 ```sh
 cargo run --release -p algoclerk-app --bin algoclerk           # the game (add --features audio for sound)
-cargo run -p algoclerk-cli -- list                             # all 80 levels
+cargo run -p algoclerk-cli -- list                             # all 86 levels
 cargo run -p algoclerk-cli -- show two-sum                     # a brief
 cargo run -p algoclerk-cli -- starter two-sum > my.cpp         # the starting program for a level
 cargo run -p algoclerk-cli -- judge two-sum my.cpp             # judge your solution from the terminal
@@ -120,7 +124,10 @@ scripts/screenshots.sh                                         # headless screen
 | Android | install the APK from the release page | `android/build-android.sh release` |
 | iOS | open the simulator build from the release page | `ios/build-ios.sh simulator` |
 
-Per-platform requirements and an honest verification status are in [docs/BUILDING.md](docs/BUILDING.md).
+Per-platform requirements and an honest verification status are in [docs/BUILDING.md](docs/BUILDING.md): on
+this branch the game was built and run on Linux (in a container, under Xvfb with a software Vulkan driver);
+the other platform builds were not repeated, so treat them as unverified. There are real window captures in
+`docs/screenshots/window-*.png`, and the remaining gaps are listed in [docs/PROGRESS.md](docs/PROGRESS.md).
 
 ### Tests
 
@@ -147,7 +154,7 @@ are in [docs/BUILDING.md](docs/BUILDING.md).
 
 ```text
 crates/algoclerk-core    C++ front end and interpreter, judge, complexity estimator, level model, validator, code generators
-crates/algoclerk-levels  the 80 shipped levels, embedded into the binary
+crates/algoclerk-levels  the 86 shipped levels, embedded into the binary
 crates/algoclerk-media   pixel-art engine: palettes, .px sprites, fonts, software canvas, chiptune synth
 crates/algoclerk-game    the game itself (engine-free: Game::tick / Game::draw), headless scenarios
 crates/algoclerk-app     thin Bevy shell: desktop binary, Android cdylib, iOS static library

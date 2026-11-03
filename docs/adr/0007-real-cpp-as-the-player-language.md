@@ -53,8 +53,11 @@ uninitialised scalar, using an iterator or reference after the container changed
 one scalar, falling off the end of a non-void function, reading from an empty container, and comparators
 that are not a strict weak ordering where this is detectable. Runaway loops, too-deep recursion and huge
 allocations stop with `time`, `depth` and `memory` errors. The full table is in `docs/CPP_SUBSET.md`. The policy
-is the goal; the few cases where the interpreter still misses or misclassifies a class are listed, honestly,
-in `docs/PROGRESS.md` and covered by a shrinking `UB_KNOWN` list in the tests.
+is the goal. During development a few cases were missed or misclassified and tracked in a `UB_KNOWN` list in the
+tests; that list is now empty (together with the generator's `KNOWN` and `KNOWN_INTERNAL`), and any new miss
+must be fixed or added to it with a reason, never left silent. The deliberate remaining differences from `g++`
+(the checker rejecting `std::string += unsigned char` and `+= int`, key based erased-iterator detection for
+ordered containers, `short` refused) are listed in `docs/PROGRESS.md`.
 
 Where C++ leaves behaviour unspecified instead of undefined, the interpreter takes a fixed choice and the judge
 guards against dependence on it: the iteration order of `unordered_map` and `unordered_set` is unspecified, so
@@ -86,8 +89,9 @@ Trust comes from tests against the real compilers, not from argument (the same a
 
 CI installs `g++`, `clang++` and `rustc`; a developer machine without one skips that part of the suite with a
 message. Where the interpreter and a compiler are found to disagree, the disagreement is recorded as a known
-divergence, excluded from the generator by name, and removed from that list when fixed (see `docs/PROGRESS.md`
-for the current state). A known divergence is a bug of the game, never an accepted difference.
+divergence, excluded from the generator by name, and removed from that list when fixed (the lists are empty at
+the time of writing, see `docs/PROGRESS.md`). A known divergence is a bug of the game, never an accepted
+difference.
 
 ## Alternatives considered
 
@@ -107,12 +111,14 @@ for the current state). A known divergence is a bug of the game, never an accept
 
 ## Consequences
 
-- The campaign is rewritten in C++: signatures, preludes, reference and naive solutions, hint ladders, lock
+- The campaign is rewritten in C++ (86 levels in 11 wings; the eleventh, The Supply Cupboard, teaches C++
+  semantics such as copies, erase-remove, comparators, `string_view` and iterator invalidation): signatures, preludes, reference and naive solutions, hint ladders, lock
   lists with reasons. The old language, its documentation and its tests are removed; ADR 0006 stays as history.
 - Saves from the previous version cannot be migrated (their drafts and solutions are in a language that no
   longer exists). The progress file format is bumped to version 2; older files are loaded without crashing, keep
   settings, solved flags and medals, and drop drafts and saved solutions, with a note shown to the player.
-- The subset has documented gaps (no templates or classes with methods, no `double`, no I/O, no C++20 library).
+- The subset has documented gaps (no templates or member functions, no `double`, `long` or `short`, no I/O, no C++20
+  library; see "Not supported (yet)" in `docs/CPP_SUBSET.md`).
   Each is a candidate for a later level wing or a good first issue; none may be filled in a way that makes the
   interpreter and the compilers disagree.
 - Adding a library member is real work: the stdlib table, the checker rule, the interpreter behaviour, the cost,

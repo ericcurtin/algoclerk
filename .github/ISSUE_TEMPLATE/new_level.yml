@@ -12,7 +12,7 @@ body:
     id: pack
     attributes:
       label: Which pack?
-      options: [Mail Room, Records Office, Filing Cabinets, Stack Room, Search and Sort Annex, Grid Hall, Chain and Tree Gallery, Strategy Suite, Basement Bits, Executive Floor, A new pack]
+      options: [Mail Room, Records Office, Filing Cabinets, Stack Room, Search and Sort Annex, Grid Hall, Chain and Tree Gallery, Strategy Suite, Basement Bits, Executive Floor, The Supply Cupboard, A new pack]
   - type: textarea
     id: topic
     attributes:

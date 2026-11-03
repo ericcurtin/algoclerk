@@ -61,14 +61,26 @@ std::vector<int> twoSum(const std::vector<int>& nums, int target) {   // the lev
 | `T*` / `ListNode*`, `TreeNode*` | pointers to level-provided (or unlocked) structs, `->`, `nullptr`, `new`, `delete` |
 | `auto`, `const`, `T&`, `const T&`, `auto&`, `const auto&` | `auto&&` and `T&&` are not in the subset |
 
-**Not in v1** (documented gaps, checker says so politely): `long`, `unsigned long`, `short`, `unsigned short`
-(16 bit integers are not stocked: use `int`), `float`, `double`, `std::ptrdiff_t`, `<cstdint>` types
-(`int64_t` is `long` on Linux but `long long` elsewhere, which would break the "identical on all compilers"
-guarantee; write `long long`), `std::gcd` / `std::lcm` / `std::is_sorted` / `std::stoul` (not in the library
-table below), template definitions, classes with methods, operator overloading, inheritance,
-exceptions (`throw`, `try`; `at()` that would throw is reported as a runtime error), `goto`, `std::cin` /
-`std::cout` and every other I/O, `std::shared_ptr` / `unique_ptr`, `std::move` and rvalue references,
-`std::ranges`, C++20 features (`contains`, `starts_with`, `<=>`, `std::span`...).
+### Not supported (yet)
+
+The checker refuses each of these politely ("this floor's supply cupboard does not stock ...") instead of running
+it. Valid C++17 on this list is not "wrong"; it is outside the contract that the interpreter and both
+compilers provably agree.
+
+| Not supported | Notes |
+| --- | --- |
+| Templates (own `template<...>` definitions) | the standard containers and algorithms are supported; defining your own generic code is not |
+| Member functions, `class` with access control, operator overloading, inheritance, destructors, `static` members, `this` | a `struct` that only holds data (fields with default values, constructors) is supported; so are the provided `ListNode` and `TreeNode` |
+| `double`, `float` | floating point results differ in the last digits across compilers and optimisation levels |
+| `long`, `unsigned long`, `int64_t` and the other `<cstdint>` types, `std::ptrdiff_t` | `long` is 32 or 64 bit depending on the platform; write `long long` |
+| `short`, `unsigned short` | refused; use `int` (`unsigned char` is supported) |
+| Exceptions (`throw`, `try`, `catch`) | an `at()` that would throw is reported as a runtime error |
+| I/O (`std::cin`, `std::cout`, files, `printf`) | programs are functions of their arguments |
+| `std::move`, rvalue references (`T&&`, `auto&&`), smart pointers (`unique_ptr`, `shared_ptr`) | `new` and `delete` on provided structs are supported |
+| Lambdas with init-captures (`[x = expr]`) | `[&]`, `[=]` and named captures by value or reference are supported |
+| C++20 and later (`std::ranges`, `<=>`, `std::span`, `contains`, `starts_with`, concepts) | C++17 only |
+| `sizeof`, `constexpr` functions, `new T[n]`, `delete[]`, `goto`, `std::gcd`, `std::lcm`, `std::is_sorted`, `std::stoul` | not in the library table below |
+| `std::string += unsigned char` / `+= int` | rejected on purpose (different meaning across platforms); use `static_cast<char>` |
 
 Valid C++17 that the subset does not describe is refused by the checker, never silently mis-run: the game's
 interpreter implements exactly the rows of the library table below (every row has a test that compiles its

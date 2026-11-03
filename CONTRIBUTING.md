@@ -108,8 +108,8 @@ not done until the tests prove the game agrees with the compilers.
 - `cpp_prop_diff` generates random UB-free programs (proptest, shrinking, `ALGOCLERK_PROP_CASES`,
   `ALGOCLERK_PROP_SEED`) and compares with the compilers. The generator lives in
   `crates/algoclerk-core/tests/prop_common/`; add your construct to it. Constructs on which the interpreter
-  is known to disagree are listed by name in `prop_common::KNOWN` with a one-line reason; that list must only
-  shrink.
+  is known to disagree are listed by name in `prop_common::KNOWN` with a one-line reason; that list is empty today
+  and must stay empty or shrink.
 - `cpp_prop_ub` and `cpp_interp_ub` hold one negative program per undefined-behaviour class; a new UB check
   needs a case there, and a case that the sanitizers also reject is flagged `san`.
 - `cpp_prop_fuzz` and `cpp_parse_fuzz` mutate programs and require "no panic, bounded time".

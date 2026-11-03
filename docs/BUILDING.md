@@ -14,28 +14,28 @@ All platforms build from the same Rust code. You need **Rust 1.95 or newer** (`r
 
 ## Verification status (be skeptical, read this before relying on a platform)
 
-The project was developed on a Linux x86_64 host with no GPU or display, no JDK, no Xcode and no Windows. Each
-platform has exactly one of the labels BUILT AND RUN HERE / BUILT HERE (not run) / TYPE-CHECKED HERE ONLY / NOT
-VERIFIED, with the commands that produced it.
+The project was developed on a Linux x86_64 host with no GPU, no physical display, no JDK, no Xcode and no
+Windows. Each platform has exactly one of the labels BUILT AND RUN / BUILT (not run) / TYPE-CHECKED ONLY / NOT
+RE-VERIFIED.
 
-**Two code bases are described here.** The evidence in the "Verified earlier" column was produced on `main`,
-the code from before the move to real C++ (the invented-language era, ADR 0006). The branch `cpp-lang` changed `algoclerk-core`,
-`algoclerk-levels`, `algoclerk-game` and `algoclerk-cli` heavily and did not touch the app shell, the packaging
-scripts or the platform projects. That makes the old results plausible for the branch, but **they were not
-repeated on `cpp-lang`**, and the column "On `cpp-lang`" says so for every row. Nothing in this table was run
-by the documentation work package; it only reports what the logs and commits show.
+**Two code bases are described here.** The "Earlier (`main`)" column is evidence produced on `main`, the code
+from before the move to real C++ (the invented-language era, ADR 0006). The column "On `cpp-lang`" is what was
+run on this branch. The branch changed `algoclerk-core`, `algoclerk-levels`, `algoclerk-game` and
+`algoclerk-cli` heavily and the app shell and front end too; the packaging scripts and the platform projects
+are unchanged.
 
-| Platform | Verified earlier (`main`) | On `cpp-lang` |
+| Platform | Earlier (`main`) | On `cpp-lang` |
 | --- | --- | --- |
-| Linux x86_64 | **BUILT AND RUN HERE**: `cargo test --workspace`; the real windowed game (debug build in a Fedora 44 container with Bevy 0.19.1) was run under Xvfb with Mesa lavapipe (software Vulkan) and driven with real mouse and keyboard events by `scripts/gui-smoke.sh`: title, memo, play, text tab, a failing Check, run. Not run on a physical display or GPU. The `audio` feature type-checks; no sound device exists here, so sound output was not heard. | **Tests: run per package, combined run not re-recorded here.** The work packages built and tested their crates in the container (see `docs/PROGRESS.md`) and the headless screenshots were regenerated. **`scripts/gui-smoke.sh` NOT re-run on `cpp-lang`**; its click coordinates depend on the layout and may need updating. |
-| Windows | **TYPE-CHECKED HERE ONLY**: `cargo check --workspace --lib --bins --target x86_64-pc-windows-gnu` and `--target x86_64-pc-windows-msvc` (both pass) | **NOT re-verified.** The compile-and-compare test suites need GNU `timeout`; CI runs the interpreter-only tests on Windows (see Continuous integration). |
-| macOS | **TYPE-CHECKED HERE ONLY**: `cargo check --workspace --lib --bins --target aarch64-apple-darwin` and `x86_64-apple-darwin` (both pass) | **NOT re-verified.** CI installs coreutils so that `timeout` exists; the macOS leg of the test job has never been seen green with the compile suites. |
-| Android | **BUILT HERE (not run)**: `cargo ndk -t arm64-v8a build -p algoclerk-app --lib --features android-game-activity` with NDK r27c produced `libalgoclerk_app.so` (aarch64, exports `android_main` and `GameActivity_onCreate`). The Gradle APK step was not run (no JDK or Android SDK here). The pure crates also type-check for `armv7-linux-androideabi` and `x86_64-linux-android`. | **NOT re-verified.** The app crate is unchanged, but the core crates it links are new; a native build on `cpp-lang` has not been done. |
-| iOS | **TYPE-CHECKED HERE ONLY (pure crates); the Bevy app NOT VERIFIED**: `cargo check -p algoclerk-core -p algoclerk-levels -p algoclerk-media -p algoclerk-game --lib --target aarch64-apple-ios` (and `-sim`) pass. The `algoclerk-app` crate cannot be checked from Linux because Bevy's iOS logging dependency (`tracing-oslog`) has a build script that needs the Apple SDK (`xcrun`); CI has an `ios-check` job on a macOS runner. | **NOT re-verified**, including the pure-crate type-check. The interpreter and front end are new code; they use only the standard library and no platform APIs, which is an argument, not a proof. |
+| Linux x86_64 | **BUILT AND RUN**: the windowed game in a Fedora 44 container (Bevy 0.19.1) under Xvfb with Mesa lavapipe, driven with real mouse and keyboard events by `scripts/gui-smoke.sh`. | **BUILT AND RUN** in the same container setup (Fedora 44, Xvfb, lavapipe): typing and card editing, a runtime error, level select, settings, the watch board, the victory screen and its code tabs. `docs/screenshots/window-*.png` are real captures. `cargo fmt --check`, `cargo clippy --workspace --all-targets -D warnings` (host for every crate except `algoclerk-app`, which is checked and built in the container), `cargo test --workspace` excluding the app (host, 440+ tests, the levels crate takes about 5 minutes) and `cargo deny check licenses bans` all pass. Not run on a physical display or a real GPU; the `audio` feature type-checks but no sound device exists, so sound was not heard. **`scripts/gui-smoke.sh` was not re-run** (its click coordinates depend on the layout). |
+| Windows | **TYPE-CHECKED ONLY**: `cargo check --workspace --lib --bins --target x86_64-pc-windows-gnu` and `-msvc`. | **TYPE-CHECKED ONLY (engine-free crates)**: `cargo check` of `algoclerk-core`, `-levels`, `-media`, `-game` for `x86_64-pc-windows-gnu` passes. **The Windows app was NOT re-built.** The compile-and-compare suites need GNU `timeout`; CI runs the interpreter-only tests on Windows. |
+| macOS | **TYPE-CHECKED ONLY**: `cargo check --workspace --lib --bins --target aarch64-apple-darwin` and `x86_64-apple-darwin`. | **TYPE-CHECKED ONLY (engine-free crates)** for `aarch64-apple-darwin`. **The macOS app was NOT re-built or run.** CI installs coreutils so that `timeout` exists; that leg has never been seen green with the compile suites. |
+| Android | **BUILT (not run)**: `cargo ndk -t arm64-v8a build -p algoclerk-app --lib --features android-game-activity` with NDK r27c produced `libalgoclerk_app.so` (exports `android_main` and `GameActivity_onCreate`). The Gradle APK step was not run (no JDK or Android SDK). | **NOT re-verified.** No native build log for this branch exists at the time of writing; if you have the NDK, run the `cargo ndk` command from the "Android" section and record the result. The APK was never run on a device. |
+| iOS | **TYPE-CHECKED ONLY (pure crates)**: `cargo check -p algoclerk-core -p algoclerk-levels -p algoclerk-media -p algoclerk-game --lib --target aarch64-apple-ios` (and `-sim`). The `algoclerk-app` crate cannot be checked from Linux (Bevy's `tracing-oslog` build script needs `xcrun`); CI has an `ios-check` job on a macOS runner. | **TYPE-CHECKED ONLY (engine-free crates)** for `aarch64-apple-ios`. **The iOS app was NOT re-built.** |
 
-Known limits that apply to every platform: no touch-device, notch or soft-keyboard testing; the interpreter's
+Known limits that apply to every platform: no touch-device, notch or soft-keyboard testing (touch drag is
+unverified on a device); no real GPU; the wide editor mode in landscape is not implemented; the interpreter's
 claim to be C++ is tested against `g++` and `clang++` on Linux only, because that is where the differential
-suites run (see below).
+suites run (see below). The remaining gaps are listed in [PROGRESS.md](PROGRESS.md).
 
 CI (`.github/workflows/ci.yml`, `release.yml`) contains the jobs that verify the rest on real runners. None of
 them has run yet for `cpp-lang`.
@@ -109,7 +109,7 @@ The same check for one level from the command line: `algoclerk-cli diff <id> [--
 ### In the container (immutable hosts)
 
 On an immutable host without the Bevy `-devel` packages, build and test in the `algoclerk-build` container
-(Fedora, with the compilers installed, see "Linux" below). The wrapper exports the target directory, which
+(Fedora 44, with the compilers installed, see "Linux" below). The wrapper exports the target directory, which
 `podman exec` does not inherit:
 
 ```sh
@@ -147,12 +147,15 @@ X11 session and a Vulkan driver (Mesa works, including software `lavapipe`).
 On an immutable Fedora-like host use a container instead of installing packages:
 
 ```sh
-podman run -d --name algoclerk-build -v "$PWD":"$PWD":Z -w "$PWD" fedora:latest sleep infinity
+podman run -d --name algoclerk-build -v "$PWD":"$PWD":Z -w "$PWD" fedora:44 sleep infinity
 podman exec --user root algoclerk-build dnf install -y gcc gcc-c++ clang libasan libubsan pkgconf-pkg-config alsa-lib-devel \
-  systemd-devel wayland-devel libxkbcommon-devel mesa-vulkan-drivers xorg-x11-server-Xvfb xdotool ImageMagick
+  systemd-devel wayland-devel libxkbcommon-devel mesa-vulkan-drivers xorg-x11-server-Xvfb xdotool ImageMagick \
+  libXcursor libXi libXrandr libXinerama libxkbcommon-x11 libXrender libXext mesa-libGL
 podman exec -e CARGO_TARGET_DIR=/path/to/target -w "$PWD" algoclerk-build cargo build -p algoclerk-app
 ```
 
+The last line of packages (`libXcursor` to `mesa-libGL`) is what the windowed game needs inside the container
+(winit's X11 backend and the software Vulkan/GL stack); the headless screenshots and the tests do not need it.
 `CARGO_TARGET_DIR` is not inherited by `podman exec` unless you pass `-e`.
 
 ## macOS

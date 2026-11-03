@@ -118,8 +118,8 @@ languages (the judge rejects solutions whose answer depends on it, and the harne
   test's arguments from the level's literals, calls the translated function and prints the result in the
   notation of `cpp/value.rs`), compiled with `rustc`, `gcc -std=c11 -Wall -Wextra` and `clang` (every compiler
   and binary under `timeout -s KILL`; missing compilers are skipped) and compared line by line with the
-  interpreter. The allowlist of untranslatable levels (`ALLOW`) is empty; an entry that translates after all is
-  an error.
+  interpreter. The allowlist of untranslatable levels (`ALLOW`) holds one level, `drop-negatives` (an
+  `it = l.erase(it)` loop over a `std::list`, for Rust and C); an entry that translates after all is an error.
 * `crates/algoclerk-core/tests/cpp_codegen_random.rs`: the programs of the interpreter's differential corpus
   (`tests/data/cpp_interp`, 170+ snippets that exercise the whole subset) and of `tests/data/cpp_corpus` (called
   with generated arguments) are translated where possible and compared the same way; the number of verified

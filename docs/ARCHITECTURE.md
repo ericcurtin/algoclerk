@@ -11,7 +11,7 @@ assets/art, assets/music ──► algoclerk-media ──► algoclerk-game ─�
 | Crate | Responsibility | Depends on |
 | --- | --- | --- |
 | `algoclerk-core` | the **C++ subset front end** (`cpp/`: lexer, parser, printer, type checker, interpreter with UB detection and the cost model), level data model and seeded test generators, the judge (tests, budgets, medals), the empirical complexity estimator, the level validator, the C/C++/Rust code generators and their compile-and-compare harnesses, progress, i18n. No graphics, no I/O beyond reading files in tests and the compiler driver. `#![forbid(unsafe_code)]`. | serde, toml |
-| `algoclerk-levels` | The 80 shipped levels embedded at build time, loading extra packs, unlock rules. | core |
+| `algoclerk-levels` | The 86 shipped levels (11 wings) embedded at build time, loading extra packs, unlock rules. | core |
 | `algoclerk-media` | Pixel-art engine: palettes, `.px` sprites, 5x7 and 3x5 fonts, software `Canvas`, text-defined chiptune synthesiser, asset embedding. | png |
 | `algoclerk-game` | The whole game as a state machine over engine-free types: `Game::tick(&Input)`, `Game::draw(&mut Canvas)`, events for audio, clipboard, fullscreen. Screens: title, level select, play (office scene, card editor, text editor, run controls), memo, victory, code reveal, settings, about, sandbox. | core, levels, media |
 | `algoclerk-app` | Thin Bevy 0.19.1 shell: window, integer-scaled nearest-neighbour texture, mouse / touch / keyboard to `Input`, audio (feature `audio`), clipboard, lifecycle, Android (GameActivity) and iOS entry points. | game, media, bevy |

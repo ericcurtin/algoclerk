@@ -25,35 +25,40 @@ Each needs: prelude, signature, story, statement, at least two examples and thre
 solution, a `naive` solution that times out on the large tests, seeded generators, and an oracle in
 `crates/algoclerk-levels/tests/common/mod.rs`. A new **wing** is a new directory under `levels/` with a
 `pack.toml` (`title`, `blurb`, `order`) and four to ten levels; tries, union-find, intervals, backtracking and
-"office tools" are open topics (see the roadmap).
+"office tools" are open topics (see the roadmap). The campaign has 86 levels in 11 wings today.
 
 ### Levels where C++ semantics are the lesson
 
-These are good first issues because the cost model already charges for the thing being taught
-(`docs/COST_MODEL.md`):
+The eleventh wing, The Supply Cupboard (`levels/supply-cupboard`), already has six: pass by reference versus by
+value, the erase-remove idiom, a custom comparator, `std::priority_queue` with `std::greater`,
+`std::string_view` versus a copy, and the iterator `erase` idiom. More variations are good first issues because
+the cost model already charges for the thing being taught (`docs/COST_MODEL.md`); copy one of those files and
+change the story and the data. Ideas that are not covered yet:
 
-- **Pass by reference versus by value**: the same task twice, or one task with a large input where a by-value
-  `std::vector<int>` parameter blows the budget and `const std::vector<int>&` passes.
-- **The iterator `erase` idiom**: remove matching elements from a vector or list in place
-  (`it = v.erase(it)`), where the naive version invalidates its iterator (the interpreter reports it).
-- **Custom comparator sorting**: sort intervals or words with a lambda; lock `std::stable_sort` or require a
-  tie-break so the answer does not depend on the order of equal elements.
-- **`std::priority_queue` with `std::greater`**: a min-heap (k smallest, merge streams) with the lock on
-  `std::sort` explaining why.
-- **`std::string_view` versus copying a string**: slicing a long string many times; `substr` of a `std::string`
-  costs its length, a `string_view` slice costs 1.
+- **Another comparator**: sort pairs or words by two keys with a lambda, or a `std::set` / `std::map` with a
+  comparator type; require a full tie-break so the answer does not depend on the order of equal elements.
+- **A second heap level**: k closest points or merging sorted streams with `std::priority_queue` and a lambda
+  comparator, with the lock on `std::sort` explaining why.
+- **A by-value trap in a recursive helper**: a DFS that takes a `std::vector<std::vector<int>>` by value and
+  blows the budget, where `const&` passes.
+- **`std::unique` and `erase`** on a sorted vector, or `std::remove_if` with a lambda, as a second erase-remove
+  level with a different naive solution.
+- **Iterator invalidation in a `std::map` or `std::deque`**: a naive version whose loop erases while iterating
+  (the interpreter reports it), and the `it = m.erase(it)` fix.
 
 ## Language support (the C++ subset)
 
 The subset has documented gaps (`docs/CPP_SUBSET.md`). Every item is a self-contained change with tests, and
 none is done until the interpreter and the real compilers provably agree:
 
-- **Support one more `std::` member or function** (for example a `std::string` overload, `std::partial_sum`,
-  `std::for_each`; the generator's `KNOWN` list in `crates/algoclerk-core/tests/prop_common/mod.rs` names a few
-  that are checked but not interpreted). The recipe, step by step, is "Adding a `std::` member" in
+- **Support one more `std::` member or function** (for example `std::gcd`, `std::lcm`, `std::is_sorted` or a
+  `std::string` overload that the library table does not list yet). The recipe, step by step, is "Adding a `std::` member" in
   CONTRIBUTING.md: stdlib table row, checker, interpreter, cost, card flag, documentation table.
-- **Shrink the `KNOWN` list**: pick an entry, fix the interpreter or checker, delete the entry, run
-  `cpp_prop_diff` with a few hundred cases.
+- **Widen the property generator**: the `KNOWN` list in `crates/algoclerk-core/tests/prop_common/mod.rs` is empty,
+  so every construct the generator can produce already agrees with `g++`. Teach it a new construct (a library
+  call, a statement shape) and run `cpp_prop_diff` with a few hundred cases; a disagreement is a bug to fix.
+- **One of the deliberate gaps** in "Not supported (yet)" in `docs/CPP_SUBSET.md` (for example `short`, or a
+  data-only feature of `struct`), provided the interpreter and both compilers provably agree afterwards.
 - **A friendlier message** for a construct outside the subset (the checker's wording lives in
   `crates/algoclerk-core/src/cpp/check/`).
 - **A new undefined-behaviour check** with a negative case in `cpp_prop_ub.rs`.
@@ -87,5 +92,6 @@ none is done until the interpreter and the real compilers provably agree:
 
 - Explain a runtime error with the exact card it happened on (highlight the card and the tray).
 - Put the "step into helper function" view on a second tray row.
-- Connect the Rust and C translations (`cpp::codegen`) to the tabs of the victory screen (`result.rs`).
+- Teach the Rust and C translators the one campaign construct they still refuse (`drop-negatives`: an iterator
+  erase loop over a `std::list`).
 - A `cargo xtask screenshots` wrapper around `scripts/screenshots.sh`.

@@ -30,7 +30,7 @@ which `cargo deny` accepts because `deny.toml` does not allow the copyleft alter
 - All music and sound effects (`assets/music/*.song`) are original text-defined chiptune scores rendered by
   the built-in synthesiser at run time; there are no audio recordings.
 - The application icon PNGs in `assets/icons/` were rendered from the game's own art.
-- All 80 levels, stories, statements, hints, oracles and UI strings were written for this project. Problems
+- All 86 levels (including the six C++-semantics levels of The Supply Cupboard), stories, statements, hints, oracles and UI strings were written for this project. Problems
   are described in the project's own words.
 
 ## Inspiration
