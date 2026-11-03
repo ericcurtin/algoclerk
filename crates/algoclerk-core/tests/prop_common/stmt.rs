@@ -213,6 +213,12 @@ impl Gen {
                     format!("({} | 1)", e.s),
                 ),
             };
+            // `unsigned += long long` is computed in `long long` (which can overflow): convert first
+            let rhs = if n == N::U && from == N::Ll && matches!(op, "+=" | "-=" | "*=") {
+                format!("static_cast<unsigned>({rhs})")
+            } else {
+                rhs
+            };
             return self.line(&format!("{name} {op} {rhs};"));
         }
         let m = v.hi + 1;
