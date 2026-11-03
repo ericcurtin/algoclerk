@@ -402,10 +402,14 @@ impl<'p> Machine<'p> {
                 if name == "gcd" {
                     return ret(c.make(p));
                 }
-                let r = if p == 0 { 0 } else { (x.abs() / p) * y.abs() };
-                if !c.fits(r) {
+                let r = if p == 0 {
+                    Some(0)
+                } else {
+                    (x.abs() / p).checked_mul(y.abs())
+                };
+                let Some(r) = r.filter(|r| c.fits(*r)) else {
                     return Err(self.err(RtKind::Overflow, "lcm does not fit"));
-                }
+                };
                 ret(c.make(r))
             }
             "swap" | "iter_swap" => {
@@ -590,7 +594,7 @@ impl<'p> Machine<'p> {
                 } else {
                     1
                 };
-                let n = if name == "prev" { -n } else { n };
+                let n = if name == "prev" { n.saturating_neg() } else { n };
                 let Value::Iter(it) = v else {
                     return Err(self.err(RtKind::BadArg, "next needs an iterator"));
                 };
@@ -676,6 +680,65 @@ impl<'p> Machine<'p> {
                     acc = self.convert(acc, &ity)?;
                 }
                 ret(acc)
+            }
+            "for_each" => {
+                self.nargs(name, args, 3, 3)?;
+                let (a, b) = self.range2(args)?;
+                let f = self.val_arg(&args[2])?;
+                let (Value::Iter(xi), Value::Iter(yi)) = (&a, &b) else {
+                    return Err(self.err(RtKind::BadArg, "expected iterators"));
+                };
+                if let Some(r) = self.try_seq_range(xi, yi)? {
+                    for k in 0..r.hi - r.lo {
+                        self.charge(1)?;
+                        let p = self.elem_place(&r, k);
+                        self.call_value(&f, vec![Rv::Place(p)])?;
+                    }
+                    return ret(f);
+                }
+                let mut cur = (**xi).clone();
+                while cur.pos != yi.pos {
+                    self.charge(1)?;
+                    let p = self.iter_deref(&cur)?;
+                    self.call_value(&f, vec![Rv::Place(p)])?;
+                    cur = self.iter_advance(&cur, 1)?;
+                }
+                ret(f)
+            }
+            "partial_sum" => {
+                self.nargs(name, args, 3, 4)?;
+                let (a, b) = self.range2(args)?;
+                let out = self.val_arg(&args[2])?;
+                let op = self.comparator_arg(args, 3)?;
+                let vals = self.range_values(&a, &b)?;
+                let Value::Iter(mut dst) = out else {
+                    return Err(self.err(RtKind::BadArg, "partial_sum needs an output iterator"));
+                };
+                let mut acc: Option<Value> = None;
+                for x in vals {
+                    let ity = x.ty();
+                    let next = match acc.take() {
+                        None => x,
+                        Some(prev) => {
+                            let r = match &op {
+                                Some(f) => {
+                                    let r =
+                                        self.call_value(f, vec![Rv::Val(prev), Rv::Val(x)])?;
+                                    self.rv_val(r)?
+                                }
+                                None => self.binary_values(BinOp::Add, prev, x)?,
+                            };
+                            self.convert(r, &ity)?
+                        }
+                    };
+                    let p = self.iter_deref(&dst)?;
+                    let v = self.convert_for_assign(&p, next.clone())?;
+                    self.store(&p, v).map_err(|f| self.fail(f))?;
+                    self.charge(1)?;
+                    dst = Box::new(self.iter_advance(&dst, 1)?);
+                    acc = Some(next);
+                }
+                ret(Value::Iter(dst))
             }
             "find" | "count" => {
                 self.nargs(name, args, 3, 3)?;

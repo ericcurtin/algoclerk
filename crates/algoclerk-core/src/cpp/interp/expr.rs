@@ -354,6 +354,17 @@ impl<'p> Machine<'p> {
     }
 
     fn binary_rv(&mut self, op: BinOp, ra: Rv, rb: Rv) -> R<Rv> {
+        // a reference to a string element (`char&`) decays to a `char` value
+        let decay = |m: &Self, rv: Rv| -> Rv {
+            if let Rv::Place(p) = &rv
+                && let Ok(Loc::B(b)) = m.loc(p)
+            {
+                return Rv::Val(Value::Char(b as i8));
+            }
+            rv
+        };
+        let ra = decay(self, ra);
+        let rb = decay(self, rb);
         let (val, cost) = {
             let x = self.rv_ref_norm(&ra)?;
             let y = self.rv_ref_norm(&rb)?;
@@ -409,7 +420,7 @@ impl<'p> Machine<'p> {
     }
 
     /// Convert `v` to the type of the object at `p` (for assignment).
-    fn convert_for_assign(&mut self, p: &Place, v: Value) -> R<Value> {
+    pub(super) fn convert_for_assign(&mut self, p: &Place, v: Value) -> R<Value> {
         if let Some(sk) = v.sk()
             && let Ok(Loc::V(old)) = self.loc(p)
         {
@@ -476,7 +487,7 @@ impl<'p> Machine<'p> {
                 let new = match (&old, &rhs_v) {
                     (Value::Iter(it), r) if r.sk().is_some() => {
                         let n = r.as_i128().unwrap_or(0) as i64;
-                        let n = if bop == BinOp::Sub { -n } else { n };
+                        let n = if bop == BinOp::Sub { n.saturating_neg() } else { n };
                         Value::Iter(Box::new(self.iter_advance(it, n)?))
                     }
                     (o, r) if o.sk().is_some() && r.sk().is_some() => {

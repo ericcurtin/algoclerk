@@ -1419,7 +1419,14 @@ impl<'p> Machine<'p> {
         if slot == u32::MAX {
             return Err(self.internal("unresolved declaration"));
         }
-        let gn = self.declare(slot, Value::Void);
+        // the name is in scope inside its own initialiser: reading it there (`int x = x;`) is an
+        // uninitialised read, not a read of "nothing"
+        let pre = if spec.is_ref || matches!(spec.ty, Ty::Auto) {
+            Value::Void
+        } else {
+            Value::Uninit(Box::new(spec.ty.clone()))
+        };
+        let gn = self.declare(slot, pre);
         let tm = self.temps.len();
         let v = self.decl_value(spec, d, slot, gn)?;
         let _ = tm;

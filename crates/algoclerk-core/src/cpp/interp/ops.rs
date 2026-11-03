@@ -105,9 +105,11 @@ pub fn binary(op: BinOp, a: &Value, b: &Value) -> Result<Value, Fail> {
         }
     };
     match op {
-        BinOp::Add => checked(x + y, "+"),
-        BinOp::Sub => checked(x - y, "-"),
-        BinOp::Mul => checked(x * y, "*"),
+        BinOp::Add => checked(x.wrapping_add(y), "+"),
+        BinOp::Sub => checked(x.wrapping_sub(y), "-"),
+        // Operands are at most 2^64 in magnitude: the product of two unsigned 64 bit values can exceed
+        // `i128::MAX`, so wrap (the unsigned kinds wrap in C++ anyway, the signed products always fit).
+        BinOp::Mul => checked(x.wrapping_mul(y), "*"),
         BinOp::Div | BinOp::Rem => {
             if y == 0 {
                 return Err((
@@ -122,7 +124,11 @@ pub fn binary(op: BinOp, a: &Value, b: &Value) -> Result<Value, Fail> {
             if c.signed() && x == c.min() && y == -1 {
                 return Err(overflow(if op == BinOp::Div { "/" } else { "%" }, c));
             }
-            Ok(c.make(if op == BinOp::Div { x / y } else { x % y }))
+            Ok(c.make(if op == BinOp::Div {
+                x.wrapping_div(y)
+            } else {
+                x.wrapping_rem(y)
+            }))
         }
         BinOp::BitAnd => Ok(c.make(x & y)),
         BinOp::BitOr => Ok(c.make(x | y)),
@@ -167,7 +173,7 @@ fn shift(op: BinOp, l: Sk, x: i128, count: i128) -> Result<Value, Fail> {
     }
     let x = wrap_to(l, x);
     if op == BinOp::Shr {
-        return Ok(l.make(x >> count));
+        return Ok(l.make(x.wrapping_shr(count as u32)));
     }
     if l.signed() {
         if x < 0 {
@@ -176,8 +182,8 @@ fn shift(op: BinOp, l: Sk, x: i128, count: i128) -> Result<Value, Fail> {
                 "left shift of a negative value is undefined behaviour".into(),
             ));
         }
-        let r = x << count;
-        if r > (1i128 << width) - 1 {
+        let r = x.wrapping_shl(count as u32);
+        if r > (1i128 << width.min(126)) - 1 {
             return Err((
                 RtKind::Shift,
                 format!("`<<` shifts bits out of {}: undefined behaviour", name(l)),
@@ -185,7 +191,7 @@ fn shift(op: BinOp, l: Sk, x: i128, count: i128) -> Result<Value, Fail> {
         }
         return Ok(l.make(r));
     }
-    Ok(l.make(x << count))
+    Ok(l.make(x.wrapping_shl(count as u32)))
 }
 
 /// Unary arithmetic on an integral scalar (`- + ~ !`).
@@ -198,7 +204,7 @@ pub fn unary(op: UnOp, a: &Value) -> Result<Value, Fail> {
         UnOp::Not => Ok(Value::Bool(x == 0)),
         UnOp::Plus => Ok(p.make(x)),
         UnOp::Neg => {
-            let r = -x;
+            let r = x.wrapping_neg();
             if p.signed() && !p.fits(r) {
                 Err(overflow("unary -", p))
             } else {

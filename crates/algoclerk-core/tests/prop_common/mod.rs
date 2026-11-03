@@ -32,30 +32,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// Constructs the generator must not produce because the interpreter or checker currently diverges from the
-/// real compilers on them (each is described in `lvl-bugs/prop.md`). The list shrinks as bugs get fixed.
+/// real compilers on them (each is described in `lvl-bugs/prop.md`). The list shrinks as bugs get fixed; it is
+/// empty now.
 /// Format: (feature name used by the generator, one line description).
-pub const KNOWN: &[(&str, &str)] = &[
-    (
-        "ull_mul",
-        "unsigned long long `*` overflows the i128 product in interpreter/ops.rs (panic in debug builds)",
-    ),
-    (
-        "str_plus_charref",
-        "`std::string + c` where `c` is a `char&` into a string (`for (auto& c : s)`) gives BadArg",
-    ),
-    (
-        "append_n",
-        "std::string::append(count, char) is valid C++17 but the checker rejects it (type.arity)",
-    ),
-    (
-        "partial_sum",
-        "std::partial_sum is accepted by the checker but the interpreter reports BadArg",
-    ),
-    (
-        "for_each",
-        "std::for_each is accepted by the checker but the interpreter reports BadArg (does not stock it)",
-    ),
-];
+pub const KNOWN: &[(&str, &str)] = &[];
 
 pub fn known(feature: &str) -> bool {
     KNOWN.iter().any(|(f, _)| *f == feature)

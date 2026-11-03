@@ -200,6 +200,12 @@ impl<'p> Machine<'p> {
                     Value::Map(m) | Value::Set(m) => m,
                     _ => return Err(self.internal("not ordered")),
                 };
+                if let Pos::Key(k) = &it.pos
+                    && !m.m.contains_key(k)
+                {
+                    // the element this iterator pointed at was erased: moving it is undefined behaviour
+                    return Err(self.fail(invalid_msg()));
+                }
                 let mut pos = it.pos.clone();
                 let mut steps = n;
                 while steps != 0 {
@@ -261,6 +267,9 @@ impl<'p> Machine<'p> {
                     Value::UMap(u) | Value::USet(u) => u,
                     _ => return Err(self.internal("not unordered")),
                 };
+                if u.ents.get(*i).and_then(Option::as_ref).is_none() {
+                    return Err(self.fail(invalid_msg()));
+                }
                 let back = self.un_back();
                 let nxt = if back {
                     if *i == 0 {
@@ -281,6 +290,11 @@ impl<'p> Machine<'p> {
                     Value::List(l) => l,
                     _ => return Err(self.internal("not a list")),
                 };
+                if let Pos::Node(x) = &it.pos
+                    && !l.nodes.get(*x as usize).is_some_and(|nd| nd.val.is_some())
+                {
+                    return Err(self.fail(invalid_msg()));
+                }
                 let mut pos = it.pos.clone();
                 let mut steps = n;
                 while steps != 0 {
@@ -321,7 +335,7 @@ impl<'p> Machine<'p> {
         match (op, x, y) {
             (BinOp::Add | BinOp::Sub, Value::Iter(it), n) if n.as_i128().is_some() => {
                 let n = n.as_i128().unwrap_or(0) as i64;
-                let n = if op == BinOp::Sub { -n } else { n };
+                let n = if op == BinOp::Sub { n.saturating_neg() } else { n };
                 Ok(Value::Iter(Box::new(self.iter_advance(it, n)?)))
             }
             (BinOp::Add, n, Value::Iter(it)) if n.as_i128().is_some() => {

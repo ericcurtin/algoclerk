@@ -40,10 +40,7 @@ struct TreeNode {
 
 /// Messages of `RtKind::Internal` failures that are known interpreter bugs (see `lvl-bugs/prop.md`); the
 /// fuzz property tolerates them until they are fixed.
-const KNOWN_INTERNAL: &[(&str, &str)] = &[(
-    "dereferencing a non-pointer",
-    "`T* p = p;` (self initialisation) should be RtKind::Uninit",
-)];
+const KNOWN_INTERNAL: &[(&str, &str)] = &[];
 
 /// Seed programs: (name, source).
 fn corpus() -> &'static Vec<(String, String)> {
