@@ -43,3 +43,14 @@ pub const RAW_CARD: &str = "raw C++ (read only card)";
 pub const CANT_DROP: &str = "A card cannot go there.";
 /// Card editor: tab with the member functions of the value left of the cursor.
 pub const MEMBERS: &str = ".fn";
+/// Shown instead of an error while the answer is still untouched.
+pub const NUDGE: &str = "Write your answer between the braces.";
+/// Status line: the problem is described in the note beside the code.
+pub const SEE_NOTE: &str = "The clerk left a red note by your code. Fix it, then press play.";
+/// Status line: a run stopped with an error, which the editor note also describes.
+pub const SEE_NOTE_RUN: &str = "The clerk stopped here. The note by your code says why.";
+/// Card editor: the button on an empty body.
+pub const ADD_STATEMENT: &str = "+ Add a statement";
+/// Card editor: first-use hint under the button.
+pub const FIRST_CARD_HINT: &str =
+    "Tap the button, then pick a card: a variable, an if, a loop, a return.";

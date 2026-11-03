@@ -13,7 +13,7 @@ use crate::ui::{GameConfig, Nav};
 use algoclerk_media::{Assets, Canvas};
 
 /// All scenario names, in documentation order.
-pub const NAMES: [&str; 24] = [
+pub const NAMES: [&str; 25] = [
     "title",
     "select",
     "select-locked",
@@ -21,6 +21,7 @@ pub const NAMES: [&str; 24] = [
     "brief-examples",
     "brief-tools",
     "play",
+    "play-empty",
     "play-grid",
     "play-error",
     "play-text",
@@ -185,6 +186,11 @@ pub fn build(spec: &Spec) -> Result<Game, String> {
                 p.jump(26);
             }
             tick_n(&mut g, 14);
+        }
+        "play-empty" => {
+            // a level opened for the first time: the untouched starter, nudge and the big add button
+            g.goto(Nav::Play("stamp-duty".into()));
+            tick_n(&mut g, 10);
         }
         "play-grid" => {
             g.goto(Nav::Play("count-islands".into()));

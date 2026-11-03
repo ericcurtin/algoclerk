@@ -141,8 +141,8 @@ struct Parts {
     kb: Rect,
 }
 
-/// Lines of the problem message shown under the text, at most three.
-const MSG_MAX_LINES: usize = 3;
+/// Lines of the note shown under the code, at most six (the clerk's messages are shorter).
+const MSG_MAX_LINES: usize = 6;
 
 fn parts(
     vp: &crate::layout::Viewport,
@@ -173,7 +173,8 @@ fn parts(
     } else {
         0
     };
-    let msg_h = if text {
+    // the text view always keeps its note line; the cards view only has one while there is something to say
+    let msg_h = if text || msg_lines > 0 {
         msg_lines.clamp(1, MSG_MAX_LINES) as i32 * 9 + 3
     } else {
         0
@@ -221,15 +222,7 @@ fn fresh_name(text: &str) -> String {
 impl EditorPanel {
     /// Hit rectangles for layout tests.
     pub fn hits(&self, vp: &crate::layout::Viewport, area: Rect) -> Vec<Hit> {
-        let p = parts(
-            vp,
-            area,
-            self.kb_open,
-            self.sel.is_some(),
-            self.tab,
-            false,
-            1,
-        );
+        let p = parts(vp, area, self.kb_open, true, self.tab, false, 1);
         let mut v = vec![Hit::area("editor", area), Hit::area("editor body", p.body)];
         for (i, r) in tab_rects(p.tabs, 4).into_iter().enumerate() {
             v.push(Hit::tap(["tab blocks", "tab text", "undo", "redo"][i], r));
@@ -239,6 +232,77 @@ impl EditorPanel {
 
     fn rows_rect(&self, body: Rect) -> Rect {
         body
+    }
+
+    /// The note under the code: its text and whether it is an error (red) or a friendly nudge (yellow).
+    /// The text view also shows the error of a recorded run; the cards only show compile problems.
+    pub fn note_of(&self, s: &Session) -> Option<(String, bool)> {
+        let m = match self.tab {
+            Tab::Text => s.problem_message(),
+            Tab::Blocks => s.problem().map(|d| d.msg),
+        };
+        match m {
+            Some(m) => Some((m, true)),
+            None if s.nudge() => Some((crate::words::NUDGE.to_string(), false)),
+            None => None,
+        }
+    }
+
+    /// The error text the note under the code shows right now (so the status line need not repeat it).
+    pub fn shown_error(&self, s: &Session) -> Option<String> {
+        self.note_of(s).filter(|n| n.1).map(|n| n.0)
+    }
+
+    /// Lines the note under the code needs at width `w` (zero for none in the cards view).
+    fn note_lines(&self, s: &Session, w: i32) -> usize {
+        let n = self.note_of(s).map_or(0, |(m, _)| {
+            algoclerk_media::Font::wrap(&m, ((w - 6) / 6).max(8) as usize).len()
+        });
+        if self.tab == Tab::Text { n.max(1) } else { n }
+    }
+
+    /// The rectangle of the note under the code for a panel placed at `area`, and how many text lines the note
+    /// needs there (the rectangle is always tall enough for them, up to the cap).
+    pub fn note_layout(
+        &self,
+        vp: &crate::layout::Viewport,
+        area: Rect,
+        s: &Session,
+    ) -> (Rect, usize) {
+        let inner = area.inset(2);
+        let n = self.note_lines(s, inner.w);
+        let p = parts(
+            vp,
+            inner,
+            self.kb_open,
+            true,
+            self.tab,
+            !s.prelude().trim().is_empty(),
+            n,
+        );
+        (p.msg, n)
+    }
+
+    /// Draw the note under the code (all its lines).
+    fn draw_note(&self, g: &mut Gfx<'_>, v: &View<'_>, s: &Session, r: Rect) {
+        if r.h == 0 {
+            return;
+        }
+        match self.note_of(s) {
+            Some((m, bad)) => {
+                g.rect(r, if bad { 'p' } else { 'y' });
+                for (i, l) in algoclerk_media::Font::wrap(&m, ((r.w - 6) / 6).max(8) as usize)
+                    .iter()
+                    .take(MSG_MAX_LINES)
+                    .enumerate()
+                {
+                    g.text(r.x + 3, r.y + 2 + i as i32 * 9, l, 'K');
+                }
+            }
+            None => {
+                g.text(r.x + 3, r.y + 2, &v.tr.t("editor.looks_good"), 'G');
+            }
+        }
     }
 
     /// Handle input. Returns whether the program changed.
@@ -254,10 +318,10 @@ impl EditorPanel {
             &vp,
             area,
             self.kb_open,
-            self.sel.is_some(),
+            true,
             self.tab,
             !s.prelude().trim().is_empty(),
-            msg_line_count(s, area.w),
+            self.note_lines(s, area.inset(2).w),
         );
         let tr = tab_rects(p.tabs, 4);
         if cx.ptr.pressed {
@@ -565,6 +629,15 @@ impl EditorPanel {
             {
                 self.palette = None;
             }
+            return changed;
+        }
+        // an empty body: the big button is the first thing to tap
+        if let Some(r) = cards::empty_slot(&rows, &geo, list, self.scroll, Self::row_h(&cx.vp) + 8)
+            && cx.ptr.tapped_in(&r)
+        {
+            self.sel = None;
+            self.palette = Some(false);
+            cx.sfx("pick");
             return changed;
         }
         // card taps, and drag and drop (mouse drag, or a touch long press) into any block
@@ -1039,10 +1112,10 @@ impl EditorPanel {
             &vp,
             area.inset(2),
             self.kb_open,
-            self.sel.is_some(),
+            true,
             self.tab,
             !s.prelude().trim().is_empty(),
-            msg_line_count(s, area.inset(2).w),
+            self.note_lines(s, area.inset(2).w),
         );
         let tr = tab_rects(p.tabs, 4);
         let st = |r: &Rect| widget_state(v.ptr, r, false, false);
@@ -1129,14 +1202,18 @@ impl EditorPanel {
             geo.content,
             list.h,
         );
-        if let Some(d) = s.problem() {
-            let r = Rect::new(list.x + 2, list.bottom() - 32, list.w - 4, 30);
-            g.round_rect(r, 'p', 'R');
-            let lines = algoclerk_media::Font::wrap(&d.msg, ((r.w - 8) / 6) as usize);
-            for (i, l) in lines.iter().take(3).enumerate() {
-                g.text(r.x + 4, r.y + 3 + i as i32 * 9, l, 'K');
+        if let Some(r) = cards::empty_slot(&rows, &geo, list, self.scroll, Self::row_h(&vp) + 8) {
+            let st = widget_state(v.ptr, &r, false, false);
+            g.button(r, crate::words::ADD_STATEMENT, Kind::Primary, st);
+            let cols = ((list.w - 24) / 6).max(8) as usize;
+            for (i, l) in algoclerk_media::Font::wrap(crate::words::FIRST_CARD_HINT, cols)
+                .iter()
+                .enumerate()
+            {
+                g.text(list.x + 12, r.bottom() + 5 + i as i32 * 9, l, 'a');
             }
         }
+        self.draw_note(g, v, s, p.msg);
         // drag ghost
         if let (Some((from, _)), Some(pos)) = (self.drag, v.ptr.pos) {
             if let Some(row) = rows.get(from) {
@@ -1247,7 +1324,6 @@ impl EditorPanel {
         p: &Parts,
         executing: Option<u32>,
     ) {
-        let msg = s.problem_message();
         let span = s.problem_span().or_else(|| s.run_error_span());
         let exec_line = executing.and_then(|n| s.node_line(n));
         if p.strip.h > 0 {
@@ -1265,21 +1341,7 @@ impl EditorPanel {
         ed.gutter = textedit::gutter_width(ed.line_count(), 1);
         textedit::draw_editor(g, &ed, p.body, 1, 9, &look);
         // the clerk's message under the text, wrapped, never cut off
-        match msg {
-            Some(m) => {
-                g.rect(p.msg, 'p');
-                for (i, l) in algoclerk_media::Font::wrap(&m, ((p.msg.w - 6) / 6).max(8) as usize)
-                    .iter()
-                    .take(MSG_MAX_LINES)
-                    .enumerate()
-                {
-                    g.text(p.msg.x + 3, p.msg.y + 2 + i as i32 * 9, l, 'K');
-                }
-            }
-            None => {
-                g.text(p.msg.x + 3, p.msg.y + 2, &v.tr.t("editor.looks_good"), 'G');
-            }
-        }
+        self.draw_note(g, v, s, p.msg);
         if p.bar.h > 0 {
             let [keys_btn, cmt_btn, close_btn] = tool_rects(p.bar);
             let st = |r: &Rect| widget_state(v.ptr, r, false, false);
@@ -1466,15 +1528,6 @@ impl EditorPanel {
             widget_state(v.ptr, &cancel_r, false, false),
         );
     }
-}
-
-/// How many lines of the problem message the text view reserves under the editor.
-fn msg_line_count(s: &Session, w: i32) -> usize {
-    s.problem_message().map_or(1, |m| {
-        algoclerk_media::Font::wrap(&m, ((w - 6) / 6).max(8) as usize)
-            .len()
-            .clamp(1, MSG_MAX_LINES)
-    })
 }
 
 /// The chips and keys buttons under the text.

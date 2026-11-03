@@ -81,6 +81,8 @@ pub struct Session {
     pub verdict: Option<Verdict>,
     /// Chosen case for visualisation.
     pub case: usize,
+    /// Run or Check was pressed since the text last changed (an untouched starter shows its problem only then).
+    pub pressed: bool,
 }
 
 impl std::fmt::Debug for Session {
@@ -139,6 +141,7 @@ impl Session {
             run: None,
             verdict: None,
             case: 0,
+            pressed: false,
         }
     }
 
@@ -184,6 +187,7 @@ impl Session {
                 self.undo.remove(0);
             }
             self.redo.clear();
+            self.pressed = false;
             self.recompile();
             self.run = None;
             self.verdict = None;
@@ -288,6 +292,7 @@ impl Session {
     /// # Errors
     /// The first problem with the program, or why the test arguments cannot be passed.
     pub fn start_run(&mut self) -> Result<(), String> {
+        self.pressed = true;
         let c = match &self.compiled {
             Ok(c) => c,
             Err(d) => {
@@ -371,6 +376,7 @@ impl Session {
     /// Run the judge on the current program (the Check button).
     pub fn check(&mut self) -> Option<&Verdict> {
         let j = self.judge.clone()?;
+        self.pressed = true;
         let text = self.edit.text();
         self.verdict = Some(j.judge(&text));
         self.verdict.as_ref()
@@ -457,8 +463,36 @@ impl Session {
         }
     }
 
-    /// The first problem with the program, if any.
+    /// The entry function has no statements yet and the only thing wrong is the missing `return`: an
+    /// untouched (or emptied) starter. Nothing is reported as an error until Run or Check is pressed.
+    pub fn nudge(&self) -> bool {
+        if self.pressed {
+            return false;
+        }
+        let Err(d) = &self.compiled else {
+            return false;
+        };
+        if d.first().map(|d| d.code) != Some("flow.missing-return") {
+            return false;
+        }
+        let entry = self.entry_name();
+        self.good
+            .as_ref()
+            .and_then(|p| p.find(&entry))
+            .and_then(|f| f.body.as_ref())
+            .is_some_and(|b| b.stmts.is_empty())
+    }
+
+    /// The first problem with the program, if any (none while the starter is merely untouched).
     pub fn problem(&self) -> Option<Diag> {
+        if self.nudge() {
+            return None;
+        }
+        self.raw_problem()
+    }
+
+    /// The first compile problem, even for an untouched starter.
+    pub fn raw_problem(&self) -> Option<Diag> {
         match &self.compiled {
             Ok(_) => None,
             Err(d) => d.first().cloned(),
@@ -536,8 +570,9 @@ mod tests {
         let l = level("two-sum");
         let s = Session::for_level(&l, "").unwrap();
         assert_eq!(s.text(), l.starter_code());
-        // the only thing wrong with the empty body is the missing `return`
-        assert_eq!(s.problem().map(|d| d.code), Some("flow.missing-return"));
+        // the only thing wrong with the empty body is the missing `return`, which is not shown yet
+        assert_eq!(s.raw_problem().map(|d| d.code), Some("flow.missing-return"));
+        assert!(s.nudge() && s.problem().is_none());
         assert_eq!(s.prelude(), l.prelude);
         assert_eq!(s.entry_name(), "twoSum");
     }
@@ -634,5 +669,51 @@ mod tests {
         assert_eq!(s.text(), start);
         assert!(s.redo());
         assert_eq!(s.text(), "int x;\n");
+    }
+
+    #[test]
+    fn an_untouched_starter_is_a_nudge_not_an_error_until_run_is_pressed() {
+        let l = level("stamp-duty");
+        let mut s = Session::for_level(&l, "").unwrap();
+        assert!(s.nudge());
+        assert!(
+            s.problem().is_none() && s.problem_span().is_none() && s.problem_message().is_none()
+        );
+        // the checker still knows about the missing return
+        assert_eq!(s.raw_problem().map(|d| d.code), Some("flow.missing-return"));
+        // pressing Run reports it in the clerk's words
+        let msg = s.start_run().unwrap_err();
+        assert!(msg.contains("must give back"), "{msg}");
+        assert!(!s.nudge());
+        assert_eq!(s.problem().map(|d| d.msg), Some(msg));
+        // Check works on the empty body too, and says the same thing
+        let mut s = Session::for_level(&l, "").unwrap();
+        let v = s.check().unwrap().clone();
+        assert!(
+            !v.passed
+                && v.diags
+                    .first()
+                    .is_some_and(|d| d.msg.contains("must give back"))
+        );
+        assert!(s.problem().is_some());
+        // typing anything (even a comment-only edit) re-arms nothing: a real statement shows real errors
+        let t = format!(
+            "{}\n",
+            l.starter_code().replace("{\n", "{\n    int x = 0;\n")
+        );
+        s.set_text(&t);
+        assert!(!s.nudge() && s.problem().is_some());
+        // emptying the body again brings the nudge back
+        s.set_text(&l.starter_code());
+        assert!(s.nudge() && s.problem().is_none());
+    }
+
+    #[test]
+    fn a_wrong_but_not_empty_body_is_reported_at_once() {
+        let l = level("stamp-duty");
+        let text = l.starter_code().replacen("{", "{\n    int x = 1;", 1);
+        let s = Session::for_level(&l, &text).unwrap();
+        assert!(!s.nudge());
+        assert_eq!(s.problem().map(|d| d.code), Some("flow.missing-return"));
     }
 }

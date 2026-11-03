@@ -799,11 +799,7 @@ impl Play {
         }
         // status
         let sr = c.status;
-        let (text, bad) = match (&self.status, self.session.problem()) {
-            (Some((t, b)), _) => (t.clone(), *b),
-            (None, Some(d)) => (d.msg, true),
-            (None, None) => (self.hint_line(v), false),
-        };
+        let (text, bad) = self.status_line(v.tr);
         let lines = Font::wrap(&text, (sr.w / 6).max(8) as usize);
         let max_lines = (sr.h / 9).max(1) as usize;
         for (i, l) in lines.iter().take(max_lines).enumerate() {
@@ -850,12 +846,34 @@ impl Play {
         }
     }
 
-    fn hint_line(&self, v: &View<'_>) -> String {
+    /// The status line under the controls. A message the editor's note already shows is not repeated here.
+    pub fn status_line(&self, tr: &algoclerk_core::i18n::Strings) -> (String, bool) {
+        let shown = self.panel.shown_error(&self.session);
+        match (&self.status, self.session.problem()) {
+            (Some((t, _)), _) if shown.as_deref() == Some(t.as_str()) => {
+                let run_error = self.session.run.as_ref().is_some_and(|r| r.result.is_err());
+                (
+                    if run_error {
+                        crate::words::SEE_NOTE_RUN
+                    } else {
+                        crate::words::SEE_NOTE
+                    }
+                    .to_string(),
+                    true,
+                )
+            }
+            (Some((t, b)), _) => (t.clone(), *b),
+            (None, Some(_)) => (crate::words::SEE_NOTE.to_string(), true),
+            (None, None) => (self.hint_line(tr), false),
+        }
+    }
+
+    fn hint_line(&self, tr: &algoclerk_core::i18n::Strings) -> String {
         match &self.session.run {
-            None => v.tr.t("play.hint_idle"),
+            None => tr.t("play.hint_idle"),
             Some(r) => match r.frames.get(r.pos) {
-                Some(f) if f.node != 0 => v.tr.t("play.hint_node"),
-                _ => v.tr.t("play.hint_start"),
+                Some(f) if f.node != 0 => tr.t("play.hint_node"),
+                _ => tr.t("play.hint_start"),
             },
         }
     }

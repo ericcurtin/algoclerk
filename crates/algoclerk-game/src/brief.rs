@@ -13,6 +13,11 @@ use algoclerk_core::level::Level;
 use algoclerk_core::progress::LevelRecord;
 use algoclerk_media::{Font, Rect};
 
+/// Where the text of a constraint starts, right of its bullet (which spans x+2..x+5).
+pub const BULLET_TEXT_X: i32 = 11;
+/// Pixels between the bullet and the text.
+pub const BULLET_GAP: i32 = BULLET_TEXT_X - 5;
+
 /// Number of memo pages.
 pub const PAGES: usize = 3;
 
@@ -174,9 +179,15 @@ impl Memo {
                 code_boxes(g, level, x, &mut y, m.body.w - 4, cols);
                 h(g, &mut y, &v.tr.t("brief.constraints"));
                 for c in &level.constraints {
-                    for (i, l) in Font::wrap(c, cols.saturating_sub(2)).iter().enumerate() {
-                        g.text(x, y, if i == 0 { "-" } else { " " }, 'k');
-                        g.text(x + 8, y, l, 'K');
+                    for (i, l) in Font::wrap(c, cols.saturating_sub(BULLET_TEXT_X as usize / 6 + 1))
+                        .iter()
+                        .enumerate()
+                    {
+                        if i == 0 {
+                            // a real bullet (a small square), with a gap before the text
+                            g.rect(Rect::new(x + 2, y + 3, 3, 3), 'k');
+                        }
+                        g.text(x + BULLET_TEXT_X, y, l, 'K');
                         y += 9;
                     }
                 }

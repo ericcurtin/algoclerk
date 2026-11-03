@@ -131,6 +131,27 @@ pub fn geometry(rows: &[Row], list: Rect, min_h: i32) -> Geometry {
     }
 }
 
+/// The function has no statement cards yet (only its header and read-only items).
+pub fn is_empty_body(rows: &[Row]) -> bool {
+    rows.iter().any(|r| r.kind == CardKind::Header)
+        && rows
+            .iter()
+            .all(|r| matches!(r.kind, CardKind::Header | CardKind::Item))
+}
+
+/// Where the "add a statement" button goes on an empty body: just under the last card, scrolled with the list.
+pub fn empty_slot(rows: &[Row], geo: &Geometry, list: Rect, scroll: i32, h: i32) -> Option<Rect> {
+    if !is_empty_body(rows) {
+        return None;
+    }
+    Some(Rect::new(
+        list.x + 10,
+        list.y + geo.content + 4 - scroll,
+        (list.w - 20).max(30),
+        h,
+    ))
+}
+
 /// Wrap a comment to `cols` characters, keeping every character (long words are cut).
 pub fn wrap_plain(s: &str, cols: usize) -> Vec<String> {
     let cols = cols.max(4);
