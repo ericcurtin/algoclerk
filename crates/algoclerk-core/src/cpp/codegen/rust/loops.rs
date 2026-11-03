@@ -114,6 +114,12 @@ impl Rs<'_> {
             let lim_ty = self.info.ty(c.limit.id).clone();
             let lx = self.ex(c.limit, false)?;
             let hi = self.conv_int(lx, &lim_ty, &ty)?;
+            // the other end fixes the type of a literal start: `0..v.len()`, not `0usize..v.len()`
+            let lo = if hi.lit.is_none() {
+                super::expr::bare_lit(lo)
+            } else {
+                lo
+            };
             let range = if c.up {
                 let r = if c.op == BinOp::Lt {
                     format!("{}..{}", lo.at(5), hi.at(5))

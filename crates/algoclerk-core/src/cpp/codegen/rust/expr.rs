@@ -14,7 +14,7 @@ fn ends_with_cast(s: &str) -> bool {
 }
 
 /// An integer literal without its type suffix.
-fn bare_lit(mut x: Ex) -> Ex {
+pub(super) fn bare_lit(mut x: Ex) -> Ex {
     if let Some(v) = x.lit {
         let t = v.to_string();
         if x.s.len() > t.len() && x.s.starts_with(&t) && x.s[t.len()..].starts_with(['u', 'i']) {

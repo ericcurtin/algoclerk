@@ -284,6 +284,10 @@ impl Rs<'_> {
         let init = match (&v.array, &v.init) {
             (Some(n), init) => self.array_init(&ty, n, init)?,
             (None, Init::None) => self.default_val(&ty)?,
+            // the annotation fixes the type of a literal: `let n: usize = 0`
+            (None, Init::Copy(e)) if !matches!(ty, Ty::Lambda(_)) => {
+                super::expr::bare_lit(self.conv_val(e, &ty)?).s
+            }
             (None, Init::Copy(e)) => self.conv_val(e, &ty)?.s,
             (None, Init::Direct(a)) => self.construct(&ty, a, false)?.s,
             (None, Init::Brace { elems, .. }) => self.construct(&ty, elems, true)?.s,

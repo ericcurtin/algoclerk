@@ -19,7 +19,18 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 const THREADS: usize = 4;
 
 /// `(level id, language id, reason)`: levels the translator may refuse.
-const ALLOW: &[(&str, &str, &str)] = &[];
+const ALLOW: &[(&str, &str, &str)] = &[
+    (
+        "drop-negatives",
+        "rust",
+        "walks a std::list with an iterator and `it = l.erase(it)`; only `find` iterators are translated",
+    ),
+    (
+        "drop-negatives",
+        "c",
+        "walks a std::list with an iterator and `it = l.erase(it)`; only `find` iterators are translated",
+    ),
+];
 
 fn allowed(level: &str, lang: Lang) -> Option<&'static str> {
     ALLOW
