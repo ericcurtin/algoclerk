@@ -707,7 +707,7 @@ fn unsupported_types() {
         ("short", "short"),
         ("double", "decimal"),
         ("float", "decimal"),
-        ("unsigned char", "unsigned char"),
+        ("unsigned short", "unsigned short"),
         ("int&&", "rvalue"),
         ("auto&&", "rvalue"),
         ("std::vector<int>&&", "rvalue"),
