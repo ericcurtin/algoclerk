@@ -15,6 +15,7 @@ impl Cx<'_> {
         let n = match t {
             Ty::Bool => "bool".into(),
             Ty::Char => "char".into(),
+            Ty::UChar => "uchar".into(),
             Ty::Int => "int".into(),
             Ty::UInt => "uint".into(),
             Ty::LongLong => "ll".into(),
@@ -144,9 +145,14 @@ impl Cx<'_> {
     fn instantiate(&mut self, t: &Ty, n: &str) -> R<(String, Option<&'static str>)> {
         let nm = |this: &mut Self, t: &Ty| this.nested(t);
         Ok(match t {
-            Ty::Bool | Ty::Char | Ty::Int | Ty::UInt | Ty::LongLong | Ty::ULongLong | Ty::Size => {
-                (format!("SCALAR({n})\n"), None)
-            }
+            Ty::Bool
+            | Ty::Char
+            | Ty::UChar
+            | Ty::Int
+            | Ty::UInt
+            | Ty::LongLong
+            | Ty::ULongLong
+            | Ty::Size => (format!("SCALAR({n})\n"), None),
             Ty::Str | Ty::StrView => (String::new(), None),
             Ty::Ptr(inner) => {
                 let Ty::Struct(s) = &**inner else {

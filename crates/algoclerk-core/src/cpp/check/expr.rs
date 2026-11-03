@@ -171,6 +171,10 @@ impl<'a> Checker<'a> {
                 self.need_header(e.id, "<string>", "std::string::npos");
                 Val::constant(Ty::Size, i128::from(u64::MAX))
             }
+            ["string_view", "npos"] => {
+                self.need_header(e.id, "<string_view>", "std::string_view::npos");
+                Val::constant(Ty::Size, i128::from(u64::MAX))
+            }
             ["nullopt"] => {
                 self.need_header(e.id, "<optional>", "std::nullopt");
                 Val::pr(Ty::Struct("nullopt_t".into()))

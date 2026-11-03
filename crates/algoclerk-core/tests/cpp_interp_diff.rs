@@ -6,7 +6,9 @@
 //! Skipped (with a message) when `g++` is not installed. Set `ALGOCLERK_DIFF_CLANG=1` to also compile every
 //! program with `clang++` and require the same output (this validates the corpus itself).
 
+use algoclerk_core::cpp::check::{CheckOpts, check};
 use algoclerk_core::cpp::interp::{Limits, run};
+use algoclerk_core::cpp::parse::{ParseOpts, parse};
 mod common;
 use algoclerk_core::cpp::value::{Heap, render};
 use std::path::{Path, PathBuf};
@@ -28,6 +30,9 @@ struct TreeNode {
     TreeNode(int x, TreeNode* l, TreeNode* r) : val(x), left(l), right(r) {}
 };
 ";
+
+/// Corpus files run through the real parser and the checker (the others still use the test-support parser).
+const REAL_FRONT_END: &[&str] = &["overloads", "smallints"];
 
 const PRINTER: &str = r#"
 #include <cstdio>
@@ -257,8 +262,30 @@ fn interp(case: &Case) -> Result<String, String> {
         src.push('\n');
     }
     src.push_str(&body);
-    let prog = common::parse_any(&src, &["ListNode", "TreeNode"])
-        .map_err(|d| format!("parse error: {d}"))?;
+    let prog = if REAL_FRONT_END.contains(&case.file.as_str()) {
+        // the real parser and the checker: the program must be accepted exactly like a player's
+        let p = parse(
+            &src,
+            &ParseOpts {
+                first_id: 0,
+                known_types: vec!["ListNode".into(), "TreeNode".into()],
+            },
+        )
+        .map_err(|d| format!("parse error: {}", d[0].msg))?;
+        if let Err(ds) = check(&p, &CheckOpts::all()) {
+            return Err(format!(
+                "checker refuses it: {}",
+                ds.iter()
+                    .map(|d| format!("[{}] {}", d.code, d.msg))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ));
+        }
+        p
+    } else {
+        common::parse_any(&src, &["ListNode", "TreeNode"])
+            .map_err(|d| format!("parse error: {d}"))?
+    };
     let f = prog.find("test").ok_or("no test()")?;
     let ty = f.ret.ty.clone();
     let lim = Limits {
@@ -358,5 +385,6 @@ macro_rules! diff {
 }
 
 diff!(
-    arith, control, strings, vectors, assoc, adaptors, algos, lambdas, structs, misc
+    arith, control, strings, vectors, assoc, adaptors, algos, lambdas, structs, misc, overloads,
+    smallints
 );

@@ -108,7 +108,10 @@ impl Checker<'_> {
                 self.method_const(node, recv, m, who);
                 self.check_callables(node, m, &bind, args);
                 if name.starts_with("emplace") {
-                    self.emplace_check(node, &recv.ty, args);
+                    // `v.emplace(pos, args...)` builds from the arguments after the position
+                    let seq = matches!(recv.ty, Ty::Vector(_) | Ty::Deque(_) | Ty::List(_));
+                    let skip = usize::from(name == "emplace" && seq);
+                    self.emplace_check(node, &recv.ty, args.get(skip..).unwrap_or_default());
                 }
                 ret
             }

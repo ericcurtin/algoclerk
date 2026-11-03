@@ -33,7 +33,7 @@ const RESERVED: &[&str] = &[
     "div", "rand", "time", "index", "printf", "puts", "read", "write", "round", "floor", "ceil",
     "pow", "log", "exp", "sqrt", "signal", "remove", "rename", "system", "malloc", "calloc",
     "realloc", "memcpy", "memset", "strlen", "strcmp", "isdigit", "isalpha", "min", "max", "swap",
-    "Str", "SWAP", "uint", "ll", "ull",
+    "Str", "SWAP", "uint", "uchar", "ll", "ull",
 ];
 
 /// A C function name for a C++ one.

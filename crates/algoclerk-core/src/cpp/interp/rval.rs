@@ -19,6 +19,8 @@ pub enum Sk {
     Bool,
     /// `char`
     Char,
+    /// `unsigned char`
+    UChar,
     /// `int`
     Int,
     /// `unsigned`
@@ -37,6 +39,7 @@ impl Sk {
         match self {
             Sk::Bool => Ty::Bool,
             Sk::Char => Ty::Char,
+            Sk::UChar => Ty::UChar,
             Sk::Int => Ty::Int,
             Sk::UInt => Ty::UInt,
             Sk::LL => Ty::LongLong,
@@ -49,6 +52,7 @@ impl Sk {
         Some(match t {
             Ty::Bool => Sk::Bool,
             Ty::Char => Sk::Char,
+            Ty::UChar => Sk::UChar,
             Ty::Int => Sk::Int,
             Ty::UInt => Sk::UInt,
             Ty::LongLong => Sk::LL,
@@ -65,7 +69,7 @@ impl Sk {
     pub fn bits(self) -> u32 {
         match self {
             Sk::Bool => 1,
-            Sk::Char => 8,
+            Sk::Char | Sk::UChar => 8,
             Sk::Int | Sk::UInt => 32,
             _ => 64,
         }
@@ -84,6 +88,7 @@ impl Sk {
         match self {
             Sk::Bool => 1,
             Sk::Char => 127,
+            Sk::UChar => 255,
             Sk::Int => i128::from(i32::MAX),
             Sk::UInt => i128::from(u32::MAX),
             Sk::LL => i128::from(i64::MAX),
@@ -99,6 +104,7 @@ impl Sk {
         match self {
             Sk::Bool => Value::Bool(x != 0),
             Sk::Char => Value::Char(x as i8),
+            Sk::UChar => Value::UChar(x as u8),
             Sk::Int => Value::Int(x as i32),
             Sk::UInt => Value::UInt(x as u32),
             Sk::LL => Value::LL(x as i64),
@@ -394,6 +400,8 @@ pub enum Value {
     Bool(bool),
     /// `char`
     Char(i8),
+    /// `unsigned char`
+    UChar(u8),
     /// `int`
     Int(i32),
     /// `unsigned`
@@ -457,6 +465,7 @@ impl Value {
         Some(match self {
             Value::Bool(b) => i128::from(*b),
             Value::Char(c) => i128::from(*c),
+            Value::UChar(c) => i128::from(*c),
             Value::Int(i) => i128::from(*i),
             Value::UInt(u) => i128::from(*u),
             Value::LL(i) => i128::from(*i),
@@ -469,6 +478,7 @@ impl Value {
         Some(match self {
             Value::Bool(_) => Sk::Bool,
             Value::Char(_) => Sk::Char,
+            Value::UChar(_) => Sk::UChar,
             Value::Int(_) => Sk::Int,
             Value::UInt(_) => Sk::UInt,
             Value::LL(_) => Sk::LL,
@@ -541,6 +551,7 @@ impl Value {
             Value::Uninit(t) => (**t).clone(),
             Value::Bool(_) => Ty::Bool,
             Value::Char(_) => Ty::Char,
+            Value::UChar(_) => Ty::UChar,
             Value::Int(_) => Ty::Int,
             Value::UInt(_) => Ty::UInt,
             Value::LL(_) => Ty::LongLong,
@@ -596,6 +607,7 @@ fn scalar_elems(t: &Ty) -> bool {
         t,
         Ty::Bool
             | Ty::Char
+            | Ty::UChar
             | Ty::Int
             | Ty::UInt
             | Ty::LongLong
@@ -729,6 +741,7 @@ pub fn cmp_val(a: &Value, b: &Value) -> Ordering {
         (Value::Tuple(x), Value::Tuple(y)) => cmp_seq(x.iter(), y.iter()),
         (Value::Vector(x), Value::Vector(y)) => cmp_seq(x.v.iter(), y.v.iter()),
         (Value::Deque(x), Value::Deque(y)) => cmp_seq(x.v.iter(), y.v.iter()),
+        (Value::List(x), Value::List(y)) => cmp_seq(x.values().into_iter(), y.values().into_iter()),
         (Value::Opt(x), Value::Opt(y)) => match (&x.v, &y.v) {
             (None, None) => Ordering::Equal,
             (None, Some(_)) => Ordering::Less,

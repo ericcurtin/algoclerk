@@ -600,6 +600,7 @@ pub fn int_range(t: &Ty) -> (i128, i128) {
     match t {
         Ty::Bool => (0, 1),
         Ty::Char => (-128, 127),
+        Ty::UChar => (0, 255),
         Ty::Int => (i128::from(i32::MIN), i128::from(i32::MAX)),
         Ty::UInt => (0, i128::from(u32::MAX)),
         Ty::LongLong => (i128::from(i64::MIN), i128::from(i64::MAX)),
