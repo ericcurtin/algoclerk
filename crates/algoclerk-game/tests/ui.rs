@@ -518,3 +518,38 @@ fn an_old_save_loads_with_a_one_time_note_and_progress_kept() {
     assert!(g.progress.migration_note.is_empty());
     assert!(g.hits().len() > 3);
 }
+
+#[test]
+fn the_code_reveal_translates_every_reference_solution_or_says_why_not() {
+    use algoclerk_game::result::translations;
+    use algoclerk_game::session::Session;
+    let campaign = Campaign::shipped();
+    let (mut ok_c, mut ok_rust, mut total) = (0, 0, 0);
+    for level in campaign.all_levels() {
+        let mut s = Session::for_level(level, &level.reference).unwrap();
+        s.recompile();
+        let tabs = translations(&s);
+        assert_eq!(tabs.len(), 3);
+        total += 1;
+        // the C++ tab is the player's own code, always available, with the level's includes
+        let cpp = &tabs[1];
+        assert!(cpp.available(), "{}: {:?}", level.id, cpp.error);
+        if !level.prelude.trim().is_empty() {
+            assert!(!cpp.prelude.trim().is_empty(), "{}", level.id);
+        }
+        assert!(cpp.code.contains(&level.signature.name), "{}", level.id);
+        for t in &tabs {
+            match &t.error {
+                Some(e) => assert!(e.len() > 10, "{}: unhelpful message {e:?}", level.id),
+                None => assert!(!t.code.trim().is_empty(), "{} {}", level.id, t.label),
+            }
+        }
+        ok_c += usize::from(tabs[0].available());
+        ok_rust += usize::from(tabs[2].available());
+    }
+    assert!(ok_c * 10 >= total * 7, "C translated {ok_c}/{total}");
+    assert!(
+        ok_rust * 10 >= total * 7,
+        "Rust translated {ok_rust}/{total}"
+    );
+}

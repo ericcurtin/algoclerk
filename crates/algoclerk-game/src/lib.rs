@@ -35,6 +35,7 @@
 pub mod about;
 pub mod blocks;
 pub mod brief;
+pub mod cards;
 pub mod clerk;
 pub mod complete;
 pub mod editor;
@@ -56,6 +57,7 @@ pub mod title;
 pub mod transition;
 pub mod ui;
 pub mod value_view;
+pub mod watch;
 pub mod words;
 
 pub use input::{Input, Key};

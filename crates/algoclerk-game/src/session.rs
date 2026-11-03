@@ -123,10 +123,12 @@ impl Session {
     }
 
     fn raw(level: Option<Level>, judge: Option<Arc<Judge>>, text: &str) -> Session {
+        let mut edit = TextEdit::new(text, true);
+        edit.smart = true;
         Session {
             level,
             judge,
-            edit: TextEdit::new(text, true),
+            edit,
             last_text: text.to_string(),
             undo: Vec::new(),
             redo: Vec::new(),
@@ -329,9 +331,11 @@ impl Session {
                     node: e.node,
                     cost: e.cost,
                     depth: e.depth,
+                    // the core reports the local that a `return` hands out as a `void` variable: skip those
                     vars: e
                         .vars
                         .into_iter()
+                        .filter(|v| !(v.ty == Ty::Void && v.value == Plain::Void))
                         .map(|v| (v.name, v.ty, v.value))
                         .collect(),
                     returned: e.returned,

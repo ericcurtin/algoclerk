@@ -164,6 +164,15 @@ const STD_TYPES: &[(&str, &str)] = &[
 
 /// Names after `std::` that start with `prefix`, for the headers in reach.
 pub fn std_items(s: &Session, prefix: &str) -> Vec<Item> {
+    std_filtered(s, prefix, false)
+}
+
+/// Like [`std_items`], but only the functions cards can express (`card: true`).
+pub fn card_std_items(s: &Session, prefix: &str) -> Vec<Item> {
+    std_filtered(s, prefix, true)
+}
+
+fn std_filtered(s: &Session, prefix: &str, card_only: bool) -> Vec<Item> {
     let allowed = allowed_headers(s);
     let mut out: Vec<Item> = Vec::new();
     for (name, header) in STD_TYPES {
@@ -183,6 +192,7 @@ pub fn std_items(s: &Session, prefix: &str) -> Vec<Item> {
         if !short.starts_with(prefix)
             || !header_ok(&allowed, m.header)
             || is_locked(s, m)
+            || (card_only && !m.card)
             || out.iter().any(|o| o.label == short)
         {
             continue;
@@ -206,6 +216,15 @@ pub fn std_items(s: &Session, prefix: &str) -> Vec<Item> {
 
 /// Members of a value of type `ty` that start with `prefix` (`arrow`: reached through `->`).
 pub fn member_items(s: &Session, ty: &Ty, arrow: bool, prefix: &str) -> Vec<Item> {
+    members_filtered(s, ty, arrow, prefix, false)
+}
+
+/// Like [`member_items`], but only the members cards can express (rows of the table with `card: true`).
+pub fn card_member_items(s: &Session, ty: &Ty, arrow: bool, prefix: &str) -> Vec<Item> {
+    members_filtered(s, ty, arrow, prefix, true)
+}
+
+fn members_filtered(s: &Session, ty: &Ty, arrow: bool, prefix: &str, card_only: bool) -> Vec<Item> {
     let mut out: Vec<Item> = Vec::new();
     // `p->x` on a pointer to a struct, `x.f` on a struct: its data members
     let struct_name = match ty {
@@ -235,7 +254,11 @@ pub fn member_items(s: &Session, ty: &Ty, arrow: bool, prefix: &str) -> Vec<Item
     let ty = if arrow { deref(ty) } else { Some(ty.clone()) };
     let Some(ty) = ty else { return out };
     for m in members_of(&ty) {
-        if m.name == "ctor" || m.name.starts_with("operator") || !m.name.starts_with(prefix) {
+        if m.name == "ctor"
+            || m.name.starts_with("operator")
+            || !m.name.starts_with(prefix)
+            || (card_only && !m.card)
+        {
             continue;
         }
         // a member needs no header of its own: the receiver exists, so its type's header is in reach

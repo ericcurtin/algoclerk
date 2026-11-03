@@ -43,18 +43,46 @@ tray that changed, the returned value goes to the outbox with the expected value
 and the wall clock shows the abstract cost. A runtime error becomes a speech bubble and the failing line is
 highlighted in both editor views (`RtError.node` through `Program.spans`).
 
-The editor (`editor.rs`, `blocks.rs`, `complete.rs`) shows the player's part of the program (the level's
-read-only prelude is summarised in a strip above it and shown in full on the brief) as nested cards or as
-text. The text view colours tokens with `cpp::lexer::highlight` (`syntax.rs`), underlines the problem with the
-clerk's message and offers autocomplete for `std::` names and for the members of the receiver before `.` or `->`
-(`stdlib::members_of` filtered by the unlocked headers and the level's locks; receiver types come from the
-checker's `scope_at` and declarator types). Cards are statements of the C++ tree: tap to edit one as text, move,
-delete, insert; what cards cannot express (`switch`, `do`-`while`, multi-line statements) is a read-only *raw
-C++* card, and every card edit re-prints through `cpp::print`. The program **text is the source of truth**
-(`session.rs`): card edits transform the tree and print it back, text edits re-parse, undo and redo are text
-history, so the two views are always in sync. The code reveal (`result.rs`) has C, C++ and Rust tabs behind
-`result::translations`; C++ shows the player's program, the other two say that the translation is coming until
-the code generators are connected.
+Next to the trays the **watch board** (`watch.rs`) lists the visible locals as `type name = value` in C++ spelling
+(`vector<int> nums = {2, 7}`), wrapped to two lines at most, with the variables that have no shelf room first and
+the one that just changed in amber.
+
+The editor (`editor.rs`, `cards.rs`, `blocks.rs`, `textedit.rs`, `complete.rs`) shows the player's part of the
+program (the level's read-only prelude is summarised in a strip above it and shown in full on the brief) as
+nested cards or as text.
+
+*Text view.* Tokens are coloured with `cpp::lexer::highlight` (`syntax.rs`); line numbers, sideways scrolling that
+follows the cursor (keys, wheel, touch drag), matching-bracket highlight, `Ctrl+/` and a `//` chip toggle
+comments, Enter keeps the indent (one level deeper after `{`, `}` dedents), optional auto-closing of brackets and
+quotes, error squiggles with the clerk's message, and autocomplete for `std::` names and for the members of the
+receiver before `.` or `->` (`stdlib::members_of` filtered by the unlocked headers and the level's locks;
+receiver types come from the checker's `scope_at`). The touch keyboard has a symbol layer with the C++ symbols
+and one-tap keyword and type chips.
+
+*Cards.* `blocks.rs` turns the syntax tree into rows (`Row`: kind, depth, the block it sits in, the block it holds,
+comments) and performs structural edits (`edit_stmt`, `insert_stmt`, `delete_stmt`, `move_stmt`, `step_stmt`,
+`move_to`) that transform the tree and print it back with `cpp::print`. `if`/`else`, `for`, range-`for`, `while`,
+`do`-`while` and `switch` hold their statements as nested cards; `cards.rs` lays them out as paper cards inside
+container cards, wraps the (syntax coloured) text and the comments that travel with a card so nothing is cut off,
+and maps a pointer to a drop target (before a card, inside a block, after a container by its left margin). A mouse
+drag (or a touch long press) drops a card into any block; `case`/`default` labels only stay inside a `switch`.
+What cards cannot express (bare blocks, statements that print on several lines) is a read-only *raw C++* card that
+can still be moved and deleted, so the round trip is lossless. Tapping a selected card (or Enter) opens the card
+editor: a one-line syntax coloured editor and chip pages for the variables in scope (`check::scope_at`), literals,
+operators, member functions of the value left of the cursor (only rows with `card: true`, filtered by the receiver's
+static type) and `std::` names (only unlocked headers).
+
+The program **text is the source of truth** (`session.rs`): card edits transform the tree and print it back, text
+edits re-parse, undo and redo (buttons, `Ctrl+Z`, `Ctrl+Shift+Z`) are one text history shared by both views, so the
+two views are always in sync. The current statement of a run is highlighted in the text view and on its card.
+`tests/editors.rs` round-trips the whole C++ corpus and all level references through cards and drives both editors
+with real input events and fuzzed key and pointer sequences.
+
+The code reveal (`result.rs`) has C, C++ and Rust tabs behind `result::translations`, which calls
+`cpp::codegen::generate`: C (with the helper prelude folded away by default) and Rust come from the generator, C++
+is the player's own formatted program with the level's includes plus the level's technique and complexity note;
+a construct a generator cannot express turns into a friendly message on that tab only. Lines wrap or scroll
+sideways and keep their line numbers, so no line is ever cut off.
 
 **Input.** The shell converts pointer positions to virtual pixels and latches presses between 60 Hz ticks;
 `input.rs` derives taps, drags and long presses. Gamepad support is not wired in the shell.
