@@ -99,12 +99,17 @@ impl Session {
     /// A session for a level, starting from a saved draft or the starter program.
     pub fn for_level(level: &Level, draft: &str) -> Result<Session, String> {
         let judge = Judge::new(level)?;
-        let text = if draft.trim().is_empty() {
-            level.starter_code()
+        let fresh = draft.trim().is_empty();
+        let text = if fresh {
+            // the cursor waits on an indented empty line between the braces
+            level.starter_code().replacen("{\n}", "{\n    \n}", 1)
         } else {
             draft.to_string()
         };
         let mut s = Session::raw(Some(level.clone()), Some(Arc::new(judge)), &text);
+        if fresh && let Some(at) = text.find("{\n    \n}") {
+            s.edit.cursor = text[..at].chars().count() + 6;
+        }
         s.recompile();
         Ok(s)
     }
@@ -569,7 +574,8 @@ mod tests {
     fn the_starter_is_the_signature_with_an_empty_body() {
         let l = level("two-sum");
         let s = Session::for_level(&l, "").unwrap();
-        assert_eq!(s.text(), l.starter_code());
+        assert_eq!(s.text().trim_end(), l.starter_code().replacen("{\n}", "{\n    \n}", 1).trim_end());
+        assert_eq!(s.edit.line_col(s.edit.cursor), (1, 4), "the cursor waits inside the braces");
         // the only thing wrong with the empty body is the missing `return`, which is not shown yet
         assert_eq!(s.raw_problem().map(|d| d.code), Some("flow.missing-return"));
         assert!(s.nudge() && s.problem().is_none());

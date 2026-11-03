@@ -771,7 +771,6 @@ impl Play {
             Kind::Normal,
             st(&c.speed),
         );
-        let can_check = self.session.compiled.is_ok() || self.session.level.is_none();
         g.button(
             c.check,
             &if self.session.level.is_some() {
@@ -781,7 +780,7 @@ impl Play {
             },
             Kind::Good,
             State {
-                disabled: !can_check,
+                // Check always works: with a problem it says what the problem is
                 ..st(&c.check)
             },
         );
@@ -879,9 +878,38 @@ impl Play {
     }
 }
 
-/// A short, friendly bubble for a problem message.
+/// A short, friendly bubble for a problem message: the first sentence, cut at a clause or a word (never in the
+/// middle of a phrase) when it is long.
 pub fn friendly(msg: &str) -> String {
-    let first = msg.split(['.', '!']).next().unwrap_or(msg);
-    let t: String = first.chars().take(60).collect();
-    format!("{t}!")
+    const MAX: usize = 60;
+    let first = msg.split(['.', '!']).next().unwrap_or(msg).trim();
+    if first.chars().count() <= MAX {
+        return format!("{first}!");
+    }
+    let head: String = first.chars().take(MAX).collect();
+    // prefer the last clause break, then the last word break
+    if let Some(i) = head.rfind([',', ';', ':']).filter(|i| *i >= 20) {
+        return format!("{}!", &head[..i]);
+    }
+    match head.rfind(' ') {
+        Some(i) if i >= 20 => format!("{}...", &head[..i]),
+        _ => format!("{head}..."),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::friendly;
+
+    #[test]
+    fn bubbles_end_at_a_clause_or_a_word() {
+        assert_eq!(friendly("Short one. And more."), "Short one!");
+        let m = "`stampDuty` must give back an int, but some path reaches the closing brace without a `return`.";
+        assert_eq!(friendly(m), "`stampDuty` must give back an int!");
+        let long = "this sentence keeps going without any comma at all until it is far too long for a bubble";
+        let b = friendly(long);
+        assert!(b.ends_with("...") && b.chars().count() <= 63, "{b}");
+        assert!(!b.trim_end_matches("...").ends_with(' '));
+        assert!(long.starts_with(b.trim_end_matches("...")), "{b}");
+    }
 }

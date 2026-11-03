@@ -1210,7 +1210,7 @@ impl EditorPanel {
                 .iter()
                 .enumerate()
             {
-                g.text(list.x + 12, r.bottom() + 5 + i as i32 * 9, l, 'a');
+                g.text(list.x + 12, r.bottom() + 5 + i as i32 * 9, l, 'k');
             }
         }
         self.draw_note(g, v, s, p.msg);
