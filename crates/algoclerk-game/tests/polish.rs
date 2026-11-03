@@ -343,3 +343,26 @@ fn a_card_can_be_cleared_and_rebuilt_with_chips_alone() {
     tap(&mut g, "<-");
     assert_eq!(line(&mut g), "total".trim_end_matches('l'));
 }
+
+#[test]
+fn every_card_icon_exists_in_the_art_bank() {
+    use algoclerk_media::{ArtBank, Assets};
+    let bank = ArtBank::load(&Assets::embedded()).expect("art loads");
+    let icons: Vec<String> = bank.names("icons").iter().map(|s| s.to_string()).collect();
+    let mut seen = std::collections::BTreeSet::new();
+    for l in algoclerk_levels::Campaign::shipped().all_levels() {
+        let p = algoclerk_game::session::parse_with_prelude(&l.prelude, &l.reference).unwrap();
+        for r in algoclerk_game::blocks::rows(&p) {
+            seen.insert(r.icon);
+        }
+    }
+    assert!(seen.len() >= 5, "{seen:?}");
+    for icon in seen {
+        assert!(
+            icons
+                .iter()
+                .any(|i| i == icon || i.ends_with(&format!("/{icon}"))),
+            "the card icon {icon} is not in the art bank: {icons:?}"
+        );
+    }
+}
